@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Users, Calendar, Activity } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -9,6 +10,8 @@ import { AIInsightsCard } from "@/components/dashboard/AIInsightsCard";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { AIChatPanel } from "@/components/dashboard/AIChatPanel";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -16,105 +19,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
-// todo: remove mock functionality
-const mockChildren = [
-  {
-    firstName: "Luka",
-    lastName: "Beridze",
-    dateOfBirth: "2022-03-15",
-    diagnosis: "HIE",
-    severity: "moderate" as const,
-    gmfcsLevel: 2,
-    nextAppointment: "Dec 10, 2025 at 10:00 AM",
-    documentsCount: 12,
-    therapiesCount: 3,
-  },
-  {
-    firstName: "Mariam",
-    lastName: "Beridze",
-    dateOfBirth: "2022-03-15",
-    diagnosis: "HIE",
-    severity: "mild" as const,
-    gmfcsLevel: 1,
-    nextAppointment: "Dec 12, 2025 at 2:00 PM",
-    documentsCount: 8,
-    therapiesCount: 2,
-  },
-];
-
-const mockActivities = [
-  {
-    id: "1",
-    type: "document" as const,
-    title: "MRI Report Uploaded",
-    description: "Brain MRI scan from Tbilisi Medical Center",
-    timestamp: "2 hours ago",
-    status: "success" as const,
-  },
-  {
-    id: "2",
-    type: "ai_analysis" as const,
-    title: "AI Analysis Complete",
-    description: "Document analysis for EEG report finished",
-    timestamp: "5 hours ago",
-    status: "success" as const,
-  },
-  {
-    id: "3",
-    type: "therapy" as const,
-    title: "Therapy Session Logged",
-    description: "Physiotherapy session with Dr. Natia",
-    timestamp: "Yesterday",
-    status: "info" as const,
-  },
-  {
-    id: "4",
-    type: "email" as const,
-    title: "Email Sent",
-    description: "Inquiry to Boston Children's Hospital",
-    timestamp: "2 days ago",
-    status: "pending" as const,
-  },
-];
-
-const mockAppointments = [
-  {
-    id: "1",
-    title: "Physiotherapy Session",
-    provider: "Dr. Natia Gabisonia",
-    location: "Tbilisi Rehabilitation Center",
-    date: "Dec 10, 2025",
-    time: "10:00 AM",
-    type: "therapy" as const,
-  },
-  {
-    id: "2",
-    title: "Neurology Follow-up",
-    provider: "Dr. Giorgi Khabeishvili",
-    location: "Iashvili Children's Hospital",
-    date: "Dec 15, 2025",
-    time: "2:30 PM",
-    type: "medical" as const,
-  },
-];
-
-const mockInsights = [
-  {
-    id: "1",
-    title: "New Clinical Trial Available",
-    description: "A phase 2 trial for erythropoietin therapy matches your child's profile with 85% eligibility.",
-    priority: "high" as const,
-    actionLabel: "View Trial Details",
-  },
-  {
-    id: "2",
-    title: "Therapy Frequency Recommendation",
-    description: "Based on recent progress notes, increasing physiotherapy to 3x/week may accelerate motor development.",
-    priority: "medium" as const,
-    actionLabel: "Learn More",
-  },
-];
+import type { Child, Appointment, Document, Therapy } from "@shared/schema";
+import { format } from "date-fns";
 
 interface DashboardProps {
   user?: {
@@ -127,7 +33,208 @@ export default function Dashboard({ user }: DashboardProps) {
   const { t } = useLanguage();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
+  const { data: children, isLoading: childrenLoading } = useQuery<Child[]>({
+    queryKey: ['/api/children']
+  });
+
+  const { data: appointments, isLoading: appointmentsLoading } = useQuery<Appointment[]>({
+    queryKey: ['/api/appointments']
+  });
+
+  const { data: documents, isLoading: documentsLoading } = useQuery<Document[]>({
+    queryKey: ['/api/documents']
+  });
+
+  const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
+    queryKey: ['/api/therapies']
+  });
+
+  const isLoading = childrenLoading || appointmentsLoading || documentsLoading || therapiesLoading;
+
   const userName = user?.firstName || "Parent";
+
+  const getNextAppointmentForChild = (childId: number): string | undefined => {
+    if (!appointments) return undefined;
+    const childAppointments = appointments
+      .filter(apt => apt.childId === childId && new Date(apt.appointmentDate) > new Date())
+      .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
+    
+    if (childAppointments.length === 0) return undefined;
+    const nextApt = childAppointments[0];
+    return format(new Date(nextApt.appointmentDate), "MMM d, yyyy 'at' h:mm a");
+  };
+
+  const getDocumentsCountForChild = (childId: number): number => {
+    if (!documents) return 0;
+    return documents.filter(doc => doc.childId === childId).length;
+  };
+
+  const getTherapiesCountForChild = (childId: number): number => {
+    if (!therapies) return 0;
+    return therapies.filter(t => t.childId === childId && t.isActive).length;
+  };
+
+  const transformAppointments = () => {
+    if (!appointments) return [];
+    const now = new Date();
+    return appointments
+      .filter(apt => new Date(apt.appointmentDate) > now)
+      .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
+      .slice(0, 5)
+      .map(apt => ({
+        id: apt.id.toString(),
+        title: apt.title,
+        provider: apt.description || "",
+        location: apt.location || "",
+        date: format(new Date(apt.appointmentDate), "MMM d, yyyy"),
+        time: format(new Date(apt.appointmentDate), "h:mm a"),
+        type: (apt.status === "therapy" ? "therapy" : apt.status === "consultation" ? "consultation" : "medical") as "therapy" | "medical" | "consultation"
+      }));
+  };
+
+  const generateRecentActivities = () => {
+    const activities: Array<{
+      id: string;
+      type: "document" | "email" | "appointment" | "ai_analysis" | "therapy";
+      title: string;
+      description: string;
+      timestamp: string;
+      status: "success" | "pending" | "info";
+    }> = [];
+
+    if (documents && documents.length > 0) {
+      const recentDocs = [...documents]
+        .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime())
+        .slice(0, 2);
+      
+      recentDocs.forEach((doc, index) => {
+        activities.push({
+          id: `doc-${doc.id}`,
+          type: "document",
+          title: `${doc.title} Uploaded`,
+          description: doc.category || "Medical document",
+          timestamp: doc.uploadedAt ? format(new Date(doc.uploadedAt), "MMM d, yyyy") : "Recently",
+          status: doc.aiSummary ? "success" : "pending"
+        });
+      });
+    }
+
+    if (appointments && appointments.length > 0) {
+      const recentApts = [...appointments]
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 2);
+      
+      recentApts.forEach((apt) => {
+        activities.push({
+          id: `apt-${apt.id}`,
+          type: "appointment",
+          title: apt.title,
+          description: apt.location || "Upcoming appointment",
+          timestamp: format(new Date(apt.appointmentDate), "MMM d, yyyy"),
+          status: "info"
+        });
+      });
+    }
+
+    return activities.slice(0, 4);
+  };
+
+  const staticInsights = [
+    {
+      id: "1",
+      title: "Upload Documents for AI Analysis",
+      description: "Upload medical records, therapy notes, or assessments to get AI-powered insights and summaries.",
+      priority: "medium" as const,
+      actionLabel: "Upload Documents",
+    },
+    {
+      id: "2",
+      title: "Track Therapy Progress",
+      description: "Log therapy sessions regularly to monitor your child's developmental progress over time.",
+      priority: "low" as const,
+      actionLabel: "View Therapies",
+    },
+  ];
+
+  const upcomingAppointmentsCount = appointments?.filter(
+    apt => new Date(apt.appointmentDate) > new Date()
+  ).length || 0;
+
+  const activeTherapiesCount = therapies?.filter(t => t.isActive).length || 0;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-36" />
+            <Skeleton className="h-9 w-28" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-12 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div>
+              <Skeleton className="h-6 w-32 mb-4" />
+              <div className="grid md:grid-cols-2 gap-4">
+                {[...Array(2)].map((_, i) => (
+                  <Card key={i}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-12 w-12 rounded-full" />
+                        <div>
+                          <Skeleton className="h-5 w-32 mb-1" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-9 w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-5 w-24" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const childrenList = children || [];
+  const hasChildren = childrenList.length > 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -161,26 +268,25 @@ export default function Dashboard({ user }: DashboardProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Documents"
-          value={20}
+          value={documents?.length || 0}
           description="Across all children"
           icon={FileText}
-          trend={{ value: 12, isPositive: true }}
         />
         <StatCard
           title="Active Therapies"
-          value={5}
-          description="This month"
+          value={activeTherapiesCount}
+          description="Currently active"
           icon={Activity}
         />
         <StatCard
           title="Appointments"
-          value={mockAppointments.length}
-          description="Upcoming this week"
+          value={upcomingAppointmentsCount}
+          description="Upcoming"
           icon={Calendar}
         />
         <StatCard
           title="Children"
-          value={mockChildren.length}
+          value={childrenList.length}
           icon={Users}
         />
       </div>
@@ -189,21 +295,44 @@ export default function Dashboard({ user }: DashboardProps) {
         <div className="lg:col-span-2 space-y-6">
           <div>
             <h2 className="text-lg font-semibold mb-4">{t("childProfile")}s</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              {mockChildren.map((child, i) => (
-                <ChildCard
-                  key={i}
-                  {...child}
-                  onClick={() => console.log("View child:", child.firstName)}
-                />
-              ))}
-            </div>
+            {hasChildren ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                {childrenList.map((child) => (
+                  <ChildCard
+                    key={child.id}
+                    firstName={child.firstName}
+                    lastName={child.lastName}
+                    dateOfBirth={child.dateOfBirth || ""}
+                    diagnosis={child.diagnosis || "Not specified"}
+                    severity="moderate"
+                    nextAppointment={getNextAppointmentForChild(child.id)}
+                    documentsCount={getDocumentsCountForChild(child.id)}
+                    therapiesCount={getTherapiesCountForChild(child.id)}
+                    onClick={() => console.log("View child:", child.firstName)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No children added yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Add your child's profile to start tracking their medical journey
+                  </p>
+                  <Button className="gap-2" data-testid="button-add-child-empty">
+                    <Plus className="h-4 w-4" />
+                    Add Child
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <RecentActivity activities={mockActivities} />
+            <RecentActivity activities={generateRecentActivities()} />
             <UpcomingAppointments
-              appointments={mockAppointments}
+              appointments={transformAppointments()}
               onAddAppointment={() => console.log("Add appointment")}
             />
           </div>
@@ -211,10 +340,12 @@ export default function Dashboard({ user }: DashboardProps) {
 
         <div className="space-y-6">
           <AIInsightsCard
-            insights={mockInsights}
+            insights={staticInsights}
             onViewInsight={(id) => console.log("View insight:", id)}
           />
-          <AIChatPanel childName={mockChildren[0]?.firstName} />
+          {hasChildren && (
+            <AIChatPanel childName={childrenList[0]?.firstName} />
+          )}
         </div>
       </div>
     </div>

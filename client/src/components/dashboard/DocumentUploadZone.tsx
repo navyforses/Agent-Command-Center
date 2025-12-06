@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, Image, File, X, Check, Loader2 } from "lucide-react";
+import { Upload, FileText, Image, File, X, Check, Loader2, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
   id: string;
@@ -11,15 +13,18 @@ interface UploadedFile {
   type: string;
   status: "uploading" | "processing" | "complete" | "error";
   progress: number;
+  file: File;
+  errorMessage?: string;
 }
 
 interface DocumentUploadZoneProps {
-  onFilesSelected?: (files: File[]) => void;
+  onUploadComplete?: () => void;
 }
 
-export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps) {
+export function DocumentUploadZone({ onUploadComplete }: DocumentUploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,7 +36,7 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
     setIsDragOver(false);
   }, []);
 
-  const simulateUpload = (file: File) => {
+  const uploadFile = async (file: File) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newFile: UploadedFile = {
       id,
@@ -40,44 +45,108 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
       type: file.type,
       status: "uploading",
       progress: 0,
+      file,
     };
     
     setUploadedFiles((prev) => [...prev, newFile]);
-    
-    // todo: remove mock functionality - simulate upload progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
+
+    try {
       setUploadedFiles((prev) =>
-        prev.map((f) =>
-          f.id === id
-            ? { ...f, progress, status: progress >= 100 ? "processing" : "uploading" }
-            : f
-        )
+        prev.map((f) => f.id === id ? { ...f, progress: 10, status: "uploading" } : f)
       );
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setUploadedFiles((prev) =>
-            prev.map((f) => (f.id === id ? { ...f, status: "complete" } : f))
-          );
-        }, 1500);
+
+      const uploadUrlResponse = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = await uploadUrlResponse.json();
+
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, progress: 30 } : f)
+      );
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
       }
-    }, 200);
+
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, progress: 70, status: "processing" } : f)
+      );
+
+      const url = new URL(uploadURL);
+      const filePath = url.pathname;
+
+      await apiRequest("POST", "/api/objects/acl", {
+        uploadURL: uploadURL,
+        aclPolicy: {
+          visibility: "private",
+        },
+      });
+
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, progress: 85 } : f)
+      );
+
+      const category = getCategoryFromFileType(file.type, file.name);
+
+      await apiRequest("POST", "/api/documents", {
+        title: file.name,
+        category,
+        filePath,
+        fileType: file.type,
+        fileSize: file.size,
+      });
+
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, progress: 100, status: "complete" } : f)
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Upload failed";
+      
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, status: "error", errorMessage } : f)
+      );
+      
+      toast({
+        title: "Upload Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getCategoryFromFileType = (mimeType: string, fileName: string): string => {
+    const lowerName = fileName.toLowerCase();
+    
+    if (lowerName.includes("mri") || lowerName.includes("scan")) return "mri";
+    if (lowerName.includes("eeg")) return "eeg";
+    if (lowerName.includes("blood") || lowerName.includes("lab")) return "blood_test";
+    if (lowerName.includes("therapy") || lowerName.includes("pt") || lowerName.includes("ot")) return "therapy_report";
+    if (lowerName.includes("discharge") || lowerName.includes("summary")) return "discharge_summary";
+    if (lowerName.includes("prescription") || lowerName.includes("rx")) return "prescription";
+    
+    return "other";
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    files.forEach(simulateUpload);
-    onFilesSelected?.(files);
-  }, [onFilesSelected]);
+    files.forEach(uploadFile);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(simulateUpload);
-    onFilesSelected?.(files);
+    files.forEach(uploadFile);
   };
 
   const removeFile = (id: string) => {
@@ -95,6 +164,9 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const allComplete = uploadedFiles.length > 0 && 
+    uploadedFiles.every((f) => f.status === "complete" || f.status === "error");
 
   return (
     <Card>
@@ -138,7 +210,9 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
               return (
                 <div
                   key={file.id}
-                  className="flex items-center gap-3 p-3 rounded-md bg-accent/30"
+                  className={`flex items-center gap-3 p-3 rounded-md ${
+                    file.status === "error" ? "bg-destructive/10" : "bg-accent/30"
+                  }`}
                   data-testid={`uploaded-file-${file.id}`}
                 >
                   <FileIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -147,6 +221,9 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
                     <p className="text-xs text-muted-foreground">{formatSize(file.size)}</p>
                     {file.status === "uploading" && (
                       <Progress value={file.progress} className="h-1 mt-1" />
+                    )}
+                    {file.status === "error" && file.errorMessage && (
+                      <p className="text-xs text-destructive mt-1">{file.errorMessage}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -159,10 +236,12 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
                     {file.status === "complete" && (
                       <Check className="h-4 w-4 text-chart-2" />
                     )}
+                    {file.status === "error" && (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
                       onClick={() => removeFile(file.id)}
                       data-testid={`button-remove-file-${file.id}`}
                     >
@@ -173,6 +252,16 @@ export function DocumentUploadZone({ onFilesSelected }: DocumentUploadZoneProps)
               );
             })}
           </div>
+        )}
+
+        {allComplete && (
+          <Button
+            className="w-full"
+            onClick={onUploadComplete}
+            data-testid="button-done-uploading"
+          >
+            Done
+          </Button>
         )}
       </CardContent>
     </Card>

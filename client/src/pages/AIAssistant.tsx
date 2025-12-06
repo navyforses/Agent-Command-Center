@@ -1,10 +1,14 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { ChatMessage } from "@shared/schema";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bot,
   Send,
@@ -44,18 +48,51 @@ const suggestedPrompts = [
   "Explain the GMFCS levels and what they mean",
 ];
 
+function transformChatMessage(chatMessage: ChatMessage): Message {
+  return {
+    id: chatMessage.id.toString(),
+    role: chatMessage.role as "user" | "assistant",
+    content: chatMessage.content,
+    timestamp: chatMessage.createdAt ? new Date(chatMessage.createdAt) : new Date(),
+  };
+}
+
 export default function AIAssistant() {
   const { language, t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = (message?: string) => {
+  const { data: chatHistory, isLoading: historyLoading } = useQuery<ChatMessage[]>({
+    queryKey: ['/api/chat/messages']
+  });
+
+  useEffect(() => {
+    if (chatHistory) {
+      const sortedHistory = [...chatHistory].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+      setMessages(sortedHistory.map(transformChatMessage));
+    }
+  }, [chatHistory]);
+
+  const sendMessage = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await apiRequest('POST', '/api/chat', { content });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/messages'] });
+    }
+  });
+
+  const handleSend = async (message?: string) => {
     const text = message || input;
     if (!text.trim()) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `temp-user-${Date.now()}`,
       role: "user",
       content: text,
       timestamp: new Date(),
@@ -63,31 +100,19 @@ export default function AIAssistant() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setIsLoading(true);
 
-    // todo: remove mock functionality - simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+    try {
+      await sendMessage.mutateAsync(text);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
         role: "assistant",
-        content: `Thank you for your question. Based on the medical literature and your child's records, I can provide some insights about "${text}".
-
-This is a demonstration response. In the full application, I would:
-- Analyze your uploaded documents
-- Search relevant medical databases
-- Provide personalized recommendations based on your child's specific condition
-- Offer translations in both English and Georgian
-
-Would you like me to elaborate on any specific aspect?`,
+        content: "I apologize, but I encountered an error processing your request. Please try again.",
         timestamp: new Date(),
-        sources: [
-          { title: "PubMed: HIE Treatment Guidelines 2024", type: "research" },
-          { title: "Luka's MRI Report - Nov 2025", type: "document" },
-        ],
       };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 2000);
+      setMessages((prev) => [...prev, errorMessage]);
+    }
   };
 
   const handleQuickAction = (action: typeof quickActions[0]) => {
@@ -100,6 +125,34 @@ Would you like me to elaborate on any specific aspect?`,
     };
     handleSend(promptMap[action.label] || action.label);
   };
+
+  if (historyLoading) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-4rem)]">
+        <div className="p-6 pb-0">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary rounded-md">
+                <Bot className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <Skeleton className="h-8 w-40 mb-2" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            </div>
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </div>
+        <div className="flex-1 p-6">
+          <div className="space-y-4 max-w-3xl mx-auto">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-3/4 ml-auto" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -199,7 +252,7 @@ Would you like me to elaborate on any specific aspect?`,
                   </Card>
                 </div>
               ))}
-              {isLoading && (
+              {sendMessage.isPending && (
                 <div className="flex gap-4">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary text-primary-foreground">
@@ -233,11 +286,11 @@ Would you like me to elaborate on any specific aspect?`,
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t("typeMessage")}
-            disabled={isLoading}
+            disabled={sendMessage.isPending}
             className="flex-1"
             data-testid="input-ai-message"
           />
-          <Button type="submit" disabled={!input.trim() || isLoading} data-testid="button-send-ai-message">
+          <Button type="submit" disabled={!input.trim() || sendMessage.isPending} data-testid="button-send-ai-message">
             <Send className="h-4 w-4" />
           </Button>
         </form>
