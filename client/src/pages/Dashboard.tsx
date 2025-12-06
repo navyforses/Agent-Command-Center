@@ -10,6 +10,7 @@ import { AIInsightsCard } from "@/components/dashboard/AIInsightsCard";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { AIChatPanel } from "@/components/dashboard/AIChatPanel";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -22,15 +23,9 @@ import {
 import type { Child, Appointment, Document, Therapy } from "@shared/schema";
 import { format } from "date-fns";
 
-interface DashboardProps {
-  user?: {
-    firstName?: string;
-    lastName?: string;
-  };
-}
-
-export default function Dashboard({ user }: DashboardProps) {
+export default function Dashboard() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const { data: children, isLoading: childrenLoading } = useQuery<Child[]>({

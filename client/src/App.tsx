@@ -9,6 +9,9 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppSidebar } from "@/components/shared/AppSidebar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { LogIn, LogOut } from "lucide-react";
 import Dashboard from "@/pages/Dashboard";
 import ChildProfile from "@/pages/ChildProfile";
 import Documents from "@/pages/Documents";
@@ -37,34 +40,69 @@ function Router() {
   );
 }
 
-function App() {
+function AuthButton() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (isAuthenticated && user) {
+    return (
+      <a href="/api/logout">
+        <Button variant="ghost" size="sm" className="gap-2" data-testid="button-logout">
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">{user.firstName || user.email}</span>
+        </Button>
+      </a>
+    );
+  }
+
+  return (
+    <a href="/api/login">
+      <Button variant="default" size="sm" className="gap-2" data-testid="button-login">
+        <LogIn className="h-4 w-4" />
+        <span className="hidden sm:inline">Sign In</span>
+      </Button>
+    </a>
+  );
+}
+
+function AppContent() {
   const sidebarStyle = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
   };
 
   return (
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 min-w-0">
+          <header className="flex items-center justify-between gap-2 p-2 border-b bg-background sticky top-0 z-50">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-1">
+              <AuthButton />
+              <LanguageToggle />
+              <ThemeToggle />
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto">
+            <Router />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
           <TooltipProvider>
-            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <header className="flex items-center justify-between gap-2 p-2 border-b bg-background sticky top-0 z-50">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex items-center gap-1">
-                      <LanguageToggle />
-                      <ThemeToggle />
-                    </div>
-                  </header>
-                  <main className="flex-1 overflow-auto">
-                    <Router />
-                  </main>
-                </div>
-              </div>
-            </SidebarProvider>
+            <AppContent />
             <Toaster />
           </TooltipProvider>
         </LanguageProvider>
