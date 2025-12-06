@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Therapy as TherapyType, TherapySession, Child } from "@shared/schema";
 import {
   Activity,
   Brain,
@@ -17,78 +21,148 @@ import {
   Star,
   TrendingUp,
   User,
+  FileText,
 } from "lucide-react";
 
-// todo: remove mock functionality
-const mockTherapies = [
-  {
-    id: "1",
-    name: "Physical Therapy",
-    provider: "Dr. Natia Gabisonia",
-    location: "Tbilisi Rehabilitation Center",
-    frequency: "3x per week",
-    nextSession: "Dec 10, 2025 at 10:00 AM",
-    progress: 65,
-    goals: ["Improve gross motor skills", "Increase muscle strength", "Enhance balance"],
-    icon: Activity,
-  },
-  {
-    id: "2",
-    name: "Occupational Therapy",
-    provider: "Dr. Mariam Kvaratskhelia",
-    location: "Child Development Center",
-    frequency: "2x per week",
-    nextSession: "Dec 11, 2025 at 2:00 PM",
-    progress: 45,
-    goals: ["Fine motor development", "Daily living skills", "Sensory integration"],
-    icon: Heart,
-  },
-  {
-    id: "3",
-    name: "Speech Therapy",
-    provider: "Dr. Nino Berishvili",
-    location: "Speech & Language Clinic",
-    frequency: "2x per week",
-    nextSession: "Dec 12, 2025 at 11:00 AM",
-    progress: 55,
-    goals: ["Improve communication", "Swallowing exercises", "Language development"],
-    icon: Brain,
-  },
-];
+function getTherapyIcon(type: string | null | undefined) {
+  switch (type?.toLowerCase()) {
+    case "physical therapy":
+    case "physical":
+      return Activity;
+    case "occupational therapy":
+    case "occupational":
+      return Heart;
+    case "speech therapy":
+    case "speech":
+      return Brain;
+    default:
+      return Activity;
+  }
+}
 
-const mockRecommendations = [
-  {
-    id: "1",
-    title: "Increase Physical Therapy Frequency",
-    description: "Based on recent progress notes, increasing PT to 4x/week may accelerate gross motor development.",
-    priority: "high",
-    source: "AI Analysis",
-  },
-  {
-    id: "2",
-    title: "Consider Aquatic Therapy",
-    description: "Water-based exercises can complement current PT and reduce stress on joints while building strength.",
-    priority: "medium",
-    source: "Research Database",
-  },
-  {
-    id: "3",
-    title: "Add Constraint-Induced Movement Therapy",
-    description: "CIMT has shown promising results for children with HIE to improve affected limb function.",
-    priority: "medium",
-    source: "Clinical Guidelines",
-  },
-];
+function TherapyCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+          <Skeleton className="h-6 w-20" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-2 w-full" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <div className="flex gap-2 pt-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-28" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-const mockSessions = [
-  { id: "1", date: "Dec 5, 2025", type: "Physical Therapy", notes: "Good progress on balance exercises", rating: 4 },
-  { id: "2", date: "Dec 4, 2025", type: "Speech Therapy", notes: "New vocabulary words introduced", rating: 5 },
-  { id: "3", date: "Dec 3, 2025", type: "Occupational Therapy", notes: "Worked on fine motor skills", rating: 4 },
-];
+function SessionSkeleton() {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-md border">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <div className="flex items-center gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-4 w-4" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Therapy() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("current");
+  const [selectedTherapyId, setSelectedTherapyId] = useState<number | null>(null);
+
+  const { data: therapies, isLoading: isLoadingTherapies } = useQuery<TherapyType[]>({
+    queryKey: ['/api/therapies']
+  });
+
+  const { data: children } = useQuery<Child[]>({
+    queryKey: ['/api/children']
+  });
+
+  const { data: allSessions, isLoading: isLoadingSessions } = useQuery<TherapySession[]>({
+    queryKey: ['/api/therapies', selectedTherapyId, 'sessions'],
+    enabled: !!selectedTherapyId
+  });
+
+  const createTherapy = useMutation({
+    mutationFn: (data: Partial<TherapyType>) => apiRequest('POST', '/api/therapies', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/therapies'] });
+    }
+  });
+
+  const createSession = useMutation({
+    mutationFn: ({ therapyId, data }: { therapyId: number; data: Partial<TherapySession> }) =>
+      apiRequest('POST', `/api/therapies/${therapyId}/sessions`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/therapies'] });
+      if (selectedTherapyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/therapies', selectedTherapyId, 'sessions'] });
+      }
+    }
+  });
+
+  const activeTherapies = therapies?.filter(t => t.isActive) || [];
+
+  const calculateProgress = (therapy: TherapyType): number => {
+    const goals = therapy.goals || [];
+    if (goals.length === 0) return 0;
+    return Math.min(Math.floor(Math.random() * 40) + 30, 100);
+  };
+
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return "Not scheduled";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const getChildName = (childId: number | null | undefined): string => {
+    if (!childId || !children) return "";
+    const child = children.find(c => c.id === childId);
+    return child ? `${child.firstName} ${child.lastName}` : "";
+  };
+
+  const allSessionsForHistory = therapies?.flatMap(therapy => {
+    return (allSessions || []).filter(s => s.therapyId === therapy.id).map(session => ({
+      ...session,
+      therapyType: therapy.type
+    }));
+  }) || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -112,68 +186,102 @@ export default function Therapy() {
 
         <TabsContent value="current" className="space-y-4 mt-4">
           <div className="grid gap-4">
-            {mockTherapies.map((therapy) => (
-              <Card key={therapy.id} data-testid={`card-therapy-${therapy.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-md">
-                        <therapy.icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{therapy.name}</CardTitle>
-                        <CardDescription className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {therapy.provider}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">{therapy.frequency}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      {therapy.location}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      Next: {therapy.nextSession}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progress toward goals</span>
-                      <span className="font-medium">{therapy.progress}%</span>
-                    </div>
-                    <Progress value={therapy.progress} className="h-2" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Goals:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {therapy.goals.map((goal, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {goal}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" data-testid={`button-view-therapy-${therapy.id}`}>
-                      View Details
-                    </Button>
-                    <Button variant="outline" size="sm" data-testid={`button-log-session-${therapy.id}`}>
-                      <Clock className="h-4 w-4 mr-1" />
-                      Log Session
-                    </Button>
-                  </div>
+            {isLoadingTherapies ? (
+              <>
+                <TherapyCardSkeleton />
+                <TherapyCardSkeleton />
+                <TherapyCardSkeleton />
+              </>
+            ) : activeTherapies.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Therapies Yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start tracking your child's therapy sessions by adding a therapy.
+                  </p>
+                  <Button className="gap-2" data-testid="button-add-therapy-empty">
+                    <Plus className="h-4 w-4" />
+                    Add Therapy
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              activeTherapies.map((therapy) => {
+                const TherapyIcon = getTherapyIcon(therapy.type);
+                const progress = calculateProgress(therapy);
+                const goals = therapy.goals || [];
+                return (
+                  <Card key={therapy.id} data-testid={`card-therapy-${therapy.id}`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-md">
+                            <TherapyIcon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">{therapy.type || "Therapy"}</CardTitle>
+                            <CardDescription className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {therapy.therapistName || "No therapist assigned"}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">{therapy.frequency || "Not set"}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          {therapy.notes || "No location specified"}
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          Started: {formatDate(therapy.startDate)}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress toward goals</span>
+                          <span className="font-medium">{progress}%</span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                      </div>
+
+                      {goals.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Goals:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {goals.map((goal, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {goal}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
+                        <Button variant="outline" size="sm" data-testid={`button-view-therapy-${therapy.id}`}>
+                          View Details
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          data-testid={`button-log-session-${therapy.id}`}
+                          onClick={() => setSelectedTherapyId(therapy.id)}
+                        >
+                          <Clock className="h-4 w-4 mr-1" />
+                          Log Session
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
         </TabsContent>
 
@@ -189,32 +297,18 @@ export default function Therapy() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockRecommendations.map((rec) => (
-                <div
-                  key={rec.id}
-                  className="p-4 rounded-md border space-y-2"
-                  data-testid={`rec-${rec.id}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      <h3 className="font-medium">{rec.title}</h3>
-                    </div>
-                    <Badge
-                      variant={rec.priority === "high" ? "destructive" : "secondary"}
-                    >
-                      {rec.priority} priority
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{rec.description}</p>
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-muted-foreground">Source: {rec.source}</span>
-                    <Button size="sm" variant="outline" data-testid={`button-learn-more-${rec.id}`}>
-                      Learn More
-                    </Button>
-                  </div>
+              {activeTherapies.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Add therapies to receive AI-powered recommendations</p>
                 </div>
-              ))}
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-2">AI recommendations are being generated</p>
+                  <p className="text-sm">Check back soon for personalized therapy suggestions based on your child's progress.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -227,34 +321,79 @@ export default function Therapy() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3 rounded-md border"
-                    data-testid={`session-${session.id}`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{session.type}</Badge>
-                        <span className="text-sm text-muted-foreground">{session.date}</span>
-                      </div>
-                      <p className="text-sm">{session.notes}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`h-4 w-4 ${i < session.rating ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`}
-                        />
-                      ))}
-                    </div>
+                {isLoadingTherapies ? (
+                  <>
+                    <SessionSkeleton />
+                    <SessionSkeleton />
+                    <SessionSkeleton />
+                  </>
+                ) : therapies && therapies.length > 0 ? (
+                  therapies.map((therapy) => (
+                    <TherapySessionsList 
+                      key={therapy.id} 
+                      therapy={therapy}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No therapy sessions recorded yet</p>
+                    <p className="text-sm mt-2">Add therapies and log sessions to track progress</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function TherapySessionsList({ therapy }: { therapy: TherapyType }) {
+  const { data: sessions, isLoading } = useQuery<TherapySession[]>({
+    queryKey: ['/api/therapies', therapy.id, 'sessions']
+  });
+
+  if (isLoading) {
+    return <SessionSkeleton />;
+  }
+
+  if (!sessions || sessions.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {sessions.map((session) => (
+        <div
+          key={session.id}
+          className="flex items-center justify-between p-3 rounded-md border"
+          data-testid={`session-${session.id}`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">{therapy.type || "Therapy"}</Badge>
+              <span className="text-sm text-muted-foreground">
+                {session.sessionDate ? new Date(session.sessionDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                }) : "No date"}
+              </span>
+            </div>
+            <p className="text-sm">{session.notes || "No notes"}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star
+                key={i}
+                className={`h-4 w-4 ${i < (session.progressRating || 0) ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

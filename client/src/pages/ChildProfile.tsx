@@ -1,72 +1,49 @@
 import { useState } from "react";
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  User,
   Calendar,
   Activity,
   FileText,
   Brain,
-  Eye,
-  Ear,
-  Zap,
   Edit,
   Plus,
-  CheckCircle,
-  Circle,
-  Clock,
+  AlertCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-// todo: remove mock functionality
-const mockChild = {
-  firstName: "Luka",
-  lastName: "Beridze",
-  dateOfBirth: "2022-03-15",
-  gestationalAge: 38,
-  birthWeight: 3200,
-  apgarOneMin: 3,
-  apgarFiveMin: 6,
-  primaryDiagnosis: "HIE",
-  severity: "moderate",
-  sarnatStage: 2,
-  additionalDx: ["Developmental Delay", "Hypotonia"],
-  gmfcsLevel: 2,
-  cfcsLevel: 2,
-  edacsLevel: 2,
-  visionStatus: "Cortical Visual Impairment - Mild",
-  hearingStatus: "Normal",
-  seizureStatus: "Controlled with medication",
-};
-
-const mockTherapies = [
-  { type: "Physiotherapy", provider: "Dr. Natia Gabisonia", frequency: "3x/week", isActive: true },
-  { type: "Occupational Therapy", provider: "Maia Lomidze", frequency: "2x/week", isActive: true },
-  { type: "Speech Therapy", provider: "Nino Kvirikashvili", frequency: "2x/week", isActive: true },
-  { type: "Hydrotherapy", provider: "Aqua Therapy Center", frequency: "1x/week", isActive: false },
-];
-
-const mockMilestones = [
-  { category: "Motor", description: "Holds head steady", status: "achieved", achievedDate: "Sep 2022" },
-  { category: "Motor", description: "Rolls over", status: "achieved", achievedDate: "Jan 2023" },
-  { category: "Motor", description: "Sits with support", status: "achieved", achievedDate: "Jun 2023" },
-  { category: "Motor", description: "Sits independently", status: "in_progress", expectedDate: "Dec 2025" },
-  { category: "Motor", description: "Crawling", status: "not_started", expectedDate: "Mar 2026" },
-  { category: "Cognitive", description: "Responds to name", status: "achieved", achievedDate: "Aug 2023" },
-  { category: "Cognitive", description: "Object permanence", status: "in_progress", expectedDate: "Jan 2026" },
-  { category: "Speech", description: "Babbling", status: "achieved", achievedDate: "Dec 2022" },
-  { category: "Speech", description: "First words", status: "in_progress", expectedDate: "Feb 2026" },
-];
+import { Link } from "wouter";
+import type { Child, Therapy, Document } from "@shared/schema";
 
 export default function ChildProfile() {
   const { t } = useLanguage();
+  const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState("overview");
 
-  const calculateAge = (dob: string) => {
+  const { data: child, isLoading: childLoading, error: childError } = useQuery<Child>({
+    queryKey: ['/api/children', id],
+    enabled: !!id,
+  });
+
+  const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
+    queryKey: ['/api/children', id, 'therapies'],
+    enabled: !!id,
+  });
+
+  const { data: documents, isLoading: documentsLoading } = useQuery<Document[]>({
+    queryKey: ['/api/children', id, 'documents'],
+    enabled: !!id,
+  });
+
+  const calculateAge = (dob: string | null) => {
+    if (!dob) return "Unknown";
     const birthDate = new Date(dob);
     const today = new Date();
     const years = today.getFullYear() - birthDate.getFullYear();
@@ -78,16 +55,74 @@ export default function ChildProfile() {
     return `${years} years, ${months >= 0 ? months : 12 + months} months (${totalMonths} months)`;
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "achieved": return <CheckCircle className="h-4 w-4 text-chart-2" />;
-      case "in_progress": return <Clock className="h-4 w-4 text-chart-4" />;
-      default: return <Circle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
+  const activeTherapiesCount = therapies?.filter((t) => t.isActive).length ?? 0;
+  const documentsCount = documents?.length ?? 0;
 
-  const achievedCount = mockMilestones.filter(m => m.status === "achieved").length;
-  const progressPercent = (achievedCount / mockMilestones.length) * 100;
+  if (childLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-16 w-16 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-32" />
+              <div className="flex gap-2 mt-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-6 w-24" />
+              </div>
+            </div>
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-96" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-md" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (childError || !child) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <AlertCircle className="h-12 w-12 text-muted-foreground" />
+              <div>
+                <h2 className="text-xl font-semibold">Child Not Found</h2>
+                <p className="text-muted-foreground mt-1">
+                  The child profile you're looking for doesn't exist or you don't have access to it.
+                </p>
+              </div>
+              <Link href="/">
+                <Button variant="outline" className="gap-2" data-testid="button-back-dashboard">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -95,16 +130,22 @@ export default function ChildProfile() {
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarFallback className="bg-primary text-primary-foreground text-xl font-semibold">
-              {mockChild.firstName[0]}{mockChild.lastName[0]}
+              {child.firstName?.[0] ?? ""}{child.lastName?.[0] ?? ""}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-2xl font-bold">{mockChild.firstName} {mockChild.lastName}</h1>
-            <p className="text-muted-foreground">{calculateAge(mockChild.dateOfBirth)}</p>
+            <h1 className="text-2xl font-bold" data-testid="text-child-name">
+              {child.firstName} {child.lastName}
+            </h1>
+            <p className="text-muted-foreground" data-testid="text-child-age">
+              {calculateAge(child.dateOfBirth)}
+            </p>
             <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="default">{mockChild.severity} {mockChild.primaryDiagnosis}</Badge>
-              <Badge variant="outline">GMFCS Level {mockChild.gmfcsLevel}</Badge>
-              <Badge variant="outline">Sarnat Stage {mockChild.sarnatStage}</Badge>
+              {child.diagnosis && (
+                <Badge variant="default" data-testid="badge-diagnosis">
+                  {child.diagnosis}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -119,7 +160,7 @@ export default function ChildProfile() {
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="medical" data-testid="tab-medical">Medical Info</TabsTrigger>
           <TabsTrigger value="therapies" data-testid="tab-therapies">Therapies</TabsTrigger>
-          <TabsTrigger value="milestones" data-testid="tab-milestones">{t("milestones")}</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
@@ -132,7 +173,11 @@ export default function ChildProfile() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Birth Date</p>
-                    <p className="font-medium">{new Date(mockChild.dateOfBirth).toLocaleDateString()}</p>
+                    <p className="font-medium" data-testid="text-birth-date">
+                      {child.dateOfBirth
+                        ? new Date(child.dateOfBirth).toLocaleDateString()
+                        : "Not set"}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -145,7 +190,13 @@ export default function ChildProfile() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Active Therapies</p>
-                    <p className="font-medium">{mockTherapies.filter(t => t.isActive).length}</p>
+                    <p className="font-medium" data-testid="text-active-therapies-count">
+                      {therapiesLoading ? (
+                        <Skeleton className="h-5 w-8 inline-block" />
+                      ) : (
+                        activeTherapiesCount
+                      )}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -158,7 +209,13 @@ export default function ChildProfile() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Documents</p>
-                    <p className="font-medium">12</p>
+                    <p className="font-medium" data-testid="text-documents-count">
+                      {documentsLoading ? (
+                        <Skeleton className="h-5 w-8 inline-block" />
+                      ) : (
+                        documentsCount
+                      )}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -170,115 +227,91 @@ export default function ChildProfile() {
                     <Brain className="h-5 w-5 text-chart-4" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Milestones</p>
-                    <p className="font-medium">{achievedCount}/{mockMilestones.length}</p>
+                    <p className="text-sm text-muted-foreground">Diagnosis Date</p>
+                    <p className="font-medium" data-testid="text-diagnosis-date">
+                      {child.diagnosisDate
+                        ? new Date(child.diagnosisDate).toLocaleDateString()
+                        : "Not set"}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Developmental Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Milestones achieved</span>
-                  <span className="font-medium">{Math.round(progressPercent)}%</span>
+          {child.notes && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground" data-testid="text-child-notes">
+                  {child.notes}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTherapiesCount > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Therapy Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Active therapies</span>
+                    <span className="font-medium">{activeTherapiesCount}</span>
+                  </div>
+                  <Progress value={(activeTherapiesCount / (therapies?.length || 1)) * 100} className="h-2" />
                 </div>
-                <Progress value={progressPercent} className="h-2" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="medical" className="mt-6">
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Birth Information</CardTitle>
+                <CardTitle className="text-lg">Diagnosis Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Gestational Age</span>
-                  <span className="font-medium">{mockChild.gestationalAge} weeks</span>
+                  <span className="text-muted-foreground">Primary Diagnosis</span>
+                  <span className="font-medium" data-testid="text-diagnosis">
+                    {child.diagnosis || "Not specified"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Birth Weight</span>
-                  <span className="font-medium">{mockChild.birthWeight}g</span>
+                  <span className="text-muted-foreground">Diagnosis Date</span>
+                  <span className="font-medium" data-testid="text-diagnosis-date-medical">
+                    {child.diagnosisDate
+                      ? new Date(child.diagnosisDate).toLocaleDateString()
+                      : "Not specified"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">APGAR (1 min)</span>
-                  <span className="font-medium">{mockChild.apgarOneMin}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">APGAR (5 min)</span>
-                  <span className="font-medium">{mockChild.apgarFiveMin}</span>
+                  <span className="text-muted-foreground">Date of Birth</span>
+                  <span className="font-medium">
+                    {child.dateOfBirth
+                      ? new Date(child.dateOfBirth).toLocaleDateString()
+                      : "Not specified"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Functional Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">GMFCS Level</span>
-                  <Badge variant="outline">Level {mockChild.gmfcsLevel}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">CFCS Level</span>
-                  <Badge variant="outline">Level {mockChild.cfcsLevel}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">EDACS Level</span>
-                  <Badge variant="outline">Level {mockChild.edacsLevel}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Sensory & Neurological</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Eye className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Vision</p>
-                    <p className="text-sm text-muted-foreground">{mockChild.visionStatus}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Ear className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Hearing</p>
-                    <p className="text-sm text-muted-foreground">{mockChild.hearingStatus}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Zap className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Seizures</p>
-                    <p className="text-sm text-muted-foreground">{mockChild.seizureStatus}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Additional Diagnoses</CardTitle>
+                <CardTitle className="text-lg">Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {mockChild.additionalDx.map((dx, i) => (
-                    <Badge key={i} variant="secondary">{dx}</Badge>
-                  ))}
-                </div>
+                {child.notes ? (
+                  <p className="text-muted-foreground">{child.notes}</p>
+                ) : (
+                  <p className="text-muted-foreground italic">No additional notes</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -292,67 +325,140 @@ export default function ChildProfile() {
               Add Therapy
             </Button>
           </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            {mockTherapies.map((therapy, i) => (
-              <Card key={i} data-testid={`therapy-card-${i}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-accent rounded-md">
-                        <Activity className="h-5 w-5 text-accent-foreground" />
+
+          {therapiesLoading ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 rounded-md" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-5 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium">{therapy.type}</h4>
-                        <p className="text-sm text-muted-foreground">{therapy.provider}</p>
-                        <p className="text-sm text-muted-foreground">{therapy.frequency}</p>
-                      </div>
+                      <Skeleton className="h-6 w-16" />
                     </div>
-                    <Badge variant={therapy.isActive ? "default" : "secondary"}>
-                      {therapy.isActive ? "Active" : "Paused"}
-                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : therapies && therapies.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              {therapies.map((therapy) => (
+                <Card key={therapy.id} data-testid={`therapy-card-${therapy.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-accent rounded-md">
+                          <Activity className="h-5 w-5 text-accent-foreground" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{therapy.type || "Therapy"}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {therapy.therapistName || "No therapist assigned"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {therapy.frequency || "No frequency set"}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={therapy.isActive ? "default" : "secondary"}>
+                        {therapy.isActive ? "Active" : "Paused"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center justify-center text-center space-y-3">
+                  <Activity className="h-10 w-10 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">No therapies yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Add a therapy to start tracking progress
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        <TabsContent value="milestones" className="mt-6">
+        <TabsContent value="documents" className="mt-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Developmental Milestones</h3>
-            <Button className="gap-2" data-testid="button-add-milestone">
+            <h3 className="text-lg font-semibold">Documents</h3>
+            <Button className="gap-2" data-testid="button-add-document">
               <Plus className="h-4 w-4" />
-              Add Milestone
+              Upload Document
             </Button>
           </div>
-          <div className="space-y-4">
-            {["Motor", "Cognitive", "Speech"].map((category) => (
-              <Card key={category}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{category}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {mockMilestones
-                      .filter((m) => m.category === category)
-                      .map((milestone, i) => (
-                        <div key={i} className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            {getStatusIcon(milestone.status)}
-                            <span className={milestone.status === "achieved" ? "" : "text-muted-foreground"}>
-                              {milestone.description}
-                            </span>
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            {milestone.status === "achieved" ? milestone.achievedDate : `Expected: ${milestone.expectedDate}`}
-                          </span>
-                        </div>
-                      ))}
+
+          {documentsLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Skeleton className="h-10 w-10 rounded-md" />
+                      <div className="space-y-1 flex-1">
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : documents && documents.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {documents.map((doc) => (
+                <Card key={doc.id} data-testid={`document-card-${doc.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-accent rounded-md">
+                        <FileText className="h-5 w-5 text-accent-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{doc.title}</h4>
+                        {doc.category && (
+                          <Badge variant="secondary" className="mt-1">
+                            {doc.category}
+                          </Badge>
+                        )}
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {doc.uploadedAt
+                            ? new Date(doc.uploadedAt).toLocaleDateString()
+                            : "Unknown date"}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center justify-center text-center space-y-3">
+                  <FileText className="h-10 w-10 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">No documents yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Upload medical documents to keep track of records
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
