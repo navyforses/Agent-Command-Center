@@ -14,6 +14,7 @@ import {
 import { openai, AI_MODEL } from "./openai";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { sendEmail } from "./resend";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -507,6 +508,23 @@ export async function registerRoutes(
       if (!parseResult.success) {
         return res.status(400).json({ message: "Invalid email data", errors: parseResult.error.errors });
       }
+      
+      // If status is 'sent', actually send the email via Resend
+      if (parseResult.data.status === 'sent' && parseResult.data.recipient && parseResult.data.subject && parseResult.data.body) {
+        const sendResult = await sendEmail({
+          to: parseResult.data.recipient,
+          subject: parseResult.data.subject,
+          body: parseResult.data.body,
+        });
+        
+        if (!sendResult.success) {
+          return res.status(500).json({ message: sendResult.error || "Failed to send email" });
+        }
+        
+        // Update sentAt timestamp
+        parseResult.data.sentAt = new Date();
+      }
+      
       const email = await storage.createEmail(parseResult.data);
       res.status(201).json(email);
     } catch (error) {
