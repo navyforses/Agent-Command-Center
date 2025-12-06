@@ -2,7 +2,15 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertChildSchema, insertDocumentSchema } from "@shared/schema";
+import { 
+  insertChildSchema, 
+  insertDocumentSchema,
+  insertTherapySchema,
+  insertTherapySessionSchema,
+  insertAppointmentSchema,
+  insertEmailSchema,
+  insertChatMessageSchema,
+} from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -206,6 +214,398 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching documents for child:", error);
       res.status(500).json({ message: "Failed to fetch documents for child" });
+    }
+  });
+
+  // Therapies routes
+  app.get("/api/therapies", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const therapies = await storage.getTherapies(userId);
+      res.json(therapies);
+    } catch (error) {
+      console.error("Error fetching therapies:", error);
+      res.status(500).json({ message: "Failed to fetch therapies" });
+    }
+  });
+
+  app.post("/api/therapies", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertTherapySchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid therapy data", errors: parseResult.error.errors });
+      }
+      const therapy = await storage.createTherapy(parseResult.data);
+      res.status(201).json(therapy);
+    } catch (error) {
+      console.error("Error creating therapy:", error);
+      res.status(500).json({ message: "Failed to create therapy" });
+    }
+  });
+
+  app.get("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid therapy ID" });
+      }
+      const therapy = await storage.getTherapy(id, userId);
+      if (!therapy) {
+        return res.status(404).json({ message: "Therapy not found" });
+      }
+      res.json(therapy);
+    } catch (error) {
+      console.error("Error fetching therapy:", error);
+      res.status(500).json({ message: "Failed to fetch therapy" });
+    }
+  });
+
+  app.patch("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid therapy ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertTherapySchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid therapy data", errors: parseResult.error.errors });
+      }
+      const therapy = await storage.updateTherapy(id, userId, parseResult.data);
+      if (!therapy) {
+        return res.status(404).json({ message: "Therapy not found" });
+      }
+      res.json(therapy);
+    } catch (error) {
+      console.error("Error updating therapy:", error);
+      res.status(500).json({ message: "Failed to update therapy" });
+    }
+  });
+
+  app.delete("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid therapy ID" });
+      }
+      const deleted = await storage.deleteTherapy(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Therapy not found" });
+      }
+      res.json({ message: "Therapy deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting therapy:", error);
+      res.status(500).json({ message: "Failed to delete therapy" });
+    }
+  });
+
+  // Get therapies for specific child
+  app.get("/api/children/:childId/therapies", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      if (isNaN(childId)) {
+        return res.status(400).json({ message: "Invalid child ID" });
+      }
+      const therapies = await storage.getTherapiesByChild(childId, userId);
+      res.json(therapies);
+    } catch (error) {
+      console.error("Error fetching therapies for child:", error);
+      res.status(500).json({ message: "Failed to fetch therapies for child" });
+    }
+  });
+
+  // Therapy Sessions routes
+  app.get("/api/therapies/:therapyId/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const therapyId = parseInt(req.params.therapyId, 10);
+      if (isNaN(therapyId)) {
+        return res.status(400).json({ message: "Invalid therapy ID" });
+      }
+      const sessions = await storage.getTherapySessions(therapyId, userId);
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching therapy sessions:", error);
+      res.status(500).json({ message: "Failed to fetch therapy sessions" });
+    }
+  });
+
+  app.post("/api/therapies/:therapyId/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const therapyId = parseInt(req.params.therapyId, 10);
+      if (isNaN(therapyId)) {
+        return res.status(400).json({ message: "Invalid therapy ID" });
+      }
+      const { therapyId: __, ...bodyWithoutTherapyId } = req.body;
+      const parseResult = insertTherapySessionSchema.safeParse({ ...bodyWithoutTherapyId, therapyId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid therapy session data", errors: parseResult.error.errors });
+      }
+      const session = await storage.createTherapySession(parseResult.data, userId);
+      if (!session) {
+        return res.status(404).json({ message: "Therapy not found" });
+      }
+      res.status(201).json(session);
+    } catch (error) {
+      console.error("Error creating therapy session:", error);
+      res.status(500).json({ message: "Failed to create therapy session" });
+    }
+  });
+
+  app.patch("/api/therapy-sessions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid therapy session ID" });
+      }
+      const { userId: _, therapyId: __, ...bodyWithoutSensitiveFields } = req.body;
+      const parseResult = insertTherapySessionSchema.partial().safeParse(bodyWithoutSensitiveFields);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid therapy session data", errors: parseResult.error.errors });
+      }
+      const session = await storage.updateTherapySession(id, userId, parseResult.data);
+      if (!session) {
+        return res.status(404).json({ message: "Therapy session not found" });
+      }
+      res.json(session);
+    } catch (error) {
+      console.error("Error updating therapy session:", error);
+      res.status(500).json({ message: "Failed to update therapy session" });
+    }
+  });
+
+  app.delete("/api/therapy-sessions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid therapy session ID" });
+      }
+      const deleted = await storage.deleteTherapySession(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Therapy session not found" });
+      }
+      res.json({ message: "Therapy session deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting therapy session:", error);
+      res.status(500).json({ message: "Failed to delete therapy session" });
+    }
+  });
+
+  // Appointments routes
+  app.get("/api/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const appointments = await storage.getAppointments(userId);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      res.status(500).json({ message: "Failed to fetch appointments" });
+    }
+  });
+
+  app.post("/api/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertAppointmentSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid appointment data", errors: parseResult.error.errors });
+      }
+      const appointment = await storage.createAppointment(parseResult.data);
+      res.status(201).json(appointment);
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      res.status(500).json({ message: "Failed to create appointment" });
+    }
+  });
+
+  app.get("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
+      const appointment = await storage.getAppointment(id, userId);
+      if (!appointment) {
+        return res.status(404).json({ message: "Appointment not found" });
+      }
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error fetching appointment:", error);
+      res.status(500).json({ message: "Failed to fetch appointment" });
+    }
+  });
+
+  app.patch("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertAppointmentSchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid appointment data", errors: parseResult.error.errors });
+      }
+      const appointment = await storage.updateAppointment(id, userId, parseResult.data);
+      if (!appointment) {
+        return res.status(404).json({ message: "Appointment not found" });
+      }
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error updating appointment:", error);
+      res.status(500).json({ message: "Failed to update appointment" });
+    }
+  });
+
+  app.delete("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
+      const deleted = await storage.deleteAppointment(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Appointment not found" });
+      }
+      res.json({ message: "Appointment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      res.status(500).json({ message: "Failed to delete appointment" });
+    }
+  });
+
+  // Emails routes
+  app.get("/api/emails", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const emails = await storage.getEmails(userId);
+      res.json(emails);
+    } catch (error) {
+      console.error("Error fetching emails:", error);
+      res.status(500).json({ message: "Failed to fetch emails" });
+    }
+  });
+
+  app.post("/api/emails", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertEmailSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid email data", errors: parseResult.error.errors });
+      }
+      const email = await storage.createEmail(parseResult.data);
+      res.status(201).json(email);
+    } catch (error) {
+      console.error("Error creating email:", error);
+      res.status(500).json({ message: "Failed to create email" });
+    }
+  });
+
+  app.get("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid email ID" });
+      }
+      const email = await storage.getEmail(id, userId);
+      if (!email) {
+        return res.status(404).json({ message: "Email not found" });
+      }
+      res.json(email);
+    } catch (error) {
+      console.error("Error fetching email:", error);
+      res.status(500).json({ message: "Failed to fetch email" });
+    }
+  });
+
+  app.patch("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid email ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertEmailSchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid email data", errors: parseResult.error.errors });
+      }
+      const email = await storage.updateEmail(id, userId, parseResult.data);
+      if (!email) {
+        return res.status(404).json({ message: "Email not found" });
+      }
+      res.json(email);
+    } catch (error) {
+      console.error("Error updating email:", error);
+      res.status(500).json({ message: "Failed to update email" });
+    }
+  });
+
+  app.delete("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid email ID" });
+      }
+      const deleted = await storage.deleteEmail(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Email not found" });
+      }
+      res.json({ message: "Email deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting email:", error);
+      res.status(500).json({ message: "Failed to delete email" });
+    }
+  });
+
+  // Chat Messages routes
+  app.get("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const messages = await storage.getChatMessages(userId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching chat messages:", error);
+      res.status(500).json({ message: "Failed to fetch chat messages" });
+    }
+  });
+
+  app.post("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertChatMessageSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid chat message data", errors: parseResult.error.errors });
+      }
+      const message = await storage.createChatMessage(parseResult.data);
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error creating chat message:", error);
+      res.status(500).json({ message: "Failed to create chat message" });
+    }
+  });
+
+  app.delete("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.clearChatMessages(userId);
+      res.json({ message: "Chat messages cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing chat messages:", error);
+      res.status(500).json({ message: "Failed to clear chat messages" });
     }
   });
 
