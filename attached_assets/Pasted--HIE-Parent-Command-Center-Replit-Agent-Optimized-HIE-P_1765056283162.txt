@@ -1,0 +1,1286 @@
+# 🏥 HIE Parent Command Center - Replit Agent Optimized
+
+## 🎯 პროექტის მიზანი
+
+შექმენი **HIE Parent Command Center** - ვებ აპლიკაცია Replit-ზე, რომელიც დაეხმარება HIE-ით დაავადებული ბავშვის მშობლებს. აპლიკაციას აქვს ჩაშენებული AI აგენტები თითოეულ მოდულში.
+
+---
+
+## 🛠️ Replit ტექნოლოგიური სტეკი
+
+```
+Frontend:
+├── Next.js 14 (App Router)
+├── TypeScript
+├── Tailwind CSS
+├── shadcn/ui components
+└── React Query
+
+Backend:
+├── Next.js API Routes
+├── Prisma ORM
+├── PostgreSQL (Replit Database)
+└── NextAuth.js
+
+AI Integration:
+├── OpenAI API (GPT-4)
+├── Anthropic Claude API
+├── LangChain.js
+└── Vercel AI SDK
+
+File Processing:
+├── Tesseract.js (OCR - browser-side)
+├── pdf-parse (PDF extraction)
+├── Sharp (image processing)
+└── Cloudinary (file storage)
+
+External APIs:
+├── ClinicalTrials.gov API
+├── PubMed E-utilities API
+├── Google Gmail API
+├── Google Calendar API
+└── SendGrid (email fallback)
+```
+
+---
+
+## 📁 პროექტის სტრუქტურა
+
+```
+/hie-command-center
+├── app/
+│   ├── (auth)/
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── (dashboard)/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx (Dashboard)
+│   │   ├── child-profile/
+│   │   │   ├── page.tsx
+│   │   │   └── [id]/page.tsx
+│   │   ├── documents/
+│   │   │   ├── page.tsx
+│   │   │   └── [id]/page.tsx
+│   │   ├── therapy-recommendations/
+│   │   │   └── page.tsx
+│   │   ├── clinical-trials/
+│   │   │   └── page.tsx
+│   │   ├── email-hub/
+│   │   │   └── page.tsx
+│   │   ├── calendar/
+│   │   │   └── page.tsx
+│   │   └── ai-assistant/
+│   │       └── page.tsx
+│   ├── api/
+│   │   ├── auth/[...nextauth]/route.ts
+│   │   ├── child-profile/route.ts
+│   │   ├── documents/
+│   │   │   ├── route.ts
+│   │   │   ├── upload/route.ts
+│   │   │   └── ocr/route.ts
+│   │   ├── ai/
+│   │   │   ├── therapy-recommendations/route.ts
+│   │   │   ├── document-analysis/route.ts
+│   │   │   ├── email-draft/route.ts
+│   │   │   ├── translate/route.ts
+│   │   │   └── chat/route.ts
+│   │   ├── clinical-trials/route.ts
+│   │   └── email/route.ts
+│   └── globals.css
+├── components/
+│   ├── ui/ (shadcn components)
+│   ├── dashboard/
+│   ├── child-profile/
+│   ├── documents/
+│   ├── ai-agents/
+│   │   ├── TherapyAgent.tsx
+│   │   ├── DocumentAgent.tsx
+│   │   ├── TrialAgent.tsx
+│   │   ├── EmailAgent.tsx
+│   │   └── AssistantAgent.tsx
+│   └── shared/
+├── lib/
+│   ├── prisma.ts
+│   ├── auth.ts
+│   ├── ai/
+│   │   ├── openai.ts
+│   │   ├── claude.ts
+│   │   ├── langchain.ts
+│   │   └── agents/
+│   │       ├── therapyAgent.ts
+│   │       ├── documentAgent.ts
+│   │       ├── trialAgent.ts
+│   │       └── emailAgent.ts
+│   ├── ocr/
+│   │   └── processor.ts
+│   └── external-apis/
+│       ├── clinicalTrials.ts
+│       ├── pubmed.ts
+│       └── gmail.ts
+├── prisma/
+│   └── schema.prisma
+├── types/
+│   └── index.ts
+└── .env
+```
+
+---
+
+## 🗄️ Prisma Schema
+
+```prisma
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  children      Child[]
+  documents     Document[]
+  emailThreads  EmailThread[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Child {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  
+  // ძირითადი ინფორმაცია
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime
+  gestationalAge    Int?     // კვირები
+  birthWeight       Int?     // გრამი
+  apgarOneMin       Int?
+  apgarFiveMin      Int?
+  
+  // დიაგნოზი
+  primaryDiagnosis  String   @default("HIE")
+  severity          String?  // mild, moderate, severe
+  sarnatStage       Int?     // 1, 2, 3
+  additionalDx      String[] // დამატებითი დიაგნოზები
+  
+  // ფუნქციონალური სტატუსი
+  gmfcsLevel        Int?     // I-V
+  cfcsLevel         Int?     // I-V
+  edacsLevel        Int?     // I-V
+  visionStatus      String?
+  hearingStatus     String?
+  seizureStatus     String?
+  
+  // დოკუმენტები და თერაპიები
+  documents         Document[]
+  therapies         Therapy[]
+  recommendations   AIRecommendation[]
+  milestones        Milestone[]
+  progressNotes     ProgressNote[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Document {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  childId         String?
+  child           Child?   @relation(fields: [childId], references: [id])
+  
+  // ფაილის ინფორმაცია
+  fileName        String
+  fileType        String   // pdf, image, etc.
+  fileUrl         String   // Cloudinary URL
+  fileSize        Int
+  
+  // დოკუმენტის ტიპი
+  documentType    String   // mri, eeg, blood_test, etc.
+  documentDate    DateTime?
+  sourceClinic    String?
+  sourceDoctor    String?
+  
+  // OCR და AI
+  ocrText         String?  @db.Text
+  ocrConfidence   Float?
+  aiSummary       String?  @db.Text
+  aiSummaryKa     String?  @db.Text  // ქართული შეჯამება
+  extractedData   Json?    // სტრუქტურირებული მონაცემები
+  
+  // მეტადატა
+  language        String   @default("en")
+  tags            String[]
+  isProcessed     Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Therapy {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id])
+  
+  type            String   // physiotherapy, speech, occupational, etc.
+  provider        String?
+  frequency       String?  // 2x/week
+  startDate       DateTime?
+  endDate         DateTime?
+  isActive        Boolean  @default(true)
+  notes           String?  @db.Text
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AIRecommendation {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id])
+  
+  // რეკომენდაციები
+  recommendations Json     // სრული რეკომენდაციების ობიექტი
+  priorityList    Json     // პრიორიტეტული თერაპიები
+  actionPlan      Json     // სამოქმედო გეგმა
+  eligibleTrials  Json?    // ელიგიბელური კვლევები
+  
+  // კონტექსტი
+  basedOnDocs     String[] // დოკუმენტების IDs
+  modelUsed       String   // gpt-4, claude-3, etc.
+  confidence      Float?
+  
+  // მეტადატა
+  isActive        Boolean  @default(true)
+  reviewDate      DateTime?
+  parentFeedback  String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Milestone {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id])
+  
+  category        String   // motor, cognitive, speech, social
+  description     String
+  achievedDate    DateTime?
+  expectedDate    DateTime?
+  status          String   // achieved, in_progress, not_started
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model ProgressNote {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id])
+  
+  date            DateTime @default(now())
+  category        String   // general, therapy, medical, behavior
+  content         String   @db.Text
+  attachments     String[]
+  
+  createdAt       DateTime @default(now())
+}
+
+model EmailThread {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  recipientEmail  String
+  recipientName   String?
+  clinicName      String?
+  subject         String
+  
+  messages        EmailMessage[]
+  status          String   @default("sent") // sent, replied, no_response
+  sentiment       String?  // positive, negative, neutral
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EmailMessage {
+  id              String   @id @default(cuid())
+  threadId        String
+  thread          EmailThread @relation(fields: [threadId], references: [id])
+  
+  direction       String   // sent, received
+  content         String   @db.Text
+  aiDrafted       Boolean  @default(false)
+  
+  sentAt          DateTime @default(now())
+}
+
+model ClinicalTrialSearch {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  searchQuery     Json     // ფილტრების კონფიგურაცია
+  results         Json?    // შედეგები
+  alertEnabled    Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+```
+
+---
+
+## 🤖 AI აგენტების არქიტექტურა
+
+### 1️⃣ Document Analysis Agent
+
+```typescript
+// lib/ai/agents/documentAgent.ts
+
+import { ChatOpenAI } from "@langchain/openai";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { StructuredOutputParser } from "langchain/output_parsers";
+import { z } from "zod";
+
+const documentAnalysisSchema = z.object({
+  documentType: z.string(),
+  keyFindings: z.array(z.object({
+    finding: z.string(),
+    severity: z.enum(["normal", "mild", "moderate", "severe"]),
+    location: z.string().optional(),
+  })),
+  diagnoses: z.array(z.string()),
+  measurements: z.array(z.object({
+    name: z.string(),
+    value: z.string(),
+    unit: z.string().optional(),
+    normalRange: z.string().optional(),
+    isAbnormal: z.boolean(),
+  })),
+  recommendations: z.array(z.string()),
+  followUpNeeded: z.boolean(),
+  summaryForParent: z.string(),
+  summaryForParentKa: z.string(), // ქართულად
+});
+
+export class DocumentAnalysisAgent {
+  private model: ChatOpenAI;
+  private parser: StructuredOutputParser<typeof documentAnalysisSchema>;
+
+  constructor() {
+    this.model = new ChatOpenAI({
+      modelName: "gpt-4-turbo-preview",
+      temperature: 0.1,
+    });
+    this.parser = StructuredOutputParser.fromZodSchema(documentAnalysisSchema);
+  }
+
+  async analyze(ocrText: string, documentType: string): Promise<z.infer<typeof documentAnalysisSchema>> {
+    const prompt = PromptTemplate.fromTemplate(`
+შენ ხარ პედიატრიული ნევროლოგიის ექსპერტი, რომელიც აანალიზებს სამედიცინო დოკუმენტებს HIE-ით დაავადებული ბავშვებისთვის.
+
+დოკუმენტის ტიპი: {documentType}
+დოკუმენტის ტექსტი:
+{ocrText}
+
+გააანალიზე ეს დოკუმენტი და ამოიღე შემდეგი ინფორმაცია:
+1. ძირითადი აღმოჩენები (findings) სიმძიმის მითითებით
+2. დიაგნოზები
+3. გაზომვები და მათი ნორმალური დიაპაზონები
+4. რეკომენდაციები
+5. საჭიროა თუ არა follow-up
+
+ასევე დაწერე მარტივი შეჯამება მშობლისთვის ინგლისურად და ქართულად.
+
+{format_instructions}
+    `);
+
+    const formattedPrompt = await prompt.format({
+      documentType,
+      ocrText,
+      format_instructions: this.parser.getFormatInstructions(),
+    });
+
+    const response = await this.model.invoke(formattedPrompt);
+    return this.parser.parse(response.content as string);
+  }
+}
+```
+
+---
+
+### 2️⃣ Therapy Recommendation Agent
+
+```typescript
+// lib/ai/agents/therapyAgent.ts
+
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { z } from "zod";
+
+const therapyRecommendationSchema = z.object({
+  priorityTherapies: z.array(z.object({
+    rank: z.number(),
+    therapyType: z.string(),
+    rationale: z.string(),
+    rationaleKa: z.string(),
+    evidenceLevel: z.enum(["A", "B", "C"]),
+    frequency: z.string(),
+    duration: z.string(),
+    expectedOutcomes: z.array(z.string()),
+    warnings: z.array(z.string()).optional(),
+  })),
+  supplementaryInterventions: z.array(z.object({
+    type: z.string(),
+    description: z.string(),
+    priority: z.enum(["high", "medium", "low"]),
+  })),
+  actionPlan: z.object({
+    immediate: z.array(z.object({
+      action: z.string(),
+      actionKa: z.string(),
+      deadline: z.string(),
+    })),
+    shortTerm: z.array(z.object({
+      action: z.string(),
+      actionKa: z.string(),
+      timeframe: z.string(),
+    })),
+    longTerm: z.array(z.object({
+      action: z.string(),
+      actionKa: z.string(),
+      timeframe: z.string(),
+    })),
+  }),
+  researchBasis: z.array(z.object({
+    title: z.string(),
+    source: z.string(),
+    relevance: z.string(),
+  })),
+});
+
+export class TherapyRecommendationAgent {
+  private openaiModel: ChatOpenAI;
+  private claudeModel: ChatAnthropic;
+
+  constructor() {
+    this.openaiModel = new ChatOpenAI({
+      modelName: "gpt-4-turbo-preview",
+      temperature: 0.2,
+    });
+    this.claudeModel = new ChatAnthropic({
+      modelName: "claude-3-opus-20240229",
+      temperature: 0.2,
+    });
+  }
+
+  async generateRecommendations(childProfile: any, documents: any[], currentTherapies: any[]) {
+    const systemPrompt = `
+შენ ხარ მულტიდისციპლინური პედიატრიული რეაბილიტაციის ექსპერტთა გუნდი:
+- პედიატრი ნევროლოგი
+- ფიზიკური თერაპევტი (კინეზითერაპევტი)
+- ოკუპაციური თერაპევტი
+- მეტყველების თერაპევტი
+- ნეიროფსიქოლოგი
+
+შენი ამოცანაა HIE-ით დაავადებული ბავშვისთვის evidence-based თერაპიული რეკომენდაციების შექმნა.
+
+მნიშვნელოვანი პრინციპები:
+1. ყოველი რეკომენდაცია უნდა იყოს evidence-based (მიუთითე კვლევები)
+2. გაითვალისწინე ბავშვის ასაკი, სიმძიმე, და მიმდინარე მდგომარეობა
+3. პრიორიტეტი მიანიჭე ინტერვენციებს რომლებსაც აქვთ საუკეთესო evidence
+4. გაითვალისწინე ოჯახის შესაძლებლობები და ლოკაცია
+5. რეკომენდაციები იყოს პრაქტიკული და განხორციელებადი
+
+⚠️ დისკლეიმერი: ეს რეკომენდაციები არ ჩაანაცვლებს სამედიცინო პროფესიონალის კონსულტაციას.
+`;
+
+    const userPrompt = `
+## ბავშვის პროფილი:
+${JSON.stringify(childProfile, null, 2)}
+
+## სამედიცინო დოკუმენტებიდან ამოღებული ინფორმაცია:
+${documents.map(d => `
+### ${d.documentType} (${d.documentDate})
+აღმოჩენები: ${JSON.stringify(d.extractedData?.keyFindings || [])}
+დიაგნოზები: ${d.extractedData?.diagnoses?.join(', ') || 'N/A'}
+რეკომენდაციები: ${d.extractedData?.recommendations?.join(', ') || 'N/A'}
+`).join('\n')}
+
+## მიმდინარე თერაპიები:
+${currentTherapies.map(t => `- ${t.type}: ${t.frequency}, პროვაიდერი: ${t.provider}`).join('\n')}
+
+შექმენი დეტალური თერაპიული რეკომენდაციები JSON ფორმატში.
+`;
+
+    // ორი მოდელის კომბინირება უკეთესი შედეგისთვის
+    const [openaiResponse, claudeResponse] = await Promise.all([
+      this.openaiModel.invoke([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]),
+      this.claudeModel.invoke([
+        { role: "user", content: systemPrompt + "\n\n" + userPrompt }
+      ])
+    ]);
+
+    // შედეგების სინთეზი
+    return this.synthesizeRecommendations(openaiResponse, claudeResponse);
+  }
+
+  private synthesizeRecommendations(openaiResponse: any, claudeResponse: any) {
+    // კომბინირებული ანალიზი და საუკეთესო რეკომენდაციების შერჩევა
+    // ...implementation
+  }
+}
+```
+
+---
+
+### 3️⃣ Clinical Trial Agent
+
+```typescript
+// lib/ai/agents/trialAgent.ts
+
+import { ChatOpenAI } from "@langchain/openai";
+
+interface TrialSearchParams {
+  condition: string;
+  ageMonths: number;
+  location?: string;
+  interventionType?: string;
+}
+
+interface EligibilityResult {
+  trialId: string;
+  title: string;
+  matchScore: number;
+  matchedCriteria: string[];
+  unmatchedCriteria: string[];
+  uncertainCriteria: string[];
+  recommendation: string;
+  contactInfo: any;
+}
+
+export class ClinicalTrialAgent {
+  private model: ChatOpenAI;
+
+  constructor() {
+    this.model = new ChatOpenAI({
+      modelName: "gpt-4-turbo-preview",
+      temperature: 0.1,
+    });
+  }
+
+  async searchTrials(params: TrialSearchParams): Promise<any[]> {
+    // ClinicalTrials.gov API call
+    const baseUrl = "https://clinicaltrials.gov/api/v2/studies";
+    const query = new URLSearchParams({
+      "query.cond": params.condition,
+      "filter.overallStatus": "RECRUITING,NOT_YET_RECRUITING",
+      "pageSize": "50",
+    });
+
+    const response = await fetch(`${baseUrl}?${query}`);
+    const data = await response.json();
+    
+    return data.studies || [];
+  }
+
+  async checkEligibility(trial: any, childProfile: any): Promise<EligibilityResult> {
+    const prompt = `
+გააანალიზე კლინიკური კვლევის ელიგიბელობის კრიტერიუმები და შეადარე ბავშვის პროფილს.
+
+## კვლევა:
+სათაური: ${trial.protocolSection?.identificationModule?.briefTitle}
+ID: ${trial.protocolSection?.identificationModule?.nctId}
+
+ელიგიბელობის კრიტერიუმები:
+${trial.protocolSection?.eligibilityModule?.eligibilityCriteria}
+
+ასაკის დიაპაზონი: ${trial.protocolSection?.eligibilityModule?.minimumAge} - ${trial.protocolSection?.eligibilityModule?.maximumAge}
+
+## ბავშვის პროფილი:
+${JSON.stringify(childProfile, null, 2)}
+
+შეაფასე:
+1. რამდენად შეესაბამება ბავშვი კრიტერიუმებს (0-100%)
+2. რომელი კრიტერიუმები სრულდება
+3. რომელი არ სრულდება
+4. რომელი საჭიროებს დაზუსტებას
+5. რეკომენდაცია: უნდა განაცხადოს თუ არა
+
+პასუხი JSON ფორმატში.
+`;
+
+    const response = await this.model.invoke(prompt);
+    return JSON.parse(response.content as string);
+  }
+
+  async generateTrialSummary(trial: any): Promise<string> {
+    const prompt = `
+შექმენი მარტივი, მშობლისთვის გასაგები შეჯამება ამ კლინიკური კვლევის შესახებ ქართულ ენაზე:
+
+სათაური: ${trial.protocolSection?.identificationModule?.briefTitle}
+აღწერა: ${trial.protocolSection?.descriptionModule?.briefSummary}
+ინტერვენცია: ${JSON.stringify(trial.protocolSection?.armsInterventionsModule?.interventions)}
+ლოკაცია: ${JSON.stringify(trial.protocolSection?.contactsLocationsModule?.locations)}
+
+შეჯამება უნდა მოიცავდეს:
+1. რას სწავლობს კვლევა (მარტივი ენით)
+2. რას მოიცავს მონაწილეობა
+3. პოტენციური სარგებელი და რისკები
+4. სად და როგორ უნდა დარეგისტრირდეს
+`;
+
+    const response = await this.model.invoke(prompt);
+    return response.content as string;
+  }
+}
+```
+
+---
+
+### 4️⃣ Email Assistant Agent
+
+```typescript
+// lib/ai/agents/emailAgent.ts
+
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+
+interface EmailContext {
+  recipientType: "clinic" | "doctor" | "researcher" | "insurance";
+  purpose: "initial_contact" | "follow_up" | "document_request" | "appointment";
+  childProfile: any;
+  previousCorrespondence?: string;
+  specificRequests?: string[];
+  language: "en" | "fr" | "de";
+}
+
+export class EmailAssistantAgent {
+  private model: ChatAnthropic; // Claude უკეთესია ემაილებისთვის
+
+  constructor() {
+    this.model = new ChatAnthropic({
+      modelName: "claude-3-sonnet-20240229",
+      temperature: 0.3,
+    });
+  }
+
+  async draftEmail(context: EmailContext): Promise<{ subject: string; body: string }> {
+    const languageInstructions = {
+      en: "Write in professional but warm English",
+      fr: "Écrivez en français professionnel mais chaleureux",
+      de: "Schreiben Sie in professionellem, aber warmem Deutsch"
+    };
+
+    const prompt = `
+შენ ხარ გამოცდილი სამედიცინო კომუნიკატორი, რომელიც ეხმარება მშობლებს ექიმებთან და კლინიკებთან კომუნიკაციაში.
+
+კონტექსტი:
+- მიმღები: ${context.recipientType}
+- მიზანი: ${context.purpose}
+- ენა: ${context.language}
+
+ბავშვის ინფორმაცია:
+- სახელი: ${context.childProfile.firstName}
+- დიაგნოზი: ${context.childProfile.primaryDiagnosis}
+- სიმძიმე: ${context.childProfile.severity}
+- ასაკი: ${calculateAge(context.childProfile.dateOfBirth)}
+
+${context.previousCorrespondence ? `წინა კორესპონდენცია:\n${context.previousCorrespondence}` : ''}
+
+${context.specificRequests ? `სპეციფიკური მოთხოვნები:\n${context.specificRequests.join('\n')}` : ''}
+
+${languageInstructions[context.language]}
+
+დაწერე:
+1. Subject line (მოკლე, კონკრეტული)
+2. Email body (პროფესიონალური, თანაგრძნობით, კონკრეტული)
+
+ფორმატი:
+SUBJECT: [subject line]
+---
+BODY:
+[email body]
+`;
+
+    const response = await this.model.invoke(prompt);
+    const content = response.content as string;
+    
+    const [subjectLine, ...bodyParts] = content.split('---');
+    return {
+      subject: subjectLine.replace('SUBJECT:', '').trim(),
+      body: bodyParts.join('---').replace('BODY:', '').trim()
+    };
+  }
+
+  async analyzeResponse(emailContent: string): Promise<{
+    sentiment: string;
+    category: string;
+    actionItems: string[];
+    suggestedReply: boolean;
+    summary: string;
+    summaryKa: string;
+  }> {
+    const prompt = `
+გააანალიზე ეს ემაილის პასუხი კლინიკიდან/ექიმისგან:
+
+${emailContent}
+
+განსაზღვრე:
+1. Sentiment (positive, negative, neutral)
+2. Category (acceptance, rejection, need_more_info, scheduling, general)
+3. Action items (რა ნაბიჯები უნდა გადაიდგას)
+4. საჭიროა თუ არა პასუხის დრაფტი
+5. მოკლე შეჯამება ინგლისურად და ქართულად
+
+JSON ფორმატში.
+`;
+
+    const response = await this.model.invoke(prompt);
+    return JSON.parse(response.content as string);
+  }
+
+  async translateEmail(email: string, targetLanguage: "ka" | "en" | "fr"): Promise<string> {
+    const prompt = `
+თარგმნე ეს ემაილი ${targetLanguage === 'ka' ? 'ქართულ' : targetLanguage === 'fr' ? 'ფრანგულ' : 'ინგლისურ'} ენაზე.
+შეინარჩუნე პროფესიონალური ტონი და სამედიცინო ტერმინოლოგია.
+
+${email}
+`;
+
+    const response = await this.model.invoke(prompt);
+    return response.content as string;
+  }
+}
+
+function calculateAge(dateOfBirth: Date): string {
+  const now = new Date();
+  const birth = new Date(dateOfBirth);
+  const months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+  
+  if (months < 24) {
+    return `${months} თვე`;
+  }
+  return `${Math.floor(months / 12)} წელი`;
+}
+```
+
+---
+
+### 5️⃣ General AI Assistant Agent
+
+```typescript
+// lib/ai/agents/assistantAgent.ts
+
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { BufferMemory } from "langchain/memory";
+import { ConversationChain } from "langchain/chains";
+
+export class GeneralAssistantAgent {
+  private model: ChatAnthropic;
+  private memory: BufferMemory;
+  private chain: ConversationChain;
+
+  constructor() {
+    this.model = new ChatAnthropic({
+      modelName: "claude-3-sonnet-20240229",
+      temperature: 0.4,
+    });
+    
+    this.memory = new BufferMemory({
+      returnMessages: true,
+      memoryKey: "history",
+    });
+
+    this.chain = new ConversationChain({
+      llm: this.model,
+      memory: this.memory,
+    });
+  }
+
+  async chat(
+    message: string, 
+    context: {
+      childProfile?: any;
+      documents?: any[];
+      currentPage?: string;
+    }
+  ): Promise<string> {
+    const systemContext = `
+შენ ხარ HIE Parent Command Center-ის AI ასისტენტი.
+შენი როლი არის დაეხმარო მშობლებს:
+- სამედიცინო ტერმინების გაგებაში
+- დოკუმენტების ინტერპრეტაციაში
+- შემდეგი ნაბიჯების დაგეგმვაში
+- კითხვების ჩამოყალიბებაში ექიმებისთვის
+
+მნიშვნელოვანი:
+- ყოველთვის იყავი თანაგრძნობით და მხარდამჭერი
+- რთული ტერმინები აუხსენი მარტივად
+- არასოდეს გასცე დიაგნოზი ან სამედიცინო რჩევა
+- შეახსენე მშობლებს კონსულტაციის საჭიროება
+
+${context.childProfile ? `ბავშვის პროფილი: ${JSON.stringify(context.childProfile)}` : ''}
+${context.currentPage ? `მომხმარებელი იმყოფება: ${context.currentPage} გვერდზე` : ''}
+`;
+
+    const response = await this.chain.call({
+      input: `${systemContext}\n\nმომხმარებლის შეკითხვა: ${message}`,
+    });
+
+    return response.response;
+  }
+
+  async explainMedicalTerm(term: string): Promise<{
+    definition: string;
+    simpleExplanation: string;
+    relatedTerms: string[];
+    resources: string[];
+  }> {
+    const prompt = `
+აუხსენი სამედიცინო ტერმინი "${term}" HIE-ით დაავადებული ბავშვის მშობელს.
+
+1. ოფიციალური განმარტება
+2. მარტივი ახსნა (ანალოგიებით)
+3. დაკავშირებული ტერმინები
+4. სანდო რესურსები მეტი ინფორმაციისთვის
+
+ქართულ ენაზე, JSON ფორმატში.
+`;
+
+    const response = await this.model.invoke(prompt);
+    return JSON.parse(response.content as string);
+  }
+
+  async generateQuestionsForDoctor(
+    appointmentType: string,
+    concerns: string[],
+    childProfile: any
+  ): Promise<string[]> {
+    const prompt = `
+შექმენი კითხვების სია ${appointmentType} ვიზიტისთვის.
+
+ბავშვის პროფილი: ${JSON.stringify(childProfile)}
+მშობლის შეშფოთებები: ${concerns.join(', ')}
+
+შექმენი 5-10 კონკრეტული, რელევანტური კითხვა ქართულ და ინგლისურ ენაზე.
+`;
+
+    const response = await this.model.invoke(prompt);
+    return JSON.parse(response.content as string);
+  }
+}
+```
+
+---
+
+## 🔌 API Routes
+
+### Document Upload & OCR
+
+```typescript
+// app/api/documents/upload/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { v2 as cloudinary } from "cloudinary";
+import Tesseract from "tesseract.js";
+import { DocumentAnalysisAgent } from "@/lib/ai/agents/documentAgent";
+import { prisma } from "@/lib/prisma";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
+    const childId = formData.get("childId") as string;
+    const documentType = formData.get("documentType") as string;
+
+    // 1. Upload to Cloudinary
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploadResult = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: "hie-documents", resource_type: "auto" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      ).end(buffer);
+    });
+
+    // 2. OCR Processing
+    let ocrText = "";
+    let ocrConfidence = 0;
+
+    if (file.type.includes("image") || file.type === "application/pdf") {
+      const ocrResult = await Tesseract.recognize(buffer, "eng+fra+kat", {
+        logger: (m) => console.log(m),
+      });
+      ocrText = ocrResult.data.text;
+      ocrConfidence = ocrResult.data.confidence;
+    }
+
+    // 3. AI Analysis
+    const documentAgent = new DocumentAnalysisAgent();
+    const analysis = await documentAgent.analyze(ocrText, documentType);
+
+    // 4. Save to Database
+    const document = await prisma.document.create({
+      data: {
+        childId,
+        fileName: file.name,
+        fileType: file.type,
+        fileUrl: (uploadResult as any).secure_url,
+        fileSize: file.size,
+        documentType,
+        ocrText,
+        ocrConfidence,
+        aiSummary: analysis.summaryForParent,
+        aiSummaryKa: analysis.summaryForParentKa,
+        extractedData: analysis,
+        isProcessed: true,
+      },
+    });
+
+    return NextResponse.json({ success: true, document });
+  } catch (error) {
+    console.error("Upload error:", error);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
+}
+```
+
+---
+
+### Therapy Recommendations API
+
+```typescript
+// app/api/ai/therapy-recommendations/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { TherapyRecommendationAgent } from "@/lib/ai/agents/therapyAgent";
+import { prisma } from "@/lib/prisma";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { childId } = await req.json();
+
+    // Get child profile with all related data
+    const child = await prisma.child.findUnique({
+      where: { id: childId },
+      include: {
+        documents: {
+          where: { isProcessed: true },
+          orderBy: { createdAt: "desc" },
+        },
+        therapies: {
+          where: { isActive: true },
+        },
+      },
+    });
+
+    if (!child) {
+      return NextResponse.json({ error: "Child not found" }, { status: 404 });
+    }
+
+    // Generate recommendations
+    const therapyAgent = new TherapyRecommendationAgent();
+    const recommendations = await therapyAgent.generateRecommendations(
+      child,
+      child.documents,
+      child.therapies
+    );
+
+    // Save to database
+    const savedRecommendation = await prisma.aIRecommendation.create({
+      data: {
+        childId,
+        recommendations,
+        priorityList: recommendations.priorityTherapies,
+        actionPlan: recommendations.actionPlan,
+        basedOnDocs: child.documents.map((d) => d.id),
+        modelUsed: "gpt-4-turbo + claude-3-opus",
+        reviewDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      recommendation: savedRecommendation,
+    });
+  } catch (error) {
+    console.error("Recommendation error:", error);
+    return NextResponse.json(
+      { error: "Failed to generate recommendations" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+## 🎨 UI კომპონენტები
+
+### Therapy Recommendations Display
+
+```tsx
+// components/ai-agents/TherapyRecommendations.tsx
+
+"use client";
+
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+
+interface TherapyRecommendationsProps {
+  childId: string;
+}
+
+export function TherapyRecommendations({ childId }: TherapyRecommendationsProps) {
+  const { data: recommendation, isLoading, refetch } = useQuery({
+    queryKey: ["therapy-recommendations", childId],
+    queryFn: () => fetch(`/api/ai/therapy-recommendations?childId=${childId}`).then(r => r.json()),
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: () => fetch("/api/ai/therapy-recommendations", {
+      method: "POST",
+      body: JSON.stringify({ childId }),
+    }).then(r => r.json()),
+    onSuccess: () => refetch(),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">იტვირთება რეკომენდაციები...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">🤖 AI თერაპიის რეკომენდაციები</h2>
+        <Button
+          onClick={() => generateMutation.mutate()}
+          disabled={generateMutation.isPending}
+        >
+          {generateMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          ახალი რეკომენდაცია
+        </Button>
+      </div>
+
+      {/* Disclaimer */}
+      <Card className="border-yellow-500 bg-yellow-50">
+        <CardContent className="p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+          <div className="text-sm text-yellow-800">
+            <strong>მნიშვნელოვანი:</strong> ეს რეკომენდაციები შექმნილია AI-ის მიერ 
+            და არ ჩაანაცვლებს სამედიცინო პროფესიონალის კონსულტაციას. 
+            ნებისმიერი თერაპიის დაწყებამდე გაიარეთ კონსულტაცია ექიმთან.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Priority Therapies */}
+      {recommendation?.priorityList?.map((therapy: any, index: number) => (
+        <Card key={index} className="overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-bold text-blue-600">#{therapy.rank}</span>
+                <CardTitle>{therapy.therapyType}</CardTitle>
+              </div>
+              <Badge variant={therapy.evidenceLevel === "A" ? "default" : "secondary"}>
+                Evidence Level {therapy.evidenceLevel}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            {/* Rationale */}
+            <div>
+              <h4 className="font-semibold mb-2">რატომ არის რეკომენდებული:</h4>
+              <p className="text-gray-700">{therapy.rationaleKa}</p>
+            </div>
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm text-gray-500">სიხშირე:</span>
+                <p className="font-medium">{therapy.frequency}</p>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500">ხანგრძლივობა:</span>
+                <p className="font-medium">{therapy.duration}</p>
+              </div>
+            </div>
+
+            {/* Expected Outcomes */}
+            <div>
+              <h4 className="font-semibold mb-2">მოსალოდნელი შედეგები:</h4>
+              <ul className="space-y-1">
+                {therapy.expectedOutcomes.map((outcome: string, i: number) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>{outcome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Warnings */}
+            {therapy.warnings?.length > 0 && (
+              <div className="bg-red-50 p-3 rounded-lg">
+                <h4 className="font-semibold text-red-700 mb-1">გაფრთხილებები:</h4>
+                <ul className="text-sm text-red-600">
+                  {therapy.warnings.map((w: string, i: number) => (
+                    <li key={i}>• {w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+
+      {/* Action Plan */}
+      {recommendation?.actionPlan && (
+        <Card>
+          <CardHeader>
+            <CardTitle>📋 სამოქმედო გეგმა</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Immediate */}
+              <div>
+                <h4 className="font-semibold text-red-600 mb-2">🔴 დაუყოვნებლივ (0-2 კვირა)</h4>
+                <ul className="space-y-2">
+                  {recommendation.actionPlan.immediate.map((item: any, i: number) => (
+                    <li key={i} className="flex items-start gap-2 p-2 bg-red-50 rounded">
+                      <span className="font-medium">{item.actionKa}</span>
+                      <Badge variant="outline" className="ml-auto">{item.deadline}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Short Term */}
+              <div>
+                <h4 className="font-semibold text-yellow-600 mb-2">🟡 მოკლევადიანი (1-3 თვე)</h4>
+                <ul className="space-y-2">
+                  {recommendation.actionPlan.shortTerm.map((item: any, i: number) => (
+                    <li key={i} className="flex items-start gap-2 p-2 bg-yellow-50 rounded">
+                      <span>{item.actionKa}</span>
+                      <Badge variant="outline" className="ml-auto">{item.timeframe}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Long Term */}
+              <div>
+                <h4 className="font-semibold text-green-600 mb-2">🟢 გრძელვადიანი (3-12 თვე)</h4>
+                <ul className="space-y-2">
+                  {recommendation.actionPlan.longTerm.map((item: any, i: number) => (
+                    <li key={i} className="flex items-start gap-2 p-2 bg-green-50 rounded">
+                      <span>{item.actionKa}</span>
+                      <Badge variant="outline" className="ml-auto">{item.timeframe}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## ⚙️ Environment Variables
+
+```env
+# .env
+
+# Database
+DATABASE_URL="postgresql://..."
+
+# Auth
+NEXTAUTH_SECRET="..."
+NEXTAUTH_URL="https://your-app.replit.app"
+
+# AI APIs
+OPENAI_API_KEY="sk-..."
+ANTHROPIC_API_KEY="sk-ant-..."
+
+# File Storage
+CLOUDINARY_CLOUD_NAME="..."
+CLOUDINARY_API_KEY="..."
+CLOUDINARY_API_SECRET="..."
+
+# External APIs
+GMAIL_CLIENT_ID="..."
+GMAIL_CLIENT_SECRET="..."
+GOOGLE_CALENDAR_API_KEY="..."
+
+# Optional
+SENDGRID_API_KEY="..."
+SENTRY_DSN="..."
+```
+
+---
+
+## 🚀 Replit-ზე გაშვების ინსტრუქცია
+
+1. **შექმენი ახალი Repl**: Next.js template
+2. **დააკოპირე კოდი** ზემოთ მოცემული სტრუქტურით
+3. **დააყენე Secrets**: Environment variables
+4. **გაუშვი**: `npm run dev`
+
+---
+
+## 📝 შენიშვნები Replit Agent-ისთვის
+
+1. **მოდულარული მიდგომა**: თითოეული AI აგენტი ცალკე ფაილშია
+2. **Error handling**: ყველა API route-ში try-catch
+3. **Type safety**: TypeScript strict mode
+4. **Performance**: React Query caching
+5. **Security**: Environment variables, no hardcoded keys
+
+---
+
+**დაიწყე იმპლემენტაცია ფაზირებულად - პირველ რიგში ავტორიზაცია და ბავშვის პროფილი, შემდეგ დოკუმენტების მოდული OCR-ით.**
