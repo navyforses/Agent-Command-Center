@@ -12,6 +12,8 @@ import {
   insertChatMessageSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectPermission } from "./objectAcl";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -756,6 +758,63 @@ Format your response as JSON with the following structure:
       console.error("Error analyzing document:", error);
       res.status(500).json({ message: "Failed to analyze document" });
     }
+  });
+
+  // Object Storage routes
+  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        userId: userId,
+        requestedPermission: ObjectPermission.READ,
+      });
+      if (!canAccess) {
+        return res.sendStatus(401);
+      }
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error checking object access:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
+    const objectStorageService = new ObjectStorageService();
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    res.json({ uploadURL });
+  });
+
+  app.put("/api/documents/:id/file", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id, 10);
+    
+    const existingDoc = await storage.getDocument(id, userId);
+    if (!existingDoc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    const objectStorageService = new ObjectStorageService();
+    const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+      req.body.uploadURL,
+      {
+        owner: userId,
+        visibility: "private",
+      }
+    );
+    
+    const document = await storage.updateDocument(id, userId, {
+      filePath: objectPath,
+      fileType: req.body.fileType,
+      fileSize: req.body.fileSize,
+    });
+    
+    res.json(document);
   });
 
   return httpServer;
