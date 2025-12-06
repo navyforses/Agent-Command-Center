@@ -11,6 +11,7 @@ import {
   insertEmailSchema,
   insertChatMessageSchema,
 } from "@shared/schema";
+import { openai, AI_MODEL } from "./openai";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -606,6 +607,154 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error clearing chat messages:", error);
       res.status(500).json({ message: "Failed to clear chat messages" });
+    }
+  });
+
+  // AI Chat endpoint - sends message to OpenAI and stores conversation
+  app.post("/api/chat", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { content } = req.body;
+
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      // Get existing chat history
+      const chatHistory = await storage.getChatMessages(userId);
+      
+      // Sort by createdAt to ensure chronological order
+      chatHistory.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      // Save the user's message
+      const userMessage = await storage.createChatMessage({
+        userId,
+        role: "user",
+        content,
+      });
+
+      // Build messages array for OpenAI
+      const systemPrompt = "You are a helpful medical assistant for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). Provide empathetic, accurate information about HIE, therapies, and medical care. Always recommend consulting healthcare providers for specific medical decisions.";
+
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+      ];
+
+      // Add chat history
+      for (const msg of chatHistory) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      }
+
+      // Add the new user message
+      messages.push({ role: "user", content });
+
+      // Call OpenAI
+      const completion = await openai.chat.completions.create({
+        model: AI_MODEL,
+        messages,
+      });
+
+      const aiResponseContent = completion.choices[0]?.message?.content || "I apologize, but I was unable to generate a response. Please try again.";
+
+      // Save the AI response
+      const assistantMessage = await storage.createChatMessage({
+        userId,
+        role: "assistant",
+        content: aiResponseContent,
+      });
+
+      res.json(assistantMessage);
+    } catch (error) {
+      console.error("Error in AI chat:", error);
+      res.status(500).json({ message: "Failed to process chat message" });
+    }
+  });
+
+  // Document Analysis endpoint - analyzes document with AI
+  app.post("/api/documents/:id/analyze", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+
+      // Get the document and verify ownership
+      const document = await storage.getDocument(id, userId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Build prompt for analysis
+      const analysisPrompt = `Analyze the following medical document for a parent of a child with Hypoxic-Ischemic Encephalopathy (HIE).
+
+Document Title: ${document.title}
+Category: ${document.category || "Not specified"}
+File Type: ${document.fileType || "Unknown"}
+
+Please provide:
+1. A concise summary of what this document likely contains and its relevance to HIE care (2-3 sentences)
+2. Key findings or important points that parents should pay attention to (as a list of 3-5 key points)
+
+Format your response as JSON with the following structure:
+{
+  "summary": "Your summary here",
+  "keyFindings": ["Finding 1", "Finding 2", "Finding 3"]
+}`;
+
+      // Call OpenAI for analysis
+      const completion = await openai.chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are a medical document analysis assistant helping parents of children with HIE understand their medical documents. Always respond with valid JSON.",
+          },
+          {
+            role: "user",
+            content: analysisPrompt,
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const responseContent = completion.choices[0]?.message?.content || "{}";
+      
+      let analysisResult: { summary?: string; keyFindings?: string[] };
+      try {
+        analysisResult = JSON.parse(responseContent);
+      } catch {
+        analysisResult = {
+          summary: "Unable to parse analysis results.",
+          keyFindings: ["Please try analyzing the document again."],
+        };
+      }
+
+      const aiSummary = analysisResult.summary || "No summary available.";
+      const aiKeyFindings = Array.isArray(analysisResult.keyFindings) ? analysisResult.keyFindings : [];
+
+      // Update the document with AI analysis
+      const updatedDocument = await storage.updateDocument(id, userId, {
+        aiSummary,
+        aiKeyFindings,
+      });
+
+      res.json({
+        id: document.id,
+        aiSummary,
+        aiKeyFindings,
+        message: "Document analysis completed successfully",
+      });
+    } catch (error) {
+      console.error("Error analyzing document:", error);
+      res.status(500).json({ message: "Failed to analyze document" });
     }
   });
 
