@@ -13,6 +13,7 @@ import {
   insertTestimonialSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
+import { getConsensusResponse } from "./multiAI";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { sendEmail } from "./resend";
@@ -631,8 +632,8 @@ export async function registerRoutes(
     }
   });
 
-  // AI Chat endpoint - sends message to OpenAI and stores conversation
-  // Supports function calling for sending emails
+  // AI Chat endpoint - uses multi-AI consensus with OpenAI function calling for emails
+  // First attempts OpenAI with function calling, then uses multi-AI consensus for regular responses
   app.post("/api/chat", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -659,13 +660,13 @@ export async function registerRoutes(
         content,
       });
 
-      // Build messages array for OpenAI
+      // Build messages array for OpenAI function calling check
       const systemPrompt = `You are a helpful medical assistant for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). 
 Provide empathetic, accurate information about HIE, therapies, and medical care. Always recommend consulting healthcare providers for specific medical decisions.
+Be supportive and understanding of the emotional challenges parents face.
 
 You have the ability to send emails on behalf of the user. When a user asks you to send an email, draft an appropriate email and use the sendEmail function to send it.
-If the user doesn't specify a recipient email address, ask them for it before sending.
-After sending an email, confirm to the user that it was sent successfully.`;
+If the user doesn't specify a recipient email address, ask them for it before sending.`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
@@ -710,7 +711,7 @@ After sending an email, confirm to the user that it was sent successfully.`;
         }
       ];
 
-      // Call OpenAI with function calling
+      // First, call OpenAI with function calling to check if this is an email request
       const completion = await openai.chat.completions.create({
         model: AI_MODEL,
         messages,
@@ -720,7 +721,7 @@ After sending an email, confirm to the user that it was sent successfully.`;
 
       const responseMessage = completion.choices[0]?.message;
       
-      // Check if AI wants to call a function
+      // Check if AI wants to call a function (email sending)
       if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
         const toolCall = responseMessage.tool_calls[0];
         
@@ -798,14 +799,26 @@ After sending an email, confirm to the user that it was sent successfully.`;
         }
       }
 
-      // Regular response (no function call)
-      const aiResponseContent = responseMessage?.content || "I apologize, but I was unable to generate a response. Please try again.";
+      // For non-function-call responses, use multi-AI consensus for better quality
+      const consensusSystemPrompt = `You are a helpful medical assistant for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). 
+Provide empathetic, accurate information about HIE, therapies, and medical care. Always recommend consulting healthcare providers for specific medical decisions.
+Be supportive and understanding of the emotional challenges parents face.`;
+
+      // Format chat history for multi-AI consensus
+      const formattedHistory: { role: "user" | "assistant"; content: string }[] = chatHistory
+        .filter(msg => msg.role === "user" || msg.role === "assistant")
+        .map(msg => ({ role: msg.role as "user" | "assistant", content: msg.content }));
+
+      // Get consensus response from multiple AIs (OpenAI + Gemini)
+      const consensusResult = await getConsensusResponse(consensusSystemPrompt, content, formattedHistory);
+
+      console.log(`Multi-AI consensus: ${consensusResult.sources.length} provider(s) responded (${consensusResult.sources.join(", ") || "none"}) in ${consensusResult.processingTime}ms`);
 
       // Save the AI response
       const assistantMessage = await storage.createChatMessage({
         userId,
         role: "assistant",
-        content: aiResponseContent,
+        content: consensusResult.content,
       });
 
       res.json(assistantMessage);
