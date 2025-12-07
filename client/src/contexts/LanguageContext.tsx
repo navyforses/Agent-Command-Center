@@ -17,6 +17,7 @@ const translations: Record<string, Record<Language, string>> = {
   emailHub: { en: "Email Hub", ka: "ელ.ფოსტა" },
   calendar: { en: "Calendar", ka: "კალენდარი" },
   aiAssistant: { en: "AI Assistant", ka: "AI ასისტენტი" },
+  nexusOmega: { en: "NEXUS OMEGA", ka: "NEXUS OMEGA" },
   settings: { en: "Settings", ka: "პარამეტრები" },
   logout: { en: "Log Out", ka: "გასვლა" },
   login: { en: "Log In", ka: "შესვლა" },
