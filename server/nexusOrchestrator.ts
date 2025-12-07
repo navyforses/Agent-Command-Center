@@ -28,6 +28,11 @@ const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
 });
 
+const grok = new OpenAI({
+  baseURL: "https://api.x.ai/v1",
+  apiKey: process.env.XAI_API_KEY,
+});
+
 interface AIResearchResponse {
   provider: string;
   agentId: string;
@@ -299,12 +304,77 @@ async function queryPerplexityResearch(query: string): Promise<AIResearchRespons
   }
 }
 
+async function queryGrokResearch(query: string): Promise<AIResearchResponse> {
+  const apiKey = process.env.XAI_API_KEY;
+  
+  if (!apiKey) {
+    return {
+      provider: "Grok",
+      agentId: "grok",
+      content: "",
+      keyPoints: [],
+      concerns: [],
+      uniqueInsights: [],
+      confidence: 0,
+      success: false,
+      error: "XAI_API_KEY not configured",
+    };
+  }
+
+  try {
+    const completion = await grok.chat.completions.create({
+      model: "grok-3-mini",
+      messages: [
+        { role: "system", content: NEXUS_RESEARCH_SYSTEM_PROMPT },
+        { role: "user", content: `Research query: ${query}\n\nProvide your structured analysis in JSON format.` },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content || "{}";
+    let parsed: Record<string, unknown> = {};
+    
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      parsed = { summary: content };
+    }
+
+    return {
+      provider: "Grok",
+      agentId: "grok",
+      content: (parsed.summary as string) || content,
+      keyPoints: (parsed.keyPoints as string[]) || [],
+      concerns: (parsed.concerns as string[]) || [],
+      uniqueInsights: (parsed.uniqueInsights as string[]) || [],
+      confidence: (parsed.confidence as number) || 70,
+      success: true,
+      rawResponse: parsed,
+    };
+  } catch (error) {
+    console.error("Grok research error:", error);
+    return {
+      provider: "Grok",
+      agentId: "grok",
+      content: "",
+      keyPoints: [],
+      concerns: [],
+      uniqueInsights: [],
+      confidence: 0,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 function calculateConsensusLevel(responses: AIResearchResponse[]): "low" | "moderate" | "high" | "unanimous" {
   const successful = responses.filter(r => r.success && r.content.trim());
   if (successful.length === 0) return "low";
-  if (successful.length === 1) return "low";
-  if (successful.length === 2) return "moderate";
-  if (successful.length === 3) return "high";
+  if (successful.length <= 2) return "low";
+  if (successful.length === 3) return "moderate";
+  if (successful.length === 4) return "high";
   return "unanimous";
 }
 
@@ -440,10 +510,11 @@ export async function runNexusResearch(
     queryGeminiResearch(queryText),
     queryAnthropicResearch(queryText),
     queryPerplexityResearch(queryText),
+    queryGrokResearch(queryText),
   ]);
 
   const successfulResponses = responses.filter(r => r.success);
-  console.log(`NEXUS Research: ${successfulResponses.length}/4 AI agents responded`);
+  console.log(`NEXUS Research: ${successfulResponses.length}/5 AI agents responded`);
 
   await storage.updateNexusResearchQuery(queryId, userId, { status: "analyzing" });
 
