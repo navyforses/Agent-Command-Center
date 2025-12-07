@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { FindingCard, Finding } from "@/components/dashboard/FindingCard";
+import { HypothesisTracker } from "@/components/nexus/HypothesisTracker";
+import { DebatePanel } from "@/components/nexus/DebatePanel";
 
 interface AIAgent {
   id: string;
@@ -47,40 +49,69 @@ const aiAgents: AIAgent[] = [
 
 const disciplineCategories = [
   {
-    name: "Life Sciences",
+    nameKey: "lifeSciences",
     icon: Dna,
-    disciplines: ["Neuroscience", "Cell Biology", "Molecular Biology", "Biochemistry", "Pharmacology", "Medicine"],
+    disciplines: [
+      { id: "Neuroscience", translationKey: "neuroscience" },
+      { id: "Cell Biology", translationKey: "cellBiology" },
+      { id: "Molecular Biology", translationKey: "molecularBiology" },
+      { id: "Biochemistry", translationKey: "biochemistry" },
+      { id: "Pharmacology", translationKey: "pharmacology" },
+      { id: "Medicine", translationKey: "medicine" },
+    ],
   },
   {
-    name: "Physical Sciences",
+    nameKey: "physicalSciences",
     icon: Atom,
-    disciplines: ["Physics", "Chemistry", "Quantum Biology"],
+    disciplines: [
+      { id: "Physics", translationKey: "physics" },
+      { id: "Chemistry", translationKey: "chemistry" },
+      { id: "Quantum Biology", translationKey: "quantumBiology" },
+    ],
   },
   {
-    name: "Mathematical Sciences",
+    nameKey: "mathematicalSciences",
     icon: Calculator,
-    disciplines: ["Mathematics", "Statistics", "Network Theory"],
+    disciplines: [
+      { id: "Mathematics", translationKey: "mathematics" },
+      { id: "Statistics", translationKey: "statistics" },
+      { id: "Network Theory", translationKey: "networkTheory" },
+    ],
   },
   {
-    name: "Engineering",
+    nameKey: "engineering",
     icon: Cpu,
-    disciplines: ["Biomedical Eng", "Materials Science", "Nanotechnology", "Computer Science"],
+    disciplines: [
+      { id: "Biomedical Eng", translationKey: "biomedicalEng" },
+      { id: "Materials Science", translationKey: "materialsScience" },
+      { id: "Nanotechnology", translationKey: "nanotechnology" },
+      { id: "Computer Science", translationKey: "computerScience" },
+    ],
   },
   {
-    name: "Cross-Disciplinary",
+    nameKey: "crossDisciplinaryCategory",
     icon: GitBranch,
-    disciplines: ["Systems Biology", "Cybernetics"],
+    disciplines: [
+      { id: "Systems Biology", translationKey: "systemsBiology" },
+      { id: "Cybernetics", translationKey: "cybernetics" },
+    ],
   },
 ];
 
-const researchFocusOptions = ["Stem Cells", "Gene Therapy", "Exosomes", "Biomaterials", "All"];
+const researchFocusOptions = [
+  { id: "Stem Cells", translationKey: "stemCells" },
+  { id: "Gene Therapy", translationKey: "geneTherapy" },
+  { id: "Exosomes", translationKey: "exosomes" },
+  { id: "Biomaterials", translationKey: "biomaterials" },
+  { id: "All", translationKey: "all" },
+];
 
 const quickCommands = [
-  { label: "/omega", description: "Full synthesis" },
-  { label: "/scan", description: "Quick scan" },
-  { label: "/consensus", description: "AI consensus" },
-  { label: "/debate", description: "AI debate" },
-  { label: "/discipline", description: "By field" },
+  { label: "/omega", descriptionKey: "fullSynthesis" },
+  { label: "/scan", descriptionKey: "quickScan" },
+  { label: "/consensus", descriptionKey: "aiConsensus" },
+  { label: "/debate", descriptionKey: "aiDebate" },
+  { label: "/discipline", descriptionKey: "byField" },
 ];
 
 const mockFindings: Finding[] = [
@@ -429,7 +460,7 @@ export default function NexusOmega() {
             <h1 className="text-xl font-bold" data-testid="text-page-title">
               {t("nexusOmega")}
             </h1>
-            <p className="text-sm text-muted-foreground">Multi-AI Neuroregeneration Research Platform</p>
+            <p className="text-sm text-muted-foreground">{t("nexusOmegaSubtitle")}</p>
           </div>
         </div>
 
@@ -456,7 +487,7 @@ export default function NexusOmega() {
                       className={`text-xs ${getStatusColor(status)}`}
                       data-testid={`badge-status-${agent.id}`}
                     >
-                      {status}
+                      {t(status)}
                     </Badge>
                   </div>
                 );
@@ -473,7 +504,7 @@ export default function NexusOmega() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Enter research topic or question..."
+                  placeholder={t("enterResearchTopic")}
                   className="pl-10"
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   data-testid="input-search-query"
@@ -495,6 +526,7 @@ export default function NexusOmega() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickCommand(cmd.label)}
+                  title={t(cmd.descriptionKey)}
                   data-testid={`button-command-${cmd.label.replace("/", "")}`}
                 >
                   {cmd.label}
@@ -510,32 +542,32 @@ export default function NexusOmega() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Beaker className="h-4 w-4 text-primary" />
-                  Disciplines
+                  {t("disciplines")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
                 <ScrollArea className="h-[300px] pr-3">
                   <div className="space-y-4">
                     {disciplineCategories.map((category) => (
-                      <div key={category.name} className="space-y-2">
+                      <div key={category.nameKey} className="space-y-2">
                         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                           <category.icon className="h-3 w-3" />
-                          {category.name}
+                          {t(category.nameKey)}
                         </div>
                         <div className="space-y-1 pl-1">
                           {category.disciplines.map((discipline) => (
-                            <div key={discipline} className="flex items-center gap-2">
+                            <div key={discipline.id} className="flex items-center gap-2">
                               <Checkbox
-                                id={`discipline-${discipline}`}
-                                checked={selectedDisciplines.includes(discipline)}
-                                onCheckedChange={() => handleDisciplineToggle(discipline)}
-                                data-testid={`checkbox-discipline-${discipline.toLowerCase().replace(/\s+/g, "-")}`}
+                                id={`discipline-${discipline.id}`}
+                                checked={selectedDisciplines.includes(discipline.id)}
+                                onCheckedChange={() => handleDisciplineToggle(discipline.id)}
+                                data-testid={`checkbox-discipline-${discipline.id.toLowerCase().replace(/\s+/g, "-")}`}
                               />
                               <Label
-                                htmlFor={`discipline-${discipline}`}
+                                htmlFor={`discipline-${discipline.id}`}
                                 className="text-sm cursor-pointer"
                               >
-                                {discipline}
+                                {t(discipline.translationKey)}
                               </Label>
                             </div>
                           ))}
@@ -551,7 +583,7 @@ export default function NexusOmega() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Brain className="h-4 w-4 text-primary" />
-                  Research Focus
+                  {t("researchFocus")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
@@ -561,17 +593,17 @@ export default function NexusOmega() {
                   className="space-y-2"
                 >
                   {researchFocusOptions.map((option) => (
-                    <div key={option} className="flex items-center gap-2">
+                    <div key={option.id} className="flex items-center gap-2">
                       <RadioGroupItem
-                        value={option}
-                        id={`focus-${option}`}
-                        data-testid={`radio-focus-${option.toLowerCase().replace(/\s+/g, "-")}`}
+                        value={option.id}
+                        id={`focus-${option.id}`}
+                        data-testid={`radio-focus-${option.id.toLowerCase().replace(/\s+/g, "-")}`}
                       />
                       <Label
-                        htmlFor={`focus-${option}`}
+                        htmlFor={`focus-${option.id}`}
                         className="text-sm cursor-pointer"
                       >
-                        {option}
+                        {t(option.translationKey)}
                       </Label>
                     </div>
                   ))}
@@ -590,35 +622,35 @@ export default function NexusOmega() {
                       data-testid="tab-consensus"
                     >
                       <Activity className="h-4 w-4 mr-1" />
-                      Consensus
+                      {t("consensus")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="individual"
                       data-testid="tab-individual"
                     >
                       <MessageSquare className="h-4 w-4 mr-1" />
-                      Individual AI
+                      {t("individualAI")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="cross"
                       data-testid="tab-cross-disciplinary"
                     >
                       <Network className="h-4 w-4 mr-1" />
-                      Cross-Disciplinary
+                      {t("crossDisciplinary")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="hypotheses"
                       data-testid="tab-hypotheses"
                     >
                       <Lightbulb className="h-4 w-4 mr-1" />
-                      Hypotheses
+                      {t("hypotheses")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="debates"
                       data-testid="tab-debates"
                     >
                       <MessageSquare className="h-4 w-4 mr-1" />
-                      Debates
+                      {t("debates")}
                     </TabsTrigger>
                   </TabsList>
                 </CardHeader>
@@ -641,7 +673,7 @@ export default function NexusOmega() {
                             <div className="flex items-center gap-2 sticky top-0 bg-background py-2 z-10">
                               <div className={`w-3 h-3 rounded-full ${agent.colorClass}`} />
                               <h3 className="font-semibold text-base" data-testid={`heading-ai-${agent.id}`}>
-                                {agent.name} Perspectives
+                                {agent.name} {t("perspectives")}
                               </h3>
                             </div>
                             <div className="space-y-3 pl-2 border-l-2 border-muted ml-1.5">
@@ -657,7 +689,7 @@ export default function NexusOmega() {
                                       <div className="flex items-start justify-between gap-3 flex-wrap">
                                         <h4 className="font-medium text-sm">{finding.title}</h4>
                                         <Badge variant="outline" className="text-xs flex-shrink-0">
-                                          {analysis.confidence}% Confidence
+                                          {analysis.confidence}% {t("confidence")}
                                         </Badge>
                                       </div>
                                       <p className="text-sm text-muted-foreground">
@@ -667,7 +699,7 @@ export default function NexusOmega() {
                                         <div>
                                           <p className="text-xs font-medium text-foreground flex items-center gap-1 mb-1">
                                             <Lightbulb className="h-3 w-3" />
-                                            Key Points
+                                            {t("keyPoints")}
                                           </p>
                                           <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
                                             {analysis.keyPoints.map((point, i) => (
@@ -680,7 +712,7 @@ export default function NexusOmega() {
                                         <div>
                                           <p className="text-xs font-medium text-foreground flex items-center gap-1 mb-1">
                                             <Brain className="h-3 w-3" />
-                                            Unique Insights
+                                            {t("uniqueInsights")}
                                           </p>
                                           <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
                                             {analysis.uniqueInsights.map((insight, i) => (
@@ -701,29 +733,17 @@ export default function NexusOmega() {
                     <TabsContent value="cross" className="m-0">
                       <div className="bg-muted/50 rounded-md p-6 text-center">
                         <Network className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-medium mb-2">Cross-Disciplinary Insights</h3>
+                        <h3 className="text-lg font-medium mb-2">{t("crossDisciplinaryInsights")}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Discover connections between different fields of research.
+                          {t("discoverConnections")}
                         </p>
                       </div>
                     </TabsContent>
                     <TabsContent value="hypotheses" className="m-0">
-                      <div className="bg-muted/50 rounded-md p-6 text-center">
-                        <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-medium mb-2">Generated Hypotheses</h3>
-                        <p className="text-sm text-muted-foreground">
-                          AI-generated research hypotheses based on cross-disciplinary analysis.
-                        </p>
-                      </div>
+                      <HypothesisTracker />
                     </TabsContent>
                     <TabsContent value="debates" className="m-0">
-                      <div className="bg-muted/50 rounded-md p-6 text-center">
-                        <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-medium mb-2">AI Debates</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Watch AI agents debate different perspectives on research topics.
-                        </p>
-                      </div>
+                      <DebatePanel />
                     </TabsContent>
                   </ScrollArea>
                 </CardContent>
@@ -743,7 +763,7 @@ export default function NexusOmega() {
                     <ChevronRight className="h-4 w-4 text-primary" />
                   )}
                   <Network className="h-4 w-4 text-primary" />
-                  Knowledge Graph
+                  {t("knowledgeGraph")}
                 </CardTitle>
               </CardHeader>
             </CollapsibleTrigger>
@@ -755,8 +775,8 @@ export default function NexusOmega() {
                 >
                   <div className="text-center">
                     <Network className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Knowledge Graph Visualization</p>
-                    <p className="text-xs text-muted-foreground">Interactive concept mapping will appear here</p>
+                    <p className="text-sm text-muted-foreground">{t("knowledgeGraphVisualization")}</p>
+                    <p className="text-xs text-muted-foreground">{t("interactiveConceptMapping")}</p>
                   </div>
                 </div>
               </CardContent>
@@ -775,7 +795,7 @@ export default function NexusOmega() {
                     <ChevronRight className="h-4 w-4 text-primary" />
                   )}
                   <BookOpen className="h-4 w-4 text-primary" />
-                  Research Tools
+                  {t("researchTools")}
                 </CardTitle>
               </CardHeader>
             </CollapsibleTrigger>
@@ -787,39 +807,35 @@ export default function NexusOmega() {
                       value="hypotheses"
                       data-testid="tab-bottom-hypotheses"
                     >
-                      Hypothesis Tracker
+                      {t("hypothesisTracker")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="actions"
                       data-testid="tab-bottom-actions"
                     >
-                      Actions Queue
+                      {t("actionsQueue")}
                     </TabsTrigger>
                     <TabsTrigger
                       value="bibliography"
                       data-testid="tab-bottom-bibliography"
                     >
-                      Bibliography
+                      {t("bibliography")}
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="hypotheses" className="m-0">
-                    <div className="bg-muted/50 rounded-md p-4 border">
-                      <p className="text-sm text-muted-foreground text-center">
-                        Track and manage research hypotheses generated during your sessions.
-                      </p>
-                    </div>
+                    <HypothesisTracker variant="compact" />
                   </TabsContent>
                   <TabsContent value="actions" className="m-0">
                     <div className="bg-muted/50 rounded-md p-4 border">
                       <p className="text-sm text-muted-foreground text-center">
-                        Queue of research actions and follow-up tasks.
+                        {t("actionsQueueDesc")}
                       </p>
                     </div>
                   </TabsContent>
                   <TabsContent value="bibliography" className="m-0">
                     <div className="bg-muted/50 rounded-md p-4 border">
                       <p className="text-sm text-muted-foreground text-center">
-                        Auto-generated bibliography from research sources.
+                        {t("bibliographyDesc")}
                       </p>
                     </div>
                   </TabsContent>

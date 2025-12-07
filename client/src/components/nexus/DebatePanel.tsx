@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { NexusDebate } from "@shared/schema";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DebatePanelProps {
   variant?: "full" | "compact";
@@ -28,9 +29,9 @@ interface DebatePosition {
 }
 
 const priorityConfig = {
-  high: { label: "High Priority", colorClass: "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30" },
-  medium: { label: "Medium Priority", colorClass: "text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30" },
-  low: { label: "Low Priority", colorClass: "text-muted-foreground bg-muted" },
+  high: { labelKey: "highPriority", colorClass: "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30" },
+  medium: { labelKey: "mediumPriority", colorClass: "text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30" },
+  low: { labelKey: "lowPriority", colorClass: "text-muted-foreground bg-muted" },
 };
 
 const aiAgentColors: Record<string, string> = {
@@ -58,11 +59,13 @@ function PositionCard({
   side: "A" | "B";
   debateId: number;
 }) {
+  const { t } = useLanguage();
+
   if (!position) {
     return (
       <div className="flex-1 bg-muted/30 rounded-md p-4 text-center">
         <HelpCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">Position {side} not defined</p>
+        <p className="text-sm text-muted-foreground">{t("positionNotDefined")}</p>
       </div>
     );
   }
@@ -72,7 +75,7 @@ function PositionCard({
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant={side === "A" ? "default" : "secondary"} data-testid={`badge-position-${side}-${debateId}`}>
-            Position {side}
+            {t("position")} {side}
           </Badge>
           <div className="flex items-center gap-1">
             {position.supportingAIs.map((ai) => {
@@ -95,7 +98,7 @@ function PositionCard({
         </p>
         {position.evidence.length > 0 && (
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Evidence:</p>
+            <p className="text-xs font-medium text-muted-foreground">{t("evidence")}</p>
             <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
               {position.evidence.map((item, i) => (
                 <li key={i} data-testid={`evidence-${side}-${i}-${debateId}`}>{item}</li>
@@ -104,7 +107,7 @@ function PositionCard({
           </div>
         )}
         <div className="flex items-center gap-1 pt-1">
-          <span className="text-xs text-muted-foreground">Supported by:</span>
+          <span className="text-xs text-muted-foreground">{t("supportedBy")}</span>
           {position.supportingAIs.map((ai) => {
             const aiLower = ai.toLowerCase();
             return (
@@ -121,6 +124,7 @@ function PositionCard({
 }
 
 function DebateCard({ debate }: { debate: NexusDebate }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   
   const priority = (debate.priority as keyof typeof priorityConfig) || "medium";
@@ -139,7 +143,7 @@ function DebateCard({ debate }: { debate: NexusDebate }) {
                 <Scale className="h-4 w-4 text-primary" />
                 <Badge className={`text-xs ${config.colorClass}`} data-testid={`badge-priority-${debate.id}`}>
                   <Flag className="h-3 w-3 mr-1" />
-                  {config.label}
+                  {t(config.labelKey)}
                 </Badge>
                 {debate.status && (
                   <Badge variant="outline" className="text-xs" data-testid={`badge-debate-status-${debate.id}`}>
@@ -167,14 +171,14 @@ function DebateCard({ debate }: { debate: NexusDebate }) {
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 <span className="text-xs text-muted-foreground">
-                  Position A: {positionA?.supportingAIs?.length || 0} AIs
+                  {t("position")} A: {positionA?.supportingAIs?.length || 0} {t("ais")}
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">vs</span>
+              <span className="text-xs text-muted-foreground">{t("vs")}</span>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-orange-500" />
                 <span className="text-xs text-muted-foreground">
-                  Position B: {positionB?.supportingAIs?.length || 0} AIs
+                  {t("position")} B: {positionB?.supportingAIs?.length || 0} {t("ais")}
                 </span>
               </div>
             </div>
@@ -197,7 +201,7 @@ function DebateCard({ debate }: { debate: NexusDebate }) {
               <div className="bg-muted/50 rounded-md p-3 border">
                 <div className="flex items-center gap-2 mb-1">
                   <HelpCircle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Resolution Needed</span>
+                  <span className="text-sm font-medium">{t("resolutionNeeded")}</span>
                 </div>
                 <p className="text-sm text-muted-foreground" data-testid={`resolution-needed-${debate.id}`}>
                   {debate.resolutionNeeded}
@@ -231,6 +235,7 @@ function DebatePanelSkeleton() {
 }
 
 export function DebatePanel({ variant = "full" }: DebatePanelProps) {
+  const { t } = useLanguage();
   const { data: debates, isLoading, error } = useQuery<NexusDebate[]>({
     queryKey: ["/api/nexus/debates"],
   });
@@ -243,7 +248,7 @@ export function DebatePanel({ variant = "full" }: DebatePanelProps) {
     return (
       <div className="bg-destructive/10 text-destructive rounded-md p-4 text-center">
         <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-        <p className="text-sm">Failed to load debates</p>
+        <p className="text-sm">{t("failedToLoadDebates")}</p>
       </div>
     );
   }
@@ -252,9 +257,9 @@ export function DebatePanel({ variant = "full" }: DebatePanelProps) {
     return (
       <div className="bg-muted/50 rounded-md p-6 text-center border">
         <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-        <h3 className="text-lg font-medium mb-2">No Active Debates</h3>
+        <h3 className="text-lg font-medium mb-2">{t("noActiveDebates")}</h3>
         <p className="text-sm text-muted-foreground">
-          When AI agents disagree on research findings, debates will appear here for resolution.
+          {t("debatesWillAppear")}
         </p>
       </div>
     );
@@ -285,7 +290,7 @@ export function DebatePanel({ variant = "full" }: DebatePanelProps) {
         ))}
         {debates.length > 3 && (
           <p className="text-xs text-muted-foreground text-center">
-            +{debates.length - 3} more debates
+            +{debates.length - 3} {t("moreDebates")}
           </p>
         )}
       </div>
@@ -305,7 +310,7 @@ export function DebatePanel({ variant = "full" }: DebatePanelProps) {
             <div key={priority} className="space-y-2">
               <div className="flex items-center gap-2 sticky top-0 bg-background py-1 z-10">
                 <Flag className={`h-4 w-4 ${config.colorClass.split(" ")[0]}`} />
-                <h3 className="text-sm font-medium">{config.label}</h3>
+                <h3 className="text-sm font-medium">{t(config.labelKey)}</h3>
                 <Badge variant="outline" className="text-xs">{items.length}</Badge>
               </div>
               <div className="space-y-2 pl-2 border-l-2 border-muted ml-2">

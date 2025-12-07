@@ -21,19 +21,20 @@ import {
 import { useState } from "react";
 import type { NexusHypothesis } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface HypothesisTrackerProps {
   variant?: "full" | "compact";
 }
 
-const statusConfig = {
-  nascent: { label: "Nascent", icon: Clock, colorClass: "text-muted-foreground bg-muted" },
-  developing: { label: "Developing", icon: TrendingUp, colorClass: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
-  strong: { label: "Strong", icon: ThumbsUp, colorClass: "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30" },
-  validated: { label: "Validated", icon: CheckCircle, colorClass: "text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30" },
-  refuted: { label: "Refuted", icon: XCircle, colorClass: "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30" },
-  superseded: { label: "Superseded", icon: AlertTriangle, colorClass: "text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30" },
-};
+const getStatusConfig = (t: (key: string) => string) => ({
+  nascent: { label: t("nascent"), icon: Clock, colorClass: "text-muted-foreground bg-muted" },
+  developing: { label: t("developing"), icon: TrendingUp, colorClass: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
+  strong: { label: t("strong"), icon: ThumbsUp, colorClass: "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30" },
+  validated: { label: t("validated"), icon: CheckCircle, colorClass: "text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30" },
+  refuted: { label: t("refuted"), icon: XCircle, colorClass: "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30" },
+  superseded: { label: t("superseded"), icon: AlertTriangle, colorClass: "text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30" },
+});
 
 const aiAgentColors: Record<string, string> = {
   claude: "bg-[hsl(var(--ai-claude))]",
@@ -45,7 +46,9 @@ const aiAgentColors: Record<string, string> = {
 
 function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useLanguage();
   
+  const statusConfig = getStatusConfig(t);
   const status = hypothesis.status as keyof typeof statusConfig || "nascent";
   const config = statusConfig[status] || statusConfig.nascent;
   const StatusIcon = config.icon;
@@ -107,12 +110,12 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
             {hypothesis.proposedBy && (
               <div className="flex items-center gap-1.5">
                 <div className={`w-2.5 h-2.5 rounded-full ${aiAgentColors[hypothesis.proposedBy.toLowerCase()] || "bg-muted-foreground"}`} />
-                <span className="text-xs text-muted-foreground">Proposed by {hypothesis.proposedBy}</span>
+                <span className="text-xs text-muted-foreground">{t("proposedBy")} {hypothesis.proposedBy}</span>
               </div>
             )}
             {hypothesis.supportedBy && hypothesis.supportedBy.length > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">Supported by:</span>
+                <span className="text-xs text-muted-foreground">{t("supportedBy")}</span>
                 {hypothesis.supportedBy.map((ai) => (
                   <div
                     key={ai}
@@ -131,7 +134,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400">
                   <ThumbsUp className="h-4 w-4" />
-                  Supporting Evidence
+                  {t("supportingEvidence")}
                 </div>
                 <div className="space-y-1.5 pl-6">
                   {supportingEvidence.map((evidence, i) => (
@@ -148,7 +151,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
                   <ThumbsDown className="h-4 w-4" />
-                  Contradicting Evidence
+                  {t("contradictingEvidence")}
                 </div>
                 <div className="space-y-1.5 pl-6">
                   {contradictingEvidence.map((evidence, i) => (
@@ -165,7 +168,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Beaker className="h-4 w-4 text-primary" />
-                  Cross-Disciplinary Basis
+                  {t("crossDisciplinaryBasis")}
                 </div>
                 <div className="space-y-1.5 pl-6">
                   {crossDisciplinaryBasis.map((basis, i) => (
@@ -184,7 +187,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Beaker className="h-4 w-4 text-primary" />
-                  Testability
+                  {t("testability")}
                 </div>
                 <p className="text-sm text-muted-foreground pl-6" data-testid={`testability-${hypothesis.id}`}>
                   {hypothesis.testability}
@@ -196,7 +199,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <CheckCircle className="h-4 w-4 text-primary" />
-                  Action Items
+                  {t("actionItems")}
                 </div>
                 <div className="space-y-1 pl-6">
                   {actionItems.map((action, i) => (
@@ -213,7 +216,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
             )}
             
             <div className="flex items-center gap-2 pt-2 border-t border-muted flex-wrap">
-              <span className="text-xs text-muted-foreground">Update status:</span>
+              <span className="text-xs text-muted-foreground">{t("updateStatus")}</span>
               {Object.entries(statusConfig).map(([key, cfg]) => (
                 <Button
                   key={key}
@@ -255,6 +258,9 @@ function HypothesisTrackerSkeleton() {
 }
 
 export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) {
+  const { t } = useLanguage();
+  const statusConfig = getStatusConfig(t);
+  
   const { data: hypotheses, isLoading, error } = useQuery<NexusHypothesis[]>({
     queryKey: ["/api/nexus/hypotheses"],
   });
@@ -267,7 +273,7 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
     return (
       <div className="bg-destructive/10 text-destructive rounded-md p-4 text-center">
         <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-        <p className="text-sm">Failed to load hypotheses</p>
+        <p className="text-sm">{t("failedToLoadHypotheses")}</p>
       </div>
     );
   }
@@ -276,9 +282,9 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
     return (
       <div className="bg-muted/50 rounded-md p-6 text-center border">
         <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-        <h3 className="text-lg font-medium mb-2">No Hypotheses Yet</h3>
+        <h3 className="text-lg font-medium mb-2">{t("noHypothesesYet")}</h3>
         <p className="text-sm text-muted-foreground">
-          Run an OMEGA research query to generate hypotheses from cross-disciplinary analysis.
+          {t("runOmegaQuery")}
         </p>
       </div>
     );
@@ -309,7 +315,7 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
         ))}
         {hypotheses.length > 5 && (
           <p className="text-xs text-muted-foreground text-center">
-            +{hypotheses.length - 5} more hypotheses
+            +{hypotheses.length - 5} {t("moreHypotheses")}
           </p>
         )}
       </div>
