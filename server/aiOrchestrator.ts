@@ -1,5 +1,12 @@
 import { openai, AI_MODEL } from "./openai";
 import { storage } from "./storage";
+import { 
+  processDocument, 
+  processDocumentFromUrl,
+  extractTextFromPDF,
+  extractTextFromImage,
+  type DocumentProcessingResult,
+} from "./documentProcessor";
 import type { 
   Document, 
   Child, 
@@ -230,6 +237,68 @@ export async function analyzeDocument(
       summaryKa: "დოკუმენტის ანალიზი ვერ მოხერხდა",
       keyFindings: [],
       purpose: "",
+    };
+  }
+}
+
+export interface FullDocumentProcessingResult {
+  extraction: DocumentProcessingResult;
+  analysis: DocumentAnalysisResult;
+  success: boolean;
+  error?: string;
+}
+
+export async function processAndAnalyzeDocument(
+  filePath: string | null,
+  fileName: string,
+  fileType: string,
+  textContent?: string
+): Promise<FullDocumentProcessingResult> {
+  try {
+    const extraction = await processDocument(filePath, fileType, textContent);
+    
+    if (!extraction.success || !extraction.text) {
+      return {
+        extraction,
+        analysis: {
+          documentType: "other",
+          category: "Other",
+          summary: extraction.error || "Failed to extract document content",
+          summaryKa: "დოკუმენტის შინაარსის ამოღება ვერ მოხერხდა",
+          keyFindings: [],
+          purpose: "",
+        },
+        success: false,
+        error: extraction.error,
+      };
+    }
+
+    const analysis = await analyzeDocument(extraction.text, fileName, fileType);
+
+    return {
+      extraction,
+      analysis,
+      success: true,
+    };
+  } catch (error) {
+    console.error("Full document processing error:", error);
+    return {
+      extraction: {
+        success: false,
+        text: "",
+        extractionMethod: "none",
+        error: error instanceof Error ? error.message : "Processing failed",
+      },
+      analysis: {
+        documentType: "other",
+        category: "Other",
+        summary: "Document processing failed",
+        summaryKa: "დოკუმენტის დამუშავება ვერ მოხერხდა",
+        keyFindings: [],
+        purpose: "",
+      },
+      success: false,
+      error: error instanceof Error ? error.message : "Processing failed",
     };
   }
 }

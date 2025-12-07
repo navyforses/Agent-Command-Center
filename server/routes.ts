@@ -22,10 +22,12 @@ import {
   analyzeDocument, 
   executeAction, 
   processCommandCenterChat,
+  processAndAnalyzeDocument,
   type DocumentAnalysisResult,
   type ActionResult,
   type SuggestedAction,
   type CommandCenterChatResult,
+  type FullDocumentProcessingResult,
 } from "./aiOrchestrator";
 
 export async function registerRoutes(
@@ -1277,13 +1279,17 @@ Format your response as JSON with the following structure:
       });
       documentId = document.id;
 
-      // Analyze document with AI
-      const analysis = await analyzeDocument(
-        content || "",
+      // Process and analyze document with AI (includes PDF/image text extraction)
+      const processingResult = await processAndAnalyzeDocument(
+        filePath || null,
         title,
-        fileType || "unknown"
+        fileType || "unknown",
+        content
       );
-
+      
+      const analysis = processingResult.analysis;
+      const extractedText = processingResult.extraction.text || content || null;
+      
       // Update document with analysis results
       const updatedDocument = await storage.updateDocument(document.id, userId, {
         category: analysis.category,
@@ -1292,8 +1298,8 @@ Format your response as JSON with the following structure:
         aiSummaryKa: analysis.summaryKa,
         aiKeyFindings: analysis.keyFindings,
         purpose: analysis.purpose,
-        extractedText: content || null,
-        processingStatus: "completed",
+        extractedText,
+        processingStatus: processingResult.success ? "completed" : "failed",
       });
 
       // Create chat message about the upload
