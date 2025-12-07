@@ -1536,15 +1536,22 @@ export default function AIAssistant() {
               )}
 
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={sendMessage.isPending || isUploadingAttachments}
-                  data-testid="button-attach-file"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sendMessage.isPending || isUploadingAttachments}
+                      data-testid="button-attach-file"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {language === "en" ? "Attach file or photo" : "ფაილის ან ფოტოს მიმაგრება"}
+                  </TooltipContent>
+                </Tooltip>
                 <Input
                   placeholder={language === "en" ? "Ask me anything about your child's care..." : "მკითხეთ ნებისმიერი კითხვა თქვენი შვილის მოვლის შესახებ..."}
                   value={input}
