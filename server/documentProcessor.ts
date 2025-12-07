@@ -42,11 +42,10 @@ Respond with JSON:
 }`;
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProcessingResult> {
-  let parser: InstanceType<typeof PDFParse> | null = null;
   try {
-    parser = new PDFParse({ data: buffer });
-    const textResult = await parser.text();
-    const infoResult = await parser.info();
+    const uint8Array = new Uint8Array(buffer);
+    const parser = new PDFParse({ data: uint8Array });
+    const textResult = await parser.getText();
     
     const text = textResult.text?.trim() || "";
     const language = detectLanguage(text);
@@ -54,8 +53,8 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProces
     return {
       success: true,
       text,
-      pageCount: infoResult.numPages,
-      metadata: infoResult.info,
+      pageCount: textResult.numpages,
+      metadata: textResult.info,
       extractionMethod: "pdf",
       language,
     };
@@ -67,14 +66,6 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProces
       extractionMethod: "none",
       error: error instanceof Error ? error.message : "Failed to extract PDF text",
     };
-  } finally {
-    if (parser) {
-      try {
-        await parser.destroy();
-      } catch (destroyError) {
-        console.error("PDF parser cleanup error:", destroyError);
-      }
-    }
   }
 }
 

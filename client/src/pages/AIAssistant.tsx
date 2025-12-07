@@ -527,7 +527,7 @@ function DocumentUploadPanel({
             type="file"
             multiple
             accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-            className="absolute inset-0 opacity-0 cursor-pointer"
+            className="absolute inset-0 z-10 opacity-0 cursor-pointer"
             onChange={handleFileSelect}
             data-testid="input-ai-file-upload"
           />
