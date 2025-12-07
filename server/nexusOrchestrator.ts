@@ -65,6 +65,22 @@ interface SpecialistRecommendation {
   priority: "critical" | "important" | "supportive";
 }
 
+interface SwarmHypothesis {
+  id: string;
+  hypothesis: string;
+  confidence: number;
+  evidence: string[];
+  testability: string;
+  disciplines: string[];
+}
+
+interface SwarmDebateOutput {
+  agreements: { topic: string; supportingAgents: string[]; confidence: number }[];
+  disagreements: { topic: string; positions: { agent: string; position: string }[] }[];
+  synthesizedConclusions: string[];
+  emergentInsights: string[];
+}
+
 interface ResearchOrchestrationResult {
   query: NexusResearchQuery;
   finding: NexusFinding & {
@@ -78,28 +94,229 @@ interface ResearchOrchestrationResult {
   consensusLevel: "low" | "moderate" | "high" | "unanimous";
   processingTimeMs: number;
   diagnosisAnalyzed?: boolean;
+  swarmDebate?: SwarmDebateOutput;
+  swarmHypotheses?: SwarmHypothesis[];
 }
 
-const NEXUS_RESEARCH_SYSTEM_PROMPT = `You are an advanced research AI agent analyzing medical and scientific queries related to Hypoxic-Ischemic Encephalopathy (HIE) and related neurological conditions.
+const AI_AGENT_ROLES = {
+  claude: {
+    role: "Chief Analyst & Ethical Guardian",
+    strengths: [
+      "Deep nuanced analysis",
+      "Ethical evaluation", 
+      "Long context processing",
+      "Balanced perspective",
+      "Complex reasoning"
+    ],
+    primaryTasks: [
+      "In-depth literature analysis",
+      "Ethical implications assessment",
+      "Hypothesis logical validation",
+      "Consensus formulation"
+    ],
+    specialtyLens: ["Philosophical analysis", "Ethical framework", "Systems thinking"]
+  },
+  gpt4: {
+    role: "Creative Problem Solver & Synthesizer",
+    strengths: [
+      "Creative connection finding",
+      "Multi-domain knowledge",
+      "Technical analysis",
+      "Visualization and explanation",
+      "Broad general knowledge"
+    ],
+    primaryTasks: [
+      "Creative hypothesis generation",
+      "Cross-disciplinary connection finding",
+      "Technical modeling",
+      "Complex concept visualization"
+    ],
+    specialtyLens: ["Mathematical modeling", "Algorithmic thinking", "Creative synthesis"]
+  },
+  grok: {
+    role: "Real-Time Intelligence & Contrarian Thinker",
+    strengths: [
+      "Real-time monitoring",
+      "Unconventional perspectives",
+      "Fast direct responses",
+      "Early trend detection",
+      "First principles thinking"
+    ],
+    primaryTasks: [
+      "Real-time news monitoring",
+      "Social media signal analysis",
+      "Contrarian perspective provision",
+      "Early warning signals"
+    ],
+    specialtyLens: ["First principles reasoning", "Skeptical analysis", "Trend forecasting"]
+  },
+  gemini: {
+    role: "Multimodal Researcher & Data Integrator",
+    strengths: [
+      "Direct Google Scholar access",
+      "Multimodal analysis",
+      "Massive data processing",
+      "Academic rigor",
+      "Google ecosystem"
+    ],
+    primaryTasks: [
+      "Systematic academic literature review",
+      "Medical image analysis",
+      "Meta-analyses",
+      "Patent and funding research"
+    ],
+    specialtyLens: ["Statistical analysis", "Meta-analysis", "Data mining"]
+  },
+  perplexity: {
+    role: "Citation Hunter & Fact Verifier",
+    strengths: [
+      "Real-time source citation",
+      "Fact verification",
+      "Multi-source aggregation",
+      "Fast accurate responses",
+      "Automatic bibliography"
+    ],
+    primaryTasks: [
+      "Fact checking",
+      "Source validation",
+      "Bibliography compilation",
+      "Competitive information reconciliation"
+    ],
+    specialtyLens: ["Fact-checking", "Critical source evaluation", "Information reliability rating"]
+  }
+};
 
-Your task is to provide a structured research analysis. Respond with a JSON object containing:
+const MULTIDISCIPLINARY_SCIENCES = {
+  lifeSciences: {
+    name: "Life Sciences",
+    disciplines: [
+      { id: "Neuroscience", question: "How do neurons survive and regenerate after damage?" },
+      { id: "Cell Biology", question: "What cellular mechanisms drive regeneration?" },
+      { id: "Molecular Biology", question: "Which molecular pathways activate regeneration?" },
+      { id: "Biochemistry", question: "What metabolic processes support neural growth?" },
+      { id: "Pharmacology", question: "Which compounds stimulate neuronal growth?" },
+      { id: "Immunology", question: "How can immune response shift from destruction to regeneration?" },
+      { id: "Genetics", question: "What genes control regenerative capacity?" },
+      { id: "Developmental Biology", question: "How can we replicate natural brain formation?" }
+    ]
+  },
+  physicalSciences: {
+    name: "Physical Sciences",
+    disciplines: [
+      { id: "Physics", question: "What physical principles govern neural signal transmission?" },
+      { id: "Chemistry", question: "What chemical reactions enable synaptic plasticity?" },
+      { id: "Quantum Biology", question: "Do quantum effects play a role in neural function?" },
+      { id: "Biophysics", question: "How do physical forces affect neural development?" }
+    ]
+  },
+  mathematicalSciences: {
+    name: "Mathematical Sciences",
+    disciplines: [
+      { id: "Mathematics", question: "What mathematical models describe neural networks?" },
+      { id: "Statistics", question: "What statistical patterns emerge in treatment outcomes?" },
+      { id: "Network Theory", question: "How do neural network topologies affect recovery?" },
+      { id: "Complexity Science", question: "What emergent properties arise in neural systems?" }
+    ]
+  },
+  engineering: {
+    name: "Engineering",
+    disciplines: [
+      { id: "Biomedical Engineering", question: "What devices can support neural regeneration?" },
+      { id: "Materials Science", question: "What materials best interface with neural tissue?" },
+      { id: "Nanotechnology", question: "How can nanoscale delivery enhance treatment?" },
+      { id: "Computer Science", question: "What AI/ML patterns emerge in research data?" },
+      { id: "Electrical Engineering", question: "How can electrical stimulation promote healing?" }
+    ]
+  },
+  crossDisciplinary: {
+    name: "Cross-Disciplinary",
+    disciplines: [
+      { id: "Systems Biology", question: "How do multiple systems interact in recovery?" },
+      { id: "Cybernetics", question: "What feedback loops govern neural adaptation?" },
+      { id: "Epigenetics", question: "How can dormant regeneration genes be awakened?" },
+      { id: "Translational Medicine", question: "How do discoveries reach real patients?" }
+    ]
+  }
+};
+
+function getAgentSpecificPrompt(agentId: string, query: string): string {
+  const agent = AI_AGENT_ROLES[agentId as keyof typeof AI_AGENT_ROLES];
+  if (!agent) return getBaseResearchPrompt();
+  
+  return `You are ${agent.role} in the NEXUS OMEGA Multi-AI Swarm Intelligence System.
+
+YOUR UNIQUE STRENGTHS:
+${agent.strengths.map(s => `- ${s}`).join('\n')}
+
+YOUR PRIMARY TASKS:
+${agent.primaryTasks.map(t => `- ${t}`).join('\n')}
+
+YOUR SPECIALTY LENS:
+${agent.specialtyLens.map(l => `- ${l}`).join('\n')}
+
+MULTIDISCIPLINARY ANALYSIS FRAMEWORK:
+You must analyze the query through multiple scientific lenses:
+- Life Sciences: Neuroscience, Cell Biology, Molecular Biology, Pharmacology, Immunology
+- Physical Sciences: Physics, Chemistry, Quantum Biology
+- Mathematical Sciences: Mathematics, Statistics, Network Theory
+- Engineering: Biomedical, Materials Science, Nanotechnology, AI/ML
+- Cross-Disciplinary: Systems Biology, Cybernetics, Epigenetics
+
+SWARM INTELLIGENCE PROTOCOL:
+1. Provide your unique perspective based on your role and strengths
+2. Identify potential disagreements with other AI perspectives
+3. Suggest cross-connections between different scientific fields
+4. Generate novel hypotheses that emerge from interdisciplinary thinking
+5. Rate your confidence and explain your reasoning
+
+Respond with a JSON object:
+{
+  "summary": "Your analysis from your unique perspective (2-3 paragraphs)",
+  "keyPoints": ["Key finding 1", "Key finding 2", ...],
+  "concerns": ["Concern or limitation 1", ...],
+  "uniqueInsights": ["Novel insight from your specialty 1", ...],
+  "confidence": 85,
+  "reasoning": "Explanation of your confidence level",
+  "crossDisciplinaryConnections": [
+    {"fromField": "field1", "toField": "field2", "connection": "how they relate", "novelty": "high/medium/low"}
+  ],
+  "hypotheses": [
+    {"hypothesis": "Novel hypothesis statement", "evidence": "Supporting evidence", "testability": "How it could be tested"}
+  ],
+  "potentialDisagreements": ["Area where other AIs might disagree"],
+  "sources": [{"title": "Source name", "snippet": "Relevant excerpt"}]
+}`;
+}
+
+function getBaseResearchPrompt(): string {
+  return `You are an advanced research AI agent in the NEXUS OMEGA Swarm Intelligence System, analyzing medical and scientific queries related to Hypoxic-Ischemic Encephalopathy (HIE) and neurological conditions.
+
+Your task is to provide structured research analysis using multidisciplinary scientific perspectives.
+
+Respond with a JSON object containing:
 {
   "summary": "A concise summary of findings (2-3 paragraphs)",
   "keyPoints": ["Key point 1", "Key point 2", ...],
   "concerns": ["Concern or limitation 1", "Concern 2", ...],
   "uniqueInsights": ["Unique perspective or insight 1", ...],
   "confidence": 85,
+  "crossDisciplinaryConnections": [{"fromField": "...", "toField": "...", "connection": "..."}],
+  "hypotheses": [{"hypothesis": "...", "evidence": "...", "testability": "..."}],
   "sources": [{"title": "Source name", "snippet": "Relevant excerpt"}]
 }
 
 Focus on:
-- Evidence-based medical research
+- Evidence-based medical research across all scientific disciplines
 - Current clinical trials and emerging therapies
 - Neuroprotection mechanisms and pathways
-- Cross-disciplinary connections (neuroscience, immunology, pharmacology, etc.)
+- Cross-disciplinary connections (all sciences)
+- Novel hypothesis generation
 - Practical implications for treatment
 
 Be thorough but concise. Always cite confidence level (0-100) based on evidence strength.`;
+}
+
+const NEXUS_RESEARCH_SYSTEM_PROMPT = getBaseResearchPrompt();
 
 const DIAGNOSIS_TREATMENT_SYSTEM_PROMPT = `You are an advanced medical AI specializing in treatment planning for Hypoxic-Ischemic Encephalopathy (HIE) and related neurological conditions.
 
@@ -449,6 +666,157 @@ function calculateConsensusLevel(responses: AIResearchResponse[]): "low" | "mode
   return "unanimous";
 }
 
+interface SwarmDebateResult {
+  agreements: { topic: string; supportingAgents: string[]; confidence: number }[];
+  disagreements: { topic: string; positions: { agent: string; position: string }[] }[];
+  synthesizedConclusions: string[];
+  novelHypotheses: { hypothesis: string; originatingAgents: string[]; crossDisciplinaryBasis: string }[];
+  emergentInsights: string[];
+}
+
+async function runSwarmDebate(query: string, responses: AIResearchResponse[]): Promise<SwarmDebateResult> {
+  const successful = responses.filter(r => r.success && r.content);
+  if (successful.length < 2) {
+    return {
+      agreements: [],
+      disagreements: [],
+      synthesizedConclusions: successful[0]?.keyPoints || [],
+      novelHypotheses: [],
+      emergentInsights: [],
+    };
+  }
+
+  try {
+    const agentAnalyses = successful.map(r => ({
+      agent: r.provider,
+      role: AI_AGENT_ROLES[r.agentId as keyof typeof AI_AGENT_ROLES]?.role || "Research Agent",
+      summary: r.content,
+      keyPoints: r.keyPoints,
+      concerns: r.concerns,
+      uniqueInsights: r.uniqueInsights,
+      hypotheses: (r.rawResponse?.hypotheses as Array<{ hypothesis: string }>) || [],
+      crossConnections: (r.rawResponse?.crossDisciplinaryConnections as Array<{ fromField: string; toField: string; connection: string }>) || [],
+      potentialDisagreements: (r.rawResponse?.potentialDisagreements as string[]) || [],
+    }));
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are the NEXUS OMEGA Swarm Intelligence Synthesis Engine.
+          
+Your task is to analyze multiple AI agent research outputs and perform:
+1. CONSENSUS DETECTION: Identify where agents agree (with confidence scores)
+2. DISAGREEMENT ANALYSIS: Identify where agents disagree and what positions they hold
+3. DEBATE RESOLUTION: Synthesize disagreements into balanced conclusions
+4. HYPOTHESIS EMERGENCE: Identify novel hypotheses that emerge from combining perspectives
+5. EMERGENT INSIGHTS: Discover insights that no single agent found but emerge from synthesis
+
+Respond with JSON:
+{
+  "agreements": [{"topic": "...", "supportingAgents": ["Claude", "Gemini"], "confidence": 90}],
+  "disagreements": [{"topic": "...", "positions": [{"agent": "Claude", "position": "..."}, {"agent": "Grok", "position": "..."}]}],
+  "synthesizedConclusions": ["Conclusion that resolves disagreement 1", ...],
+  "novelHypotheses": [{"hypothesis": "...", "originatingAgents": ["Claude", "ChatGPT"], "crossDisciplinaryBasis": "Combines neuroscience with..."}],
+  "emergentInsights": ["Insight that emerges from combining all perspectives"]
+}`
+        },
+        {
+          role: "user",
+          content: `Research Query: ${query}\n\nAI Agent Analyses:\n${JSON.stringify(agentAnalyses, null, 2)}`
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(content);
+
+    return {
+      agreements: parsed.agreements || [],
+      disagreements: parsed.disagreements || [],
+      synthesizedConclusions: parsed.synthesizedConclusions || [],
+      novelHypotheses: parsed.novelHypotheses || [],
+      emergentInsights: parsed.emergentInsights || [],
+    };
+  } catch (error) {
+    console.error("Swarm debate error:", error);
+    return {
+      agreements: [],
+      disagreements: [],
+      synthesizedConclusions: [],
+      novelHypotheses: [],
+      emergentInsights: [],
+    };
+  }
+}
+
+async function generateSwarmHypotheses(
+  query: string,
+  responses: AIResearchResponse[],
+  debateResult: SwarmDebateResult
+): Promise<{ id: string; hypothesis: string; confidence: number; evidence: string[]; testability: string; disciplines: string[] }[]> {
+  const successful = responses.filter(r => r.success);
+  if (successful.length === 0) return [];
+
+  const allHypotheses: { hypothesis: string; evidence: string; testability?: string }[] = [];
+  for (const r of successful) {
+    const rawHypotheses = (r.rawResponse?.hypotheses as Array<{ hypothesis: string; evidence: string; testability?: string }>) || [];
+    allHypotheses.push(...rawHypotheses);
+  }
+
+  for (const h of debateResult.novelHypotheses) {
+    allHypotheses.push({
+      hypothesis: h.hypothesis,
+      evidence: h.crossDisciplinaryBasis,
+      testability: "Requires cross-disciplinary validation"
+    });
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Consolidate and rank research hypotheses by novelty and testability. 
+Remove duplicates, merge similar ones, and assign confidence scores.
+
+Respond with JSON array:
+[{
+  "id": "H1",
+  "hypothesis": "Clear hypothesis statement",
+  "confidence": 75,
+  "evidence": ["Supporting evidence 1", "Evidence 2"],
+  "testability": "How this hypothesis could be tested",
+  "disciplines": ["Neuroscience", "Pharmacology"]
+}]`
+        },
+        {
+          role: "user",
+          content: `Query: ${query}\n\nHypotheses to consolidate:\n${JSON.stringify(allHypotheses, null, 2)}`
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0]?.message?.content || "[]";
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : (parsed.hypotheses || []);
+  } catch (error) {
+    console.error("Hypothesis generation error:", error);
+    return allHypotheses.slice(0, 5).map((h, i) => ({
+      id: `H${i + 1}`,
+      hypothesis: h.hypothesis,
+      confidence: 60,
+      evidence: [h.evidence],
+      testability: h.testability || "To be determined",
+      disciplines: ["General"]
+    }));
+  }
+}
+
 async function synthesizeFindingTitle(query: string, responses: AIResearchResponse[]): Promise<string> {
   const successful = responses.filter(r => r.success);
   if (successful.length === 0) return `Research: ${query.substring(0, 50)}...`;
@@ -582,18 +950,21 @@ export async function runNexusResearch(
     ? `DIAGNOSIS DOCUMENT:\n${diagnosisContext}\n\nRESEARCH QUERY: ${queryText}\n\nAnalyze this diagnosis and provide treatment recommendations with required specialists.`
     : queryText;
 
-  const systemPrompt = hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : NEXUS_RESEARCH_SYSTEM_PROMPT;
-
   const responses = await Promise.all([
-    queryOpenAIResearchWithPrompt(effectiveQuery, systemPrompt),
-    queryGeminiResearchWithPrompt(effectiveQuery, systemPrompt),
-    queryAnthropicResearchWithPrompt(effectiveQuery, systemPrompt),
-    queryPerplexityResearchWithPrompt(effectiveQuery, systemPrompt),
-    queryGrokResearchWithPrompt(effectiveQuery, systemPrompt),
+    queryOpenAIResearchWithPrompt(effectiveQuery, hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : getAgentSpecificPrompt("gpt4", effectiveQuery)),
+    queryGeminiResearchWithPrompt(effectiveQuery, hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : getAgentSpecificPrompt("gemini", effectiveQuery)),
+    queryAnthropicResearchWithPrompt(effectiveQuery, hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : getAgentSpecificPrompt("claude", effectiveQuery)),
+    queryPerplexityResearchWithPrompt(effectiveQuery, hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : getAgentSpecificPrompt("perplexity", effectiveQuery)),
+    queryGrokResearchWithPrompt(effectiveQuery, hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : getAgentSpecificPrompt("grok", effectiveQuery)),
   ]);
 
   const successfulResponses = responses.filter(r => r.success);
   console.log(`NEXUS Research: ${successfulResponses.length}/5 AI agents responded`);
+
+  // Run Swarm Intelligence: Debate and Hypothesis Generation
+  const debateResult = await runSwarmDebate(queryText, responses);
+  const swarmHypotheses = await generateSwarmHypotheses(queryText, responses, debateResult);
+  console.log(`NEXUS Swarm: ${debateResult.agreements.length} agreements, ${debateResult.disagreements.length} disagreements, ${swarmHypotheses.length} hypotheses`);
 
   await storage.updateNexusResearchQuery(queryId, userId, { status: "analyzing" });
 
@@ -729,5 +1100,12 @@ export async function runNexusResearch(
     consensusLevel,
     processingTimeMs: Date.now() - startTime,
     diagnosisAnalyzed: hasDiagnosis,
+    swarmDebate: {
+      agreements: debateResult.agreements,
+      disagreements: debateResult.disagreements,
+      synthesizedConclusions: debateResult.synthesizedConclusions,
+      emergentInsights: debateResult.emergentInsights,
+    },
+    swarmHypotheses,
   };
 }

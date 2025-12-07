@@ -28,15 +28,15 @@ export interface Finding {
   consensusLevel: "5/5" | "4/5" | "3/5" | "2/5" | "1/5";
   confidenceScore: number;
   relevanceScore: number;
-  aiAnalyses: {
+  aiAnalyses: Partial<{
     claude: AIAnalysis;
     chatgpt: AIAnalysis;
     grok: AIAnalysis;
     gemini: AIAnalysis;
     perplexity: AIAnalysis;
-  };
+  }>;
   disciplinaryAnalyses: Record<string, string>;
-  sources: Array<{ title: string; url: string; doi?: string }>;
+  sources: Array<{ title: string; url?: string; doi?: string }>;
   createdAt: Date;
 }
 
@@ -161,6 +161,7 @@ export function FindingCard({ finding, variant = "default" }: FindingCardProps) 
               {aiAgentConfig.map((agent) => {
                 const analysis =
                   finding.aiAnalyses[agent.id as keyof typeof finding.aiAnalyses];
+                if (!analysis) return null;
                 return (
                   <div
                     key={agent.id}
@@ -286,16 +287,22 @@ export function FindingCard({ finding, variant = "default" }: FindingCardProps) 
                   >
                     <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm hover:underline flex items-center gap-1"
-                        data-testid={`link-source-${i}-${finding.id}`}
-                      >
-                        {source.title}
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                      </a>
+                      {source.url ? (
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm hover:underline flex items-center gap-1"
+                          data-testid={`link-source-${i}-${finding.id}`}
+                        >
+                          {source.title}
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-sm" data-testid={`text-source-${i}-${finding.id}`}>
+                          {source.title}
+                        </span>
+                      )}
                       {source.doi && (
                         <p className="text-xs text-muted-foreground">
                           DOI: {source.doi}
