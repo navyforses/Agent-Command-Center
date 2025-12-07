@@ -74,7 +74,9 @@ export interface IStorage {
   deleteEmail(id: number, userId: string): Promise<boolean>;
 
   getChatMessages(userId: string): Promise<ChatMessage[]>;
+  getChatMessage(id: number, userId: string): Promise<ChatMessage | undefined>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  updateChatMessage(id: number, userId: string, message: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
   clearChatMessages(userId: string): Promise<boolean>;
 
   getApprovedTestimonials(): Promise<Testimonial[]>;
@@ -343,9 +345,24 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(chatMessages).where(eq(chatMessages.userId, userId));
   }
 
+  async getChatMessage(id: number, userId: string): Promise<ChatMessage | undefined> {
+    const [message] = await db.select().from(chatMessages)
+      .where(and(eq(chatMessages.id, id), eq(chatMessages.userId, userId)));
+    return message;
+  }
+
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     const [newMessage] = await db.insert(chatMessages).values(message).returning();
     return newMessage;
+  }
+
+  async updateChatMessage(id: number, userId: string, message: Partial<InsertChatMessage>): Promise<ChatMessage | undefined> {
+    const [updatedMessage] = await db
+      .update(chatMessages)
+      .set(message)
+      .where(and(eq(chatMessages.id, id), eq(chatMessages.userId, userId)))
+      .returning();
+    return updatedMessage;
   }
 
   async clearChatMessages(userId: string): Promise<boolean> {

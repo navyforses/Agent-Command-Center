@@ -324,17 +324,28 @@ export async function executeAction(
   }
 }
 
+export interface SuggestedAction {
+  actionType: string;
+  actionData: any;
+  description: string;
+  descriptionKa?: string;
+  status: "pending" | "confirmed" | "executed" | "cancelled";
+}
+
+export interface CommandCenterChatResult {
+  content: string;
+  suggestedActions?: SuggestedAction[];
+  executedActions?: ActionResult[];
+  documentIds?: number[];
+}
+
 export async function processCommandCenterChat(
   userId: string,
   content: string,
   chatHistory: Array<{ role: "user" | "assistant"; content: string }>,
   documents: Document[],
   children: Child[]
-): Promise<{
-  content: string;
-  actions?: ActionResult[];
-  documentIds?: number[];
-}> {
+): Promise<CommandCenterChatResult> {
   const contextPrompt = buildContextPrompt(documents, children);
   
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -351,7 +362,7 @@ export async function processCommandCenterChat(
   });
 
   const responseMessage = completion.choices[0]?.message;
-  const actions: ActionResult[] = [];
+  const suggestedActions: SuggestedAction[] = [];
 
   if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
     for (const toolCall of responseMessage.tool_calls) {
@@ -360,18 +371,57 @@ export async function processCommandCenterChat(
         
         switch (toolCall.function.name) {
           case "createChildProfile":
-            const childResult = await executeAction("create_child", args, userId);
-            actions.push(childResult);
+            suggestedActions.push({
+              actionType: "create_child",
+              actionData: args,
+              description: `Create child profile for ${args.firstName} ${args.lastName}`,
+              descriptionKa: `შექმენით ბავშვის პროფილი: ${args.firstName} ${args.lastName}`,
+              status: "pending",
+            });
             break;
             
           case "addTherapy":
-            const therapyResult = await executeAction("add_therapy", args, userId);
-            actions.push(therapyResult);
+            suggestedActions.push({
+              actionType: "add_therapy",
+              actionData: args,
+              description: `Add ${args.type} therapy`,
+              descriptionKa: `დაამატეთ ${args.type} თერაპია`,
+              status: "pending",
+            });
             break;
             
           case "scheduleAppointment":
-            const appointmentResult = await executeAction("schedule_appointment", args, userId);
-            actions.push(appointmentResult);
+            suggestedActions.push({
+              actionType: "schedule_appointment",
+              actionData: args,
+              description: `Schedule appointment: ${args.title}`,
+              descriptionKa: `დანიშნეთ ვიზიტი: ${args.title}`,
+              status: "pending",
+            });
+            break;
+            
+          case "sendEmail":
+            suggestedActions.push({
+              actionType: "send_email",
+              actionData: args,
+              description: `Send email to ${args.to}: ${args.subject}`,
+              descriptionKa: `გაგზავნეთ ელ-ფოსტა ${args.to}-ზე: ${args.subject}`,
+              status: "pending",
+            });
+            break;
+            
+          case "analyzeDocument":
+            suggestedActions.push({
+              actionType: "analyze_document",
+              actionData: args,
+              description: `Analyze document${args.documentId ? ` (ID: ${args.documentId})` : ''}`,
+              descriptionKa: `გააანალიზეთ დოკუმენტი${args.documentId ? ` (ID: ${args.documentId})` : ''}`,
+              status: "pending",
+            });
+            break;
+            
+          default:
+            console.warn(`Unknown tool call: ${toolCall.function.name}`);
             break;
         }
       }
@@ -379,19 +429,17 @@ export async function processCommandCenterChat(
 
     let responseContent = responseMessage.content || "";
     
-    if (actions.length > 0) {
-      const actionSummary = actions
-        .map(a => a.success ? `${a.message}` : `Failed: ${a.message}`)
+    if (suggestedActions.length > 0 && !responseContent) {
+      const actionSummary = suggestedActions
+        .map(a => `- ${a.description}`)
         .join("\n");
       
-      if (!responseContent) {
-        responseContent = `I've completed the following actions:\n\n${actionSummary}`;
-      }
+      responseContent = `Based on your request, I suggest the following actions:\n\n${actionSummary}\n\nPlease confirm or cancel each action.`;
     }
 
     return {
       content: responseContent,
-      actions,
+      suggestedActions,
     };
   }
 
