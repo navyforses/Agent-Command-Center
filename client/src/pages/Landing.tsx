@@ -12,10 +12,13 @@ import {
   Globe,
   ArrowRight,
   CheckCircle,
+  Star,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { useQuery } from "@tanstack/react-query";
+import type { Testimonial } from "@shared/schema";
 
 const features = [
   {
@@ -62,25 +65,52 @@ const features = [
   },
 ];
 
-const testimonials = [
+const fallbackTestimonials = [
   {
-    quote: "This platform helped us understand our son's MRI results and find the right therapies.",
-    quoteKa: "ეს პლატფორმა დაგვეხმარა გვესმოდა ჩვენი შვილის MRI შედეგები.",
-    author: "Nino M.",
-    role: "Parent of 2-year-old with HIE",
-    roleKa: "2 წლის HIE-ით დაავადებული ბავშვის დედა",
+    id: 0,
+    content: "This platform helped us understand our son's MRI results and find the right therapies.",
+    contentKa: "ეს პლატფორმა დაგვეხმარა გვესმოდა ჩვენი შვილის MRI შედეგები.",
+    authorName: "Nino M.",
+    authorRole: "Parent of 2-year-old with HIE",
+    authorRoleKa: "2 წლის HIE-ით დაავადებული ბავშვის დედა",
+    rating: 5,
   },
   {
-    quote: "The AI assistant saved us hours of research and helped us communicate with specialists abroad.",
-    quoteKa: "AI ასისტენტმა დაგვიზოგა საათობით კვლევა და დაგვეხმარა უცხოელ სპეციალისტებთან კომუნიკაციაში.",
-    author: "Giorgi K.",
-    role: "Father of twins with HIE",
-    roleKa: "HIE-ით დაავადებული ტყუპების მამა",
+    id: 1,
+    content: "The AI assistant saved us hours of research and helped us communicate with specialists abroad.",
+    contentKa: "AI ასისტენტმა დაგვიზოგა საათობით კვლევა და დაგვეხმარა უცხოელ სპეციალისტებთან კომუნიკაციაში.",
+    authorName: "Giorgi K.",
+    authorRole: "Father of twins with HIE",
+    authorRoleKa: "HIE-ით დაავადებული ტყუპების მამა",
+    rating: 5,
   },
 ];
 
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-0.5" data-testid="star-rating">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`h-4 w-4 ${
+            star <= rating
+              ? "fill-yellow-400 text-yellow-400"
+              : "text-muted-foreground/30"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Landing() {
   const { language, t } = useLanguage();
+  
+  const { data: testimonials = [] } = useQuery<Testimonial[]>({
+    queryKey: ['/api/testimonials'],
+  });
+
+  const displayTestimonials = testimonials.length > 0 ? testimonials : fallbackTestimonials;
 
   return (
     <div className="min-h-screen bg-background">
@@ -164,22 +194,25 @@ export default function Landing() {
               {language === "en" ? "Trusted by Families" : "ოჯახების ნდობა"}
             </h2>
             <div className="grid md:grid-cols-2 gap-6">
-              {testimonials.map((testimonial, i) => (
-                <Card key={i} data-testid={`testimonial-card-${i}`}>
+              {displayTestimonials.map((testimonial, i) => (
+                <Card key={testimonial.id} data-testid={`testimonial-card-${testimonial.id}`}>
                   <CardContent className="p-6">
+                    <div className="mb-3">
+                      <StarRating rating={testimonial.rating} />
+                    </div>
                     <p className="text-muted-foreground mb-4 italic">
-                      "{language === "en" ? testimonial.quote : testimonial.quoteKa}"
+                      "{language === "en" ? testimonial.content : (testimonial.contentKa || testimonial.content)}"
                     </p>
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-semibold text-primary">
-                          {testimonial.author[0]}
+                          {testimonial.authorName[0]}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{testimonial.author}</p>
+                        <p className="font-medium text-sm">{testimonial.authorName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {language === "en" ? testimonial.role : testimonial.roleKa}
+                          {language === "en" ? testimonial.authorRole : (testimonial.authorRoleKa || testimonial.authorRole)}
                         </p>
                       </div>
                     </div>

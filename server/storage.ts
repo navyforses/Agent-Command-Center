@@ -7,6 +7,7 @@ import {
   appointments,
   emails,
   chatMessages,
+  testimonials,
   type User,
   type UpsertUser,
   type Child,
@@ -23,9 +24,11 @@ import {
   type InsertEmail,
   type ChatMessage,
   type InsertChatMessage,
+  type Testimonial,
+  type InsertTestimonial,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -73,6 +76,12 @@ export interface IStorage {
   getChatMessages(userId: string): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   clearChatMessages(userId: string): Promise<boolean>;
+
+  getApprovedTestimonials(): Promise<Testimonial[]>;
+  getUserTestimonial(userId: string): Promise<Testimonial | undefined>;
+  createTestimonial(testimonial: InsertTestimonial): Promise<Testimonial>;
+  updateTestimonial(id: number, userId: string, testimonial: Partial<InsertTestimonial>): Promise<Testimonial | undefined>;
+  deleteTestimonial(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -344,6 +353,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(chatMessages.userId, userId))
       .returning();
     return result.length >= 0;
+  }
+
+  async getApprovedTestimonials(): Promise<Testimonial[]> {
+    return db.select().from(testimonials)
+      .where(eq(testimonials.isApproved, true))
+      .orderBy(desc(testimonials.createdAt));
+  }
+
+  async getUserTestimonial(userId: string): Promise<Testimonial | undefined> {
+    const [testimonial] = await db.select().from(testimonials)
+      .where(eq(testimonials.userId, userId));
+    return testimonial;
+  }
+
+  async createTestimonial(testimonial: InsertTestimonial): Promise<Testimonial> {
+    const [newTestimonial] = await db.insert(testimonials).values(testimonial).returning();
+    return newTestimonial;
+  }
+
+  async updateTestimonial(id: number, userId: string, testimonial: Partial<InsertTestimonial>): Promise<Testimonial | undefined> {
+    const [updatedTestimonial] = await db
+      .update(testimonials)
+      .set(testimonial)
+      .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
+      .returning();
+    return updatedTestimonial;
+  }
+
+  async deleteTestimonial(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(testimonials)
+      .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
+      .returning();
+    return result.length > 0;
   }
 }
 
