@@ -10,6 +10,7 @@ import {
   insertAppointmentSchema,
   insertEmailSchema,
   insertChatMessageSchema,
+  insertTestimonialSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -951,6 +952,99 @@ Format your response as JSON with the following structure:
     });
     
     res.json(document);
+  });
+
+  // Testimonials routes - PUBLIC GET for landing page
+  app.get("/api/testimonials", async (req, res) => {
+    try {
+      const testimonials = await storage.getApprovedTestimonials();
+      res.json(testimonials);
+    } catch (error) {
+      console.error("Error fetching testimonials:", error);
+      res.status(500).json({ message: "Failed to fetch testimonials" });
+    }
+  });
+
+  // Get current user's testimonial (authenticated)
+  app.get("/api/testimonials/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const testimonial = await storage.getUserTestimonial(userId);
+      res.json(testimonial || null);
+    } catch (error) {
+      console.error("Error fetching user testimonial:", error);
+      res.status(500).json({ message: "Failed to fetch testimonial" });
+    }
+  });
+
+  // Create testimonial (authenticated)
+  app.post("/api/testimonials", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if user already has a testimonial
+      const existing = await storage.getUserTestimonial(userId);
+      if (existing) {
+        return res.status(400).json({ message: "You already have a testimonial. Please update it instead." });
+      }
+      
+      const parseResult = insertTestimonialSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid testimonial data", errors: parseResult.error.errors });
+      }
+      
+      const testimonial = await storage.createTestimonial(parseResult.data);
+      res.status(201).json(testimonial);
+    } catch (error) {
+      console.error("Error creating testimonial:", error);
+      res.status(500).json({ message: "Failed to create testimonial" });
+    }
+  });
+
+  // Update testimonial (authenticated - own only)
+  app.patch("/api/testimonials/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid testimonial ID" });
+      }
+      
+      const { userId: _, isApproved: __, ...bodyWithoutSensitiveFields } = req.body;
+      const parseResult = insertTestimonialSchema.partial().safeParse(bodyWithoutSensitiveFields);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid testimonial data", errors: parseResult.error.errors });
+      }
+      
+      const testimonial = await storage.updateTestimonial(id, userId, parseResult.data);
+      if (!testimonial) {
+        return res.status(404).json({ message: "Testimonial not found" });
+      }
+      res.json(testimonial);
+    } catch (error) {
+      console.error("Error updating testimonial:", error);
+      res.status(500).json({ message: "Failed to update testimonial" });
+    }
+  });
+
+  // Delete testimonial (authenticated - own only)
+  app.delete("/api/testimonials/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid testimonial ID" });
+      }
+      
+      const deleted = await storage.deleteTestimonial(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Testimonial not found" });
+      }
+      res.json({ message: "Testimonial deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting testimonial:", error);
+      res.status(500).json({ message: "Failed to delete testimonial" });
+    }
   });
 
   return httpServer;
