@@ -408,6 +408,26 @@ export interface CommandCenterChatResult {
   documentIds?: number[];
 }
 
+function shouldIncludeFullContent(userMessage: string): boolean {
+  const contentTriggers = [
+    "what does", "what do", "what is", "what are",
+    "tell me about", "explain", "describe", "summarize",
+    "find in", "look for", "search",
+    "according to", "based on", "in the document", "in my document",
+    "from the", "from my",
+    "details", "information about", "info about",
+    "report", "results", "findings", "diagnosis",
+    "treatment", "therapy", "medication", "prescription",
+    "history", "condition", "progress",
+    "mri", "scan", "test", "lab",
+    "რას ნიშნავს", "რა არის", "ახსენი", "აღწერე", "შემაჯამე",
+    "მოძებნე", "დოკუმენტში", "ანგარიშში",
+  ];
+  
+  const lowerMessage = userMessage.toLowerCase();
+  return contentTriggers.some(trigger => lowerMessage.includes(trigger));
+}
+
 export async function processCommandCenterChat(
   userId: string,
   content: string,
@@ -415,7 +435,8 @@ export async function processCommandCenterChat(
   documents: Document[],
   children: Child[]
 ): Promise<CommandCenterChatResult> {
-  const contextPrompt = buildContextPrompt(documents, children);
+  const includeFullContent = shouldIncludeFullContent(content);
+  const contextPrompt = buildContextPrompt(documents, children, includeFullContent);
   
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: COMMAND_CENTER_SYSTEM_PROMPT + "\n\n" + contextPrompt },
@@ -517,31 +538,65 @@ export async function processCommandCenterChat(
   };
 }
 
-function buildContextPrompt(documents: Document[], children: Child[]): string {
-  let context = "Current Context:\n\n";
+function buildContextPrompt(documents: Document[], children: Child[], includeFullContent: boolean = false): string {
+  let context = "=== KNOWLEDGE BASE ===\n\n";
 
   if (children.length > 0) {
-    context += "Children in the system:\n";
+    context += "CHILD PROFILES:\n";
     children.forEach(child => {
-      context += `- ${child.firstName} ${child.lastName}`;
-      if (child.diagnosis) context += ` (Diagnosis: ${child.diagnosis})`;
-      if (child.dateOfBirth) context += ` (DOB: ${child.dateOfBirth})`;
-      context += ` [ID: ${child.id}]\n`;
+      context += `\n--- Child: ${child.firstName} ${child.lastName} [ID: ${child.id}] ---\n`;
+      if (child.dateOfBirth) context += `Date of Birth: ${child.dateOfBirth}\n`;
+      if (child.diagnosis) context += `Diagnosis: ${child.diagnosis}\n`;
+      if (child.diagnosisDate) context += `Diagnosis Date: ${child.diagnosisDate}\n`;
+      if (child.notes) context += `Notes: ${child.notes}\n`;
     });
     context += "\n";
   } else {
-    context += "No children profiles have been created yet.\n\n";
+    context += "CHILD PROFILES: None created yet.\n\n";
   }
 
   if (documents.length > 0) {
-    context += "Uploaded documents:\n";
-    documents.slice(0, 10).forEach(doc => {
-      context += `- ${doc.title} (${doc.category || "Uncategorized"})`;
-      if (doc.aiSummary) context += `: ${doc.aiSummary}`;
-      context += ` [ID: ${doc.id}]\n`;
+    context += "MEDICAL DOCUMENTS:\n";
+    context += "(Use this information to answer questions about the child's condition, treatments, and medical history)\n\n";
+    
+    documents.forEach((doc, index) => {
+      context += `--- Document ${index + 1}: ${doc.title} [ID: ${doc.id}] ---\n`;
+      context += `Type: ${doc.documentType || "Unknown"}\n`;
+      context += `Category: ${doc.category || "Uncategorized"}\n`;
+      
+      if (doc.purpose) {
+        context += `Purpose: ${doc.purpose}\n`;
+      }
+      
+      if (doc.aiSummary) {
+        context += `Summary: ${doc.aiSummary}\n`;
+      }
+      
+      if (doc.aiKeyFindings && Array.isArray(doc.aiKeyFindings) && doc.aiKeyFindings.length > 0) {
+        context += `Key Findings:\n`;
+        doc.aiKeyFindings.forEach(finding => {
+          if (finding) {
+            context += `  - ${finding}\n`;
+          }
+        });
+      }
+      
+      if (includeFullContent && doc.extractedText && typeof doc.extractedText === 'string') {
+        const maxTextLength = 3000;
+        const text = doc.extractedText.length > maxTextLength 
+          ? doc.extractedText.substring(0, maxTextLength) + "... [truncated]"
+          : doc.extractedText;
+        context += `\nFull Document Content:\n${text}\n`;
+      }
+      
+      context += "\n";
     });
-    context += "\n";
+  } else {
+    context += "MEDICAL DOCUMENTS: No documents uploaded yet.\n\n";
   }
+
+  context += "=== END KNOWLEDGE BASE ===\n\n";
+  context += "INSTRUCTIONS: When answering questions about the child's medical condition, treatments, or history, reference the documents and information above. Cite specific documents by name when relevant. If asked about something not in the knowledge base, clearly state that information is not available in the uploaded documents.\n";
 
   return context;
 }
