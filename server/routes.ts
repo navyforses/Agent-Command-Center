@@ -13,7 +13,8 @@ import {
   insertTestimonialSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
-import { getConsensusResponse } from "./multiAI";
+import { getConsensusResponse, getConsensusSearchResponse } from "./multiAI";
+import { searchWeb, shouldTriggerSearch } from "./search";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { sendEmail } from "./resend";
@@ -809,16 +810,54 @@ Be supportive and understanding of the emotional challenges parents face.`;
         .filter(msg => msg.role === "user" || msg.role === "assistant")
         .map(msg => ({ role: msg.role as "user" | "assistant", content: msg.content }));
 
-      // Get consensus response from multiple AIs (OpenAI + Gemini)
-      const consensusResult = await getConsensusResponse(consensusSystemPrompt, content, formattedHistory);
+      // Check if this is a search query that should trigger deep web search
+      const isSearchQuery = shouldTriggerSearch(content);
+      
+      let consensusResult;
+      let searchSources: { title: string; url: string; snippet: string }[] = [];
+      
+      if (isSearchQuery) {
+        console.log("Deep search triggered for query:", content);
+        
+        // Perform web search first
+        const searchResponse = await searchWeb(content, 5);
+        searchSources = searchResponse.results;
+        
+        console.log(`Tavily search returned ${searchSources.length} results`);
+        
+        if (searchSources.length > 0) {
+          // Use search-enhanced consensus response
+          const searchConsensusResult = await getConsensusSearchResponse(
+            content,
+            searchSources,
+            formattedHistory
+          );
+          
+          consensusResult = {
+            content: searchConsensusResult.content,
+            sources: searchConsensusResult.sources,
+            processingTime: searchConsensusResult.processingTime,
+          };
+          
+          console.log(`Multi-AI search consensus: ${consensusResult.sources.length} provider(s) responded in ${consensusResult.processingTime}ms`);
+        } else {
+          // Fallback to regular consensus if no search results
+          consensusResult = await getConsensusResponse(consensusSystemPrompt, content, formattedHistory);
+          console.log(`Multi-AI consensus (no search results): ${consensusResult.sources.length} provider(s) responded in ${consensusResult.processingTime}ms`);
+        }
+      } else {
+        // Regular multi-AI consensus without search
+        consensusResult = await getConsensusResponse(consensusSystemPrompt, content, formattedHistory);
+        console.log(`Multi-AI consensus: ${consensusResult.sources.length} provider(s) responded (${consensusResult.sources.join(", ") || "none"}) in ${consensusResult.processingTime}ms`);
+      }
 
-      console.log(`Multi-AI consensus: ${consensusResult.sources.length} provider(s) responded (${consensusResult.sources.join(", ") || "none"}) in ${consensusResult.processingTime}ms`);
-
-      // Save the AI response
+      // Save the AI response with search sources if available
       const assistantMessage = await storage.createChatMessage({
         userId,
         role: "assistant",
         content: consensusResult.content,
+        searchSources: searchSources.length > 0 ? searchSources : null,
+        isSearchResult: isSearchQuery && searchSources.length > 0,
       });
 
       res.json(assistantMessage);

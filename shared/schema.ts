@@ -177,16 +177,27 @@ export const chatMessages = pgTable("chat_messages", {
   userId: varchar("user_id").references(() => users.id),
   role: varchar("role"),
   content: text("content").notNull(),
+  searchSources: jsonb("search_sources"),
+  isSearchResult: boolean("is_search_result").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+export const searchSourceSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  snippet: z.string(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages, {
+  searchSources: z.array(searchSourceSchema).nullable().optional(),
+}).omit({
   id: true,
   createdAt: true,
 });
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type SearchSource = z.infer<typeof searchSourceSchema>;
 
 // Testimonials table for public reviews
 export const testimonials = pgTable("testimonials", {

@@ -20,8 +20,17 @@ import {
   Activity,
   Mail,
   HelpCircle,
+  Search,
+  ExternalLink,
+  Globe,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+interface SearchSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
 
 interface Message {
   id: string;
@@ -29,6 +38,8 @@ interface Message {
   content: string;
   timestamp: Date;
   sources?: { title: string; type: string }[];
+  searchSources?: SearchSource[];
+  isSearchResult?: boolean;
 }
 
 const quickActions = [
@@ -54,6 +65,8 @@ function transformChatMessage(chatMessage: ChatMessage): Message {
     role: chatMessage.role as "user" | "assistant",
     content: chatMessage.content,
     timestamp: chatMessage.createdAt ? new Date(chatMessage.createdAt) : new Date(),
+    searchSources: chatMessage.searchSources as SearchSource[] | undefined,
+    isSearchResult: chatMessage.isSearchResult ?? false,
   };
 }
 
@@ -233,6 +246,39 @@ export default function AIAssistant() {
                   <Card className={`max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : ""}`}>
                     <CardContent className="p-4">
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.searchSources && message.searchSources.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-border/50">
+                          <div className="flex items-center gap-1 mb-2">
+                            <Globe className="h-3 w-3 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">Web Sources:</p>
+                          </div>
+                          <div className="space-y-2">
+                            {message.searchSources.map((source, i) => (
+                              <a
+                                key={i}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-2 p-2 rounded-md bg-background/50 hover-elevate group"
+                                data-testid={`link-source-${i}`}
+                              >
+                                <Badge variant="secondary" className="text-xs shrink-0 mt-0.5">
+                                  {i + 1}
+                                </Badge>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate group-hover:underline">
+                                    {source.title}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                    {source.snippet}
+                                  </p>
+                                </div>
+                                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {message.sources && message.sources.length > 0 && (
                         <div className="mt-4 pt-3 border-t border-border/50">
                           <p className="text-xs text-muted-foreground mb-2">Sources:</p>
@@ -263,7 +309,7 @@ export default function AIAssistant() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                        <span className="text-sm text-muted-foreground">Searching and analyzing...</span>
                       </div>
                     </CardContent>
                   </Card>
