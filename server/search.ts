@@ -126,3 +126,122 @@ export function shouldTriggerSearch(message: string): boolean {
 
   return searchTriggers.some((pattern) => pattern.test(message));
 }
+
+interface GoogleSearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+}
+
+interface GoogleSearchResponse {
+  items?: GoogleSearchResult[];
+  searchInformation?: {
+    totalResults: string;
+  };
+}
+
+export async function searchWithGoogle(query: string, maxResults: number = 5): Promise<SearchResponse> {
+  const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
+  const cx = process.env.GOOGLE_SEARCH_CX;
+  
+  if (!apiKey || !cx) {
+    console.error("GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_CX not configured");
+    return { results: [], query, summary: undefined, source: "Google" };
+  }
+
+  try {
+    const url = new URL("https://www.googleapis.com/customsearch/v1");
+    url.searchParams.set("key", apiKey);
+    url.searchParams.set("cx", cx);
+    url.searchParams.set("q", query);
+    url.searchParams.set("num", Math.min(maxResults, 10).toString());
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Google Search API error: ${response.status} - ${errorText}`);
+      return { results: [], query, summary: undefined, source: "Google" };
+    }
+
+    const data: GoogleSearchResponse = await response.json();
+    
+    const results: SearchResult[] = (data.items || []).map((item, index) => ({
+      title: item.title,
+      url: item.link,
+      snippet: item.snippet,
+      score: 1 - (index * 0.1),
+    }));
+
+    return {
+      results,
+      query,
+      summary: undefined,
+      source: "Google",
+    };
+  } catch (error) {
+    console.error("Google search error:", error);
+    return { results: [], query, summary: undefined, source: "Google" };
+  }
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    let normalized = parsed.hostname.replace(/^www\./, "") + parsed.pathname.replace(/\/$/, "");
+    const cleanParams = new URLSearchParams();
+    const trackingParams = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "source", "fbclid", "gclid"]);
+    parsed.searchParams.forEach((value, key) => {
+      if (!trackingParams.has(key.toLowerCase())) {
+        cleanParams.set(key, value);
+      }
+    });
+    const paramString = cleanParams.toString();
+    if (paramString) {
+      normalized += "?" + paramString;
+    }
+    return normalized.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
+export async function searchWebMultiSource(query: string, maxResultsPerSource: number = 5): Promise<MultiSearchResponse> {
+  const [tavilyResponse, googleResponse] = await Promise.all([
+    searchWithTavily(query, maxResultsPerSource),
+    searchWithGoogle(query, maxResultsPerSource),
+  ]);
+
+  const allResults: SearchResult[] = [];
+  const sources: string[] = [];
+
+  if (tavilyResponse.results.length > 0) {
+    allResults.push(...tavilyResponse.results);
+    sources.push("Tavily");
+  }
+
+  if (googleResponse.results.length > 0) {
+    allResults.push(...googleResponse.results);
+    sources.push("Google");
+  }
+
+  const seenUrls = new Set<string>();
+  const uniqueResults = allResults.filter((result) => {
+    const normalized = normalizeUrl(result.url);
+    if (seenUrls.has(normalized)) {
+      return false;
+    }
+    seenUrls.add(normalized);
+    return true;
+  });
+
+  uniqueResults.sort((a, b) => b.score - a.score);
+
+  return {
+    results: uniqueResults.slice(0, maxResultsPerSource * 2),
+    query,
+    sources,
+  };
+}
+
+export const searchWeb = searchWithTavily;
