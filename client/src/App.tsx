@@ -12,6 +12,7 @@ import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { LogIn, LogOut } from "lucide-react";
+import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import ChildProfile from "@/pages/ChildProfile";
 import Documents from "@/pages/Documents";
@@ -96,13 +97,31 @@ function AppContent() {
   );
 }
 
+function AuthenticatedApp() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  return <AppContent />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
           <TooltipProvider>
-            <AppContent />
+            <AuthenticatedApp />
             <Toaster />
           </TooltipProvider>
         </LanguageProvider>
