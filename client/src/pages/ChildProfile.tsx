@@ -9,6 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Calendar,
   Activity,
   FileText,
@@ -17,15 +23,19 @@ import {
   Plus,
   AlertCircle,
   ArrowLeft,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "wouter";
+import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import type { Child, Therapy, Document } from "@shared/schema";
 
 export default function ChildProfile() {
   const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState("overview");
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const { data: child, isLoading: childLoading, error: childError } = useQuery<Child>({
     queryKey: ['/api/children', id],
@@ -394,11 +404,27 @@ export default function ChildProfile() {
         <TabsContent value="documents" className="mt-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Documents</h3>
-            <Button className="gap-2" data-testid="button-add-document">
+            <Button 
+              className="gap-2" 
+              data-testid="button-add-document"
+              onClick={() => setUploadDialogOpen(true)}
+            >
               <Plus className="h-4 w-4" />
               Upload Document
             </Button>
           </div>
+
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Upload Medical Document</DialogTitle>
+              </DialogHeader>
+              <DocumentUploadZone 
+                childId={id ? parseInt(id, 10) : undefined}
+                onUploadComplete={() => setUploadDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
 
           {documentsLoading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -428,16 +454,47 @@ export default function ChildProfile() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium truncate">{doc.title}</h4>
-                        {doc.category && (
-                          <Badge variant="secondary" className="mt-1">
-                            {doc.category}
-                          </Badge>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {doc.category && (
+                            <Badge variant="secondary">
+                              {doc.category}
+                            </Badge>
+                          )}
+                          {doc.aiSummary ? (
+                            <Badge variant="outline" className="gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              AI Analyzed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1" data-testid={`badge-processing-${doc.id}`}>
+                              <Clock className="h-3 w-3" />
+                              Analysis Pending
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {doc.uploadedAt
                             ? new Date(doc.uploadedAt).toLocaleDateString()
                             : "Unknown date"}
                         </p>
+                        {doc.aiSummary ? (
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2" data-testid={`text-ai-summary-${doc.id}`}>
+                            {doc.aiSummary}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground/70 mt-2 italic" data-testid={`text-pending-analysis-${doc.id}`}>
+                            AI analysis in progress...
+                          </p>
+                        )}
+                        {doc.aiKeyFindings && doc.aiKeyFindings.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {doc.aiKeyFindings.slice(0, 2).map((finding, idx) => (
+                              <p key={idx} className="text-xs text-muted-foreground truncate" data-testid={`text-key-finding-${doc.id}-${idx}`}>
+                                {finding}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>

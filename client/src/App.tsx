@@ -28,6 +28,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/child/:id" component={ChildProfile} />
       <Route path="/child-profile" component={ChildProfile} />
       <Route path="/documents" component={Documents} />
       <Route path="/therapy" component={Therapy} />
