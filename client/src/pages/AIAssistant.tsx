@@ -1434,64 +1434,66 @@ export default function AIAssistant() {
                 </div>
               </div>
             ) : messages.length === 0 ? (
-              <div className="h-full flex flex-col max-w-3xl mx-auto py-4">
-                <DocumentUploadPanel
-                  uploadedFiles={uploadedFiles}
-                  onFilesSelected={handleFilesSelected}
-                  onRemoveFile={handleRemoveFile}
-                  onExecuteAction={handleExecuteSuggestedAction}
-                  language={language}
-                  deletingFileIds={deletingFileIds}
-                />
+              <ScrollArea className="h-full">
+                <div className="flex flex-col max-w-3xl mx-auto py-4">
+                  <DocumentUploadPanel
+                    uploadedFiles={uploadedFiles}
+                    onFilesSelected={handleFilesSelected}
+                    onRemoveFile={handleRemoveFile}
+                    onExecuteAction={handleExecuteSuggestedAction}
+                    language={language}
+                    deletingFileIds={deletingFileIds}
+                  />
 
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <div className="p-4 bg-primary/10 rounded-full mb-6">
-                    <Bot className="h-12 w-12 text-primary" />
-                  </div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    {language === "en" ? "How can I help you today?" : "როგორ შემიძლია დაგეხმაროთ დღეს?"}
-                  </h2>
-                  <p className="text-muted-foreground text-center mb-8">
-                    {language === "en"
-                      ? "I can analyze documents, find clinical trials, help with therapy recommendations, and more."
-                      : "შემიძლია დოკუმენტების ანალიზი, კლინიკური კვლევების ძებნა, თერაპიის რეკომენდაციები და სხვა."}
-                  </p>
-
-                  <div className="flex flex-wrap justify-center gap-2 mb-8">
-                    {quickActions.map((action, i) => (
-                      <Button
-                        key={i}
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() => handleQuickAction(action)}
-                        data-testid={`button-quick-action-${i}`}
-                      >
-                        <action.icon className="h-4 w-4" />
-                        {language === "en" ? action.label : action.labelKa}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <div className="w-full">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {language === "en" ? "Or try one of these:" : "ან სცადეთ ერთ-ერთი ამათგანი:"}
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="p-4 bg-primary/10 rounded-full mb-6">
+                      <Bot className="h-12 w-12 text-primary" />
+                    </div>
+                    <h2 className="text-xl font-semibold mb-2">
+                      {language === "en" ? "How can I help you today?" : "როგორ შემიძლია დაგეხმაროთ დღეს?"}
+                    </h2>
+                    <p className="text-muted-foreground text-center mb-8 px-4">
+                      {language === "en"
+                        ? "I can analyze documents, find clinical trials, help with therapy recommendations, and more."
+                        : "შემიძლია დოკუმენტების ანალიზი, კლინიკური კვლევების ძებნა, თერაპიის რეკომენდაციები და სხვა."}
                     </p>
-                    <div className="grid gap-2">
-                      {suggestedPrompts.slice(0, 4).map((prompt, i) => (
+
+                    <div className="flex flex-wrap justify-center gap-2 mb-8 px-4">
+                      {quickActions.map((action, i) => (
                         <Button
                           key={i}
-                          variant="ghost"
-                          className="justify-start text-left h-auto py-3 px-4"
-                          onClick={() => handleSend(language === "en" ? prompt.en : prompt.ka)}
-                          data-testid={`button-suggested-${i}`}
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => handleQuickAction(action)}
+                          data-testid={`button-quick-action-${i}`}
                         >
-                          {language === "en" ? prompt.en : prompt.ka}
+                          <action.icon className="h-4 w-4" />
+                          {language === "en" ? action.label : action.labelKa}
                         </Button>
                       ))}
                     </div>
+
+                    <div className="w-full px-4">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {language === "en" ? "Or try one of these:" : "ან სცადეთ ერთ-ერთი ამათგანი:"}
+                      </p>
+                      <div className="grid gap-2">
+                        {suggestedPrompts.slice(0, 4).map((prompt, i) => (
+                          <Button
+                            key={i}
+                            variant="ghost"
+                            className="justify-start text-left h-auto py-3 px-4"
+                            onClick={() => handleSend(language === "en" ? prompt.en : prompt.ka)}
+                            data-testid={`button-suggested-${i}`}
+                          >
+                            {language === "en" ? prompt.en : prompt.ka}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ScrollArea>
             ) : (
               <ScrollArea className="h-full" ref={scrollRef}>
                 <div className="py-4 max-w-3xl mx-auto">
