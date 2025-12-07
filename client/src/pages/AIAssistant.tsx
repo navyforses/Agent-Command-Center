@@ -442,6 +442,7 @@ interface DocumentUploadPanelProps {
   onRemoveFile: (id: string) => void;
   onExecuteAction: (action: SuggestedAction) => void;
   language: string;
+  deletingFileIds?: Set<string>;
 }
 
 function DocumentUploadPanel({
@@ -450,6 +451,7 @@ function DocumentUploadPanel({
   onRemoveFile,
   onExecuteAction,
   language,
+  deletingFileIds = new Set(),
 }: DocumentUploadPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -583,14 +585,31 @@ function DocumentUploadPanel({
                       {file.status === "error" && (
                         <AlertCircle className="h-4 w-4 text-destructive" />
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onRemoveFile(file.id)}
-                        data-testid={`button-remove-ai-file-${file.id}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onRemoveFile(file.id)}
+                            disabled={deletingFileIds.has(file.id)}
+                            data-testid={`button-remove-ai-file-${file.id}`}
+                          >
+                            {deletingFileIds.has(file.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : file.status === "complete" ? (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {file.status === "complete" 
+                            ? (language === "en" ? "Delete document" : "დოკუმენტის წაშლა")
+                            : (language === "en" ? "Remove" : "წაშლა")
+                          }
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
 
@@ -763,6 +782,7 @@ export default function AIAssistant() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [deletingFileIds, setDeletingFileIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -910,19 +930,29 @@ export default function AIAssistant() {
   });
 
   const deleteDocument = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/documents/${id}`);
-      return id;
+    mutationFn: async ({ documentId, fileId }: { documentId: number; fileId: string }) => {
+      await apiRequest("DELETE", `/api/documents/${documentId}`);
+      return { documentId, fileId };
     },
-    onSuccess: (deletedId) => {
+    onSuccess: ({ documentId, fileId }) => {
+      setDeletingFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      setUploadedFiles((prev) => prev.filter((f) => f.document?.id !== deletedId));
+      setUploadedFiles((prev) => prev.filter((f) => f.document?.id !== documentId));
       toast({
         title: language === "en" ? "Document deleted" : "დოკუმენტი წაიშალა",
         description: language === "en" ? "The document has been removed." : "დოკუმენტი წაიშალა.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, { fileId }) => {
+      setDeletingFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
       console.error("Delete document error:", error);
       toast({
         title: language === "en" ? "Error" : "შეცდომა",
@@ -1287,7 +1317,12 @@ export default function AIAssistant() {
   const handleRemoveFile = (id: string) => {
     const file = uploadedFiles.find((f) => f.id === id);
     if (file?.document?.id) {
-      deleteDocument.mutate(file.document.id);
+      setDeletingFileIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      deleteDocument.mutate({ documentId: file.document.id, fileId: id });
     } else {
       setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
     }
@@ -1406,6 +1441,7 @@ export default function AIAssistant() {
                   onRemoveFile={handleRemoveFile}
                   onExecuteAction={handleExecuteSuggestedAction}
                   language={language}
+                  deletingFileIds={deletingFileIds}
                 />
 
                 <div className="flex-1 flex flex-col items-center justify-center">
@@ -1466,6 +1502,7 @@ export default function AIAssistant() {
                       onRemoveFile={handleRemoveFile}
                       onExecuteAction={handleExecuteSuggestedAction}
                       language={language}
+                      deletingFileIds={deletingFileIds}
                     />
                   )}
                   <div className="space-y-6">
