@@ -624,3 +624,180 @@ export const insertNexusActionItemSchema = createInsertSchema(nexusActionItems).
 
 export type InsertNexusActionItem = z.infer<typeof insertNexusActionItemSchema>;
 export type NexusActionItem = typeof nexusActionItems.$inferSelect;
+
+// ============================================================================
+// NEXUS OMEGA EVOLUTION CYCLE - Autonomous 24-Hour Research Cycles
+// ============================================================================
+
+// Evolution Cycles - main cycle tracking (runs from start to end date)
+export const evolutionCycles = pgTable("evolution_cycles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  childId: integer("child_id").references(() => children.id),
+  status: varchar("status", { length: 50 }).default("active"), // active, paused, completed
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  triggerDocumentId: integer("trigger_document_id").references(() => documents.id),
+  diagnosisContext: text("diagnosis_context"), // Extracted diagnosis for cycle context
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const evolutionCycleStatusEnum = z.enum([
+  "active",
+  "paused",
+  "completed",
+  "cancelled"
+]);
+export type EvolutionCycleStatus = z.infer<typeof evolutionCycleStatusEnum>;
+
+export const insertEvolutionCycleSchema = createInsertSchema(evolutionCycles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEvolutionCycle = z.infer<typeof insertEvolutionCycleSchema>;
+export type EvolutionCycle = typeof evolutionCycles.$inferSelect;
+
+// Evolution Daily Runs - each 24-hour cycle
+export const evolutionDailyRuns = pgTable("evolution_daily_runs", {
+  id: serial("id").primaryKey(),
+  cycleId: integer("cycle_id").references(() => evolutionCycles.id),
+  runDate: date("run_date").notNull(),
+  currentPhase: varchar("current_phase", { length: 50 }), // observe, learn, connect, theorize, validate, adapt
+  phaseStartedAt: timestamp("phase_started_at"),
+  status: varchar("status", { length: 50 }).default("running"), // scheduled, running, completed, failed
+  phasesCompleted: text("phases_completed").array(), // Track which phases finished
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const evolutionPhaseEnum = z.enum([
+  "observe",   // 8 hours - Monitor PubMed, ClinicalTrials.gov, medical news
+  "learn",     // 4 hours - Extract and structure information
+  "connect",   // 4 hours - Link to child's diagnosis
+  "theorize",  // 4 hours - Generate hypotheses with Swarm Intelligence
+  "validate",  // 2 hours - Compare predictions with evidence
+  "adapt"      // 2 hours - Adjust model
+]);
+export type EvolutionPhase = z.infer<typeof evolutionPhaseEnum>;
+
+export const evolutionRunStatusEnum = z.enum([
+  "scheduled",
+  "running",
+  "completed",
+  "failed"
+]);
+export type EvolutionRunStatus = z.infer<typeof evolutionRunStatusEnum>;
+
+export const insertEvolutionDailyRunSchema = createInsertSchema(evolutionDailyRuns).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertEvolutionDailyRun = z.infer<typeof insertEvolutionDailyRunSchema>;
+export type EvolutionDailyRun = typeof evolutionDailyRuns.$inferSelect;
+
+// Evolution Insights - findings discovered per phase
+export const evolutionInsights = pgTable("evolution_insights", {
+  id: serial("id").primaryKey(),
+  dailyRunId: integer("daily_run_id").references(() => evolutionDailyRuns.id),
+  phase: varchar("phase", { length: 50 }).notNull(),
+  insightType: varchar("insight_type", { length: 50 }), // observation, learning, connection, hypothesis, prediction, validation, adaptation
+  contentEn: text("content_en"),
+  contentKa: text("content_ka"),
+  sources: jsonb("sources"), // Array of source references
+  metadata: jsonb("metadata"), // Phase-specific metadata
+  confidence: integer("confidence"), // Confidence score 0-100
+  relevanceScore: integer("relevance_score"), // Relevance to child's diagnosis
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const evolutionInsightTypeEnum = z.enum([
+  "observation",    // From OBSERVE phase
+  "learning",       // From LEARN phase  
+  "connection",     // From CONNECT phase
+  "hypothesis",     // From THEORIZE phase
+  "prediction",     // From THEORIZE phase
+  "validation",     // From VALIDATE phase
+  "adaptation"      // From ADAPT phase
+]);
+export type EvolutionInsightType = z.infer<typeof evolutionInsightTypeEnum>;
+
+export const insertEvolutionInsightSchema = createInsertSchema(evolutionInsights, {
+  sources: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    doi: z.string().optional(),
+    snippet: z.string().optional(),
+    source: z.string().optional(),
+  })).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEvolutionInsight = z.infer<typeof insertEvolutionInsightSchema>;
+export type EvolutionInsight = typeof evolutionInsights.$inferSelect;
+
+// Evolution Reports - daily bilingual academic reports with chat support
+export const evolutionReports = pgTable("evolution_reports", {
+  id: serial("id").primaryKey(),
+  dailyRunId: integer("daily_run_id").references(() => evolutionDailyRuns.id),
+  reportDate: date("report_date").notNull(),
+  titleEn: varchar("title_en", { length: 500 }),
+  titleKa: varchar("title_ka", { length: 500 }),
+  summaryEn: text("summary_en"),
+  summaryKa: text("summary_ka"),
+  contentEn: text("content_en"), // Full report content in English
+  contentKa: text("content_ka"), // Full report content in Georgian
+  keyFindingsEn: text("key_findings_en").array(),
+  keyFindingsKa: text("key_findings_ka").array(),
+  hypothesesGenerated: jsonb("hypotheses_generated"), // Array of hypotheses from the day
+  sourcesCompiled: jsonb("sources_compiled"), // All sources from the day
+  filePath: varchar("file_path", { length: 500 }), // PDF path in object storage
+  conversationId: integer("conversation_id").references(() => conversations.id), // For report-specific chat
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEvolutionReportSchema = createInsertSchema(evolutionReports, {
+  hypothesesGenerated: z.array(z.object({
+    hypothesis: z.string(),
+    confidence: z.number(),
+    evidence: z.array(z.string()),
+    disciplines: z.array(z.string()).optional(),
+  })).nullable().optional(),
+  sourcesCompiled: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    doi: z.string().optional(),
+    snippet: z.string().optional(),
+    source: z.string().optional(),
+  })).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEvolutionReport = z.infer<typeof insertEvolutionReportSchema>;
+export type EvolutionReport = typeof evolutionReports.$inferSelect;
+
+// Evolution Report Conversations - track chat interactions about specific reports
+export const evolutionReportMessages = pgTable("evolution_report_messages", {
+  id: serial("id").primaryKey(),
+  reportId: integer("report_id").references(() => evolutionReports.id),
+  userId: varchar("user_id").references(() => users.id),
+  role: varchar("role", { length: 20 }), // user, assistant
+  content: text("content").notNull(),
+  contentKa: text("content_ka"), // Georgian translation of response
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEvolutionReportMessageSchema = createInsertSchema(evolutionReportMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEvolutionReportMessage = z.infer<typeof insertEvolutionReportMessageSchema>;
+export type EvolutionReportMessage = typeof evolutionReportMessages.$inferSelect;

@@ -19,6 +19,11 @@ import {
   nexusHypotheses,
   nexusDebates,
   nexusActionItems,
+  evolutionCycles,
+  evolutionDailyRuns,
+  evolutionInsights,
+  evolutionReports,
+  evolutionReportMessages,
   type User,
   type UpsertUser,
   type Child,
@@ -59,6 +64,16 @@ import {
   type InsertNexusDebate,
   type NexusActionItem,
   type InsertNexusActionItem,
+  type EvolutionCycle,
+  type InsertEvolutionCycle,
+  type EvolutionDailyRun,
+  type InsertEvolutionDailyRun,
+  type EvolutionInsight,
+  type InsertEvolutionInsight,
+  type EvolutionReport,
+  type InsertEvolutionReport,
+  type EvolutionReportMessage,
+  type InsertEvolutionReportMessage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or } from "drizzle-orm";
@@ -167,6 +182,32 @@ export interface IStorage {
   getNexusActionItem(id: number, userId: string): Promise<NexusActionItem | undefined>;
   createNexusActionItem(action: InsertNexusActionItem): Promise<NexusActionItem>;
   updateNexusActionItem(id: number, userId: string, action: Partial<InsertNexusActionItem>): Promise<NexusActionItem | undefined>;
+
+  // Evolution Cycle - Autonomous 24-Hour Research Cycles
+  getEvolutionCycles(userId: string): Promise<EvolutionCycle[]>;
+  getEvolutionCycle(id: number, userId: string): Promise<EvolutionCycle | undefined>;
+  getActiveEvolutionCycle(userId: string): Promise<EvolutionCycle | undefined>;
+  createEvolutionCycle(cycle: InsertEvolutionCycle): Promise<EvolutionCycle>;
+  updateEvolutionCycle(id: number, userId: string, cycle: Partial<InsertEvolutionCycle>): Promise<EvolutionCycle | undefined>;
+
+  getEvolutionDailyRuns(cycleId: number): Promise<EvolutionDailyRun[]>;
+  getEvolutionDailyRun(id: number): Promise<EvolutionDailyRun | undefined>;
+  getTodaysDailyRun(cycleId: number): Promise<EvolutionDailyRun | undefined>;
+  createEvolutionDailyRun(run: InsertEvolutionDailyRun): Promise<EvolutionDailyRun>;
+  updateEvolutionDailyRun(id: number, run: Partial<InsertEvolutionDailyRun> & { completedAt?: Date }): Promise<EvolutionDailyRun | undefined>;
+
+  getEvolutionInsights(dailyRunId: number): Promise<EvolutionInsight[]>;
+  getEvolutionInsightsByPhase(dailyRunId: number, phase: string): Promise<EvolutionInsight[]>;
+  createEvolutionInsight(insight: InsertEvolutionInsight): Promise<EvolutionInsight>;
+
+  getEvolutionReports(userId: string): Promise<EvolutionReport[]>;
+  getEvolutionReport(id: number, userId: string): Promise<EvolutionReport | undefined>;
+  getEvolutionReportByDailyRun(dailyRunId: number): Promise<EvolutionReport | undefined>;
+  createEvolutionReport(report: InsertEvolutionReport): Promise<EvolutionReport>;
+  updateEvolutionReport(id: number, report: Partial<InsertEvolutionReport>): Promise<EvolutionReport | undefined>;
+
+  getEvolutionReportMessages(reportId: number): Promise<EvolutionReportMessage[]>;
+  createEvolutionReportMessage(message: InsertEvolutionReportMessage): Promise<EvolutionReportMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -730,6 +771,137 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(nexusActionItems.id, id), eq(nexusActionItems.userId, userId)))
       .returning();
     return updatedAction;
+  }
+
+  // Evolution Cycle Methods
+  async getEvolutionCycles(userId: string): Promise<EvolutionCycle[]> {
+    return db.select().from(evolutionCycles)
+      .where(eq(evolutionCycles.userId, userId))
+      .orderBy(desc(evolutionCycles.createdAt));
+  }
+
+  async getEvolutionCycle(id: number, userId: string): Promise<EvolutionCycle | undefined> {
+    const [cycle] = await db.select().from(evolutionCycles)
+      .where(and(eq(evolutionCycles.id, id), eq(evolutionCycles.userId, userId)));
+    return cycle;
+  }
+
+  async getActiveEvolutionCycle(userId: string): Promise<EvolutionCycle | undefined> {
+    const [cycle] = await db.select().from(evolutionCycles)
+      .where(and(eq(evolutionCycles.userId, userId), eq(evolutionCycles.status, "active")));
+    return cycle;
+  }
+
+  async createEvolutionCycle(cycle: InsertEvolutionCycle): Promise<EvolutionCycle> {
+    const [newCycle] = await db.insert(evolutionCycles).values(cycle).returning();
+    return newCycle;
+  }
+
+  async updateEvolutionCycle(id: number, userId: string, cycle: Partial<InsertEvolutionCycle>): Promise<EvolutionCycle | undefined> {
+    const [updated] = await db.update(evolutionCycles)
+      .set(cycle)
+      .where(and(eq(evolutionCycles.id, id), eq(evolutionCycles.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async getEvolutionDailyRuns(cycleId: number): Promise<EvolutionDailyRun[]> {
+    return db.select().from(evolutionDailyRuns)
+      .where(eq(evolutionDailyRuns.cycleId, cycleId))
+      .orderBy(desc(evolutionDailyRuns.runDate));
+  }
+
+  async getEvolutionDailyRun(id: number): Promise<EvolutionDailyRun | undefined> {
+    const [run] = await db.select().from(evolutionDailyRuns)
+      .where(eq(evolutionDailyRuns.id, id));
+    return run;
+  }
+
+  async getTodaysDailyRun(cycleId: number): Promise<EvolutionDailyRun | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    const [run] = await db.select().from(evolutionDailyRuns)
+      .where(and(eq(evolutionDailyRuns.cycleId, cycleId), eq(evolutionDailyRuns.runDate, today)));
+    return run;
+  }
+
+  async createEvolutionDailyRun(run: InsertEvolutionDailyRun): Promise<EvolutionDailyRun> {
+    const [newRun] = await db.insert(evolutionDailyRuns).values(run).returning();
+    return newRun;
+  }
+
+  async updateEvolutionDailyRun(id: number, run: Partial<InsertEvolutionDailyRun> & { completedAt?: Date }): Promise<EvolutionDailyRun | undefined> {
+    const [updated] = await db.update(evolutionDailyRuns)
+      .set(run)
+      .where(eq(evolutionDailyRuns.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getEvolutionInsights(dailyRunId: number): Promise<EvolutionInsight[]> {
+    return db.select().from(evolutionInsights)
+      .where(eq(evolutionInsights.dailyRunId, dailyRunId))
+      .orderBy(evolutionInsights.createdAt);
+  }
+
+  async getEvolutionInsightsByPhase(dailyRunId: number, phase: string): Promise<EvolutionInsight[]> {
+    return db.select().from(evolutionInsights)
+      .where(and(eq(evolutionInsights.dailyRunId, dailyRunId), eq(evolutionInsights.phase, phase)));
+  }
+
+  async createEvolutionInsight(insight: InsertEvolutionInsight): Promise<EvolutionInsight> {
+    const [newInsight] = await db.insert(evolutionInsights).values(insight).returning();
+    return newInsight;
+  }
+
+  async getEvolutionReports(userId: string): Promise<EvolutionReport[]> {
+    const cycles = await this.getEvolutionCycles(userId);
+    if (cycles.length === 0) return [];
+    const cycleIds = cycles.map(c => c.id);
+    const runs = await db.select().from(evolutionDailyRuns);
+    const validRunIds = runs.filter(r => r.cycleId && cycleIds.includes(r.cycleId)).map(r => r.id);
+    if (validRunIds.length === 0) return [];
+    const reports = await db.select().from(evolutionReports).orderBy(desc(evolutionReports.reportDate));
+    return reports.filter(r => r.dailyRunId && validRunIds.includes(r.dailyRunId));
+  }
+
+  async getEvolutionReport(id: number, userId: string): Promise<EvolutionReport | undefined> {
+    const [report] = await db.select().from(evolutionReports).where(eq(evolutionReports.id, id));
+    if (!report || !report.dailyRunId) return undefined;
+    const run = await this.getEvolutionDailyRun(report.dailyRunId);
+    if (!run || !run.cycleId) return undefined;
+    const cycles = await this.getEvolutionCycles(userId);
+    if (!cycles.some(c => c.id === run.cycleId)) return undefined;
+    return report;
+  }
+
+  async getEvolutionReportByDailyRun(dailyRunId: number): Promise<EvolutionReport | undefined> {
+    const [report] = await db.select().from(evolutionReports)
+      .where(eq(evolutionReports.dailyRunId, dailyRunId));
+    return report;
+  }
+
+  async createEvolutionReport(report: InsertEvolutionReport): Promise<EvolutionReport> {
+    const [newReport] = await db.insert(evolutionReports).values(report).returning();
+    return newReport;
+  }
+
+  async updateEvolutionReport(id: number, report: Partial<InsertEvolutionReport>): Promise<EvolutionReport | undefined> {
+    const [updated] = await db.update(evolutionReports)
+      .set(report)
+      .where(eq(evolutionReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getEvolutionReportMessages(reportId: number): Promise<EvolutionReportMessage[]> {
+    return db.select().from(evolutionReportMessages)
+      .where(eq(evolutionReportMessages.reportId, reportId))
+      .orderBy(evolutionReportMessages.createdAt);
+  }
+
+  async createEvolutionReportMessage(message: InsertEvolutionReportMessage): Promise<EvolutionReportMessage> {
+    const [newMsg] = await db.insert(evolutionReportMessages).values(message).returning();
+    return newMsg;
   }
 }
 
