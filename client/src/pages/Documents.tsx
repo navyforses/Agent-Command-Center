@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Filter, Grid, List } from "lucide-react";
+import { Upload, Search, Filter, Grid, List, Zap, Calendar, Loader2 } from "lucide-react";
 import { DocumentCard } from "@/components/dashboard/DocumentCard";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import {
@@ -19,13 +19,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Document } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface TransformedDocument {
   id: string;
@@ -102,6 +107,9 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showEvolutionDialog, setShowEvolutionDialog] = useState(false);
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<number | null>(null);
+  const [endDate, setEndDate] = useState<Date | undefined>(addDays(new Date(), 30));
 
   const { data: documents, isLoading } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
@@ -128,6 +136,39 @@ export default function Documents() {
     },
   });
 
+  const createEvolutionCycleMutation = useMutation({
+    mutationFn: async ({ documentId, endDate }: { documentId: number; endDate: Date }) => {
+      const response = await apiRequest("POST", "/api/evolution/cycles", {
+        childId: 1,
+        startDate: new Date().toISOString(),
+        endDate: endDate.toISOString(),
+        triggerDocumentId: documentId,
+        diagnosisContext: "Extracted from uploaded document",
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create evolution cycle");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/evolution/cycles'] });
+      setShowEvolutionDialog(false);
+      toast({
+        title: t("cycleCreated"),
+        description: t("cycleCreatedDescription"),
+      });
+      setLocation("/evolution");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("cycleCreationFailed"),
+        description: error.message || "Failed to create evolution cycle",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDownload = (doc: TransformedDocument) => {
     if (doc.filePath) {
       const downloadUrl = doc.filePath.startsWith('/objects/') 
@@ -147,9 +188,20 @@ export default function Documents() {
     analyzeMutation.mutate(documentId);
   };
 
-  const handleUploadComplete = () => {
+  const handleUploadComplete = (documentId?: number) => {
     setShowUploadDialog(false);
     queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+    
+    if (documentId) {
+      setUploadedDocumentId(documentId);
+      setShowEvolutionDialog(true);
+    }
+  };
+
+  const handleStartEvolutionCycle = () => {
+    if (uploadedDocumentId && endDate) {
+      createEvolutionCycleMutation.mutate({ documentId: uploadedDocumentId, endDate });
+    }
   };
 
   const handleViewConversation = (conversationId: number) => {
@@ -280,6 +332,78 @@ export default function Documents() {
           ))}
         </div>
       )}
+
+      <Dialog open={showEvolutionDialog} onOpenChange={setShowEvolutionDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-start-evolution">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              {t("startEvolutionCycle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("evolutionCycleDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("selectEndDate")}</label>
+              <p className="text-xs text-muted-foreground">{t("endDateDescription")}</p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                    data-testid="button-select-end-date"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    disabled={(date) => date < new Date() || date < addDays(new Date(), 1)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowEvolutionDialog(false)}
+              data-testid="button-skip-evolution"
+            >
+              {t("skipForNow")}
+            </Button>
+            <Button
+              onClick={handleStartEvolutionCycle}
+              disabled={!endDate || createEvolutionCycleMutation.isPending}
+              data-testid="button-confirm-start-cycle"
+            >
+              {createEvolutionCycleMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t("analyzingDocument")}
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  {t("startCycle")}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

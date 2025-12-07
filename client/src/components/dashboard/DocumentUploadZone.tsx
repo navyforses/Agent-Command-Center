@@ -18,13 +18,14 @@ interface UploadedFile {
 }
 
 interface DocumentUploadZoneProps {
-  onUploadComplete?: () => void;
+  onUploadComplete?: (documentId?: number) => void;
   childId?: number;
 }
 
 export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [lastUploadedDocId, setLastUploadedDocId] = useState<number | undefined>(undefined);
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -119,6 +120,7 @@ export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUpload
       }
       
       const createdDoc = await docResponse.json();
+      setLastUploadedDocId(createdDoc.id);
 
       setUploadedFiles((prev) =>
         prev.map((f) => f.id === id ? { ...f, progress: 90, status: "processing" } : f)
@@ -305,7 +307,7 @@ export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUpload
         {allComplete && (
           <Button
             className="w-full"
-            onClick={onUploadComplete}
+            onClick={() => onUploadComplete?.(lastUploadedDocId)}
             data-testid="button-done-uploading"
           >
             Done
