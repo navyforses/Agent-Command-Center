@@ -7,9 +7,11 @@ import type {
   EvolutionDailyRun,
   EvolutionInsight,
   EvolutionPhase,
+  EvolutionReport,
   InsertEvolutionInsight,
   InsertEvolutionDailyRun,
   InsertEvolutionCycle,
+  InsertEvolutionReport,
 } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -1145,6 +1147,215 @@ export async function runEvolutionTick(): Promise<{
     console.error("[Evolution Engine] Tick failed:", error);
     result.errors.push(error instanceof Error ? error.message : "Unknown tick error");
     return result;
+  }
+}
+
+export async function generateDailyReport(dailyRunId: number): Promise<EvolutionReport | null> {
+  console.log(`[Evolution Engine] Generating daily report for run ${dailyRunId}`);
+
+  try {
+    const dailyRun = await storage.getEvolutionDailyRun(dailyRunId);
+    if (!dailyRun) {
+      console.error(`[Evolution Engine] Daily run ${dailyRunId} not found`);
+      return null;
+    }
+
+    const insights = await storage.getEvolutionInsights(dailyRunId);
+    if (insights.length === 0) {
+      console.error(`[Evolution Engine] No insights found for daily run ${dailyRunId}`);
+      return null;
+    }
+
+    const insightsByPhase: Record<string, EvolutionInsight[]> = {
+      observe: [],
+      learn: [],
+      connect: [],
+      theorize: [],
+      validate: [],
+      adapt: [],
+    };
+
+    for (const insight of insights) {
+      const phase = insight.phase || "observe";
+      if (insightsByPhase[phase]) {
+        insightsByPhase[phase].push(insight);
+      }
+    }
+
+    const allSources: { title: string; url?: string; doi?: string; snippet?: string; source?: string }[] = [];
+    const allHypotheses: { hypothesis: string; confidence: number; evidence: string[]; disciplines?: string[] }[] = [];
+
+    for (const insight of insights) {
+      if (Array.isArray(insight.sources)) {
+        for (const src of insight.sources as { title: string; url?: string; doi?: string; snippet?: string; source?: string }[]) {
+          if (src.title && !allSources.some(s => s.title === src.title)) {
+            allSources.push(src);
+          }
+        }
+      }
+
+      if (insight.insightType === "hypothesis" && insight.metadata) {
+        const metadata = insight.metadata as Record<string, unknown>;
+        if (metadata.keyPoints && Array.isArray(metadata.keyPoints)) {
+          allHypotheses.push({
+            hypothesis: insight.contentEn || "",
+            confidence: insight.confidence || 70,
+            evidence: metadata.keyPoints as string[],
+            disciplines: metadata.disciplines as string[] | undefined,
+          });
+        }
+      }
+    }
+
+    const reportDate = dailyRun.runDate || new Date().toISOString().split("T")[0];
+    const formattedDate = new Date(reportDate).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const phaseContent = (phase: string, phaseInsights: EvolutionInsight[]) => {
+      if (phaseInsights.length === 0) return "No data collected for this phase.";
+      return phaseInsights.map(i => i.contentEn || "").filter(Boolean).join("\n\n");
+    };
+
+    const systemPrompt = `You are a senior medical research scientist specializing in synthesizing multi-source research into comprehensive academic reports. Your task is to compile research findings from an autonomous 24-hour Evolution Cycle into a structured, publication-quality academic report.
+
+The report should be written for medical professionals, researchers, and informed caregivers of children with neurological conditions such as Hypoxic-Ischemic Encephalopathy (HIE).
+
+Your output must be a valid JSON object with this exact structure:
+{
+  "title": "Evolution Cycle Daily Research Report - [Date]",
+  "executiveSummary": "A comprehensive 2-3 paragraph executive summary covering the day's most significant findings, breakthroughs, and clinical implications.",
+  "fullContent": "The complete academic report content with all sections formatted in markdown",
+  "keyFindings": ["Finding 1", "Finding 2", "Finding 3", ...],
+  "synthesizedHypotheses": [
+    {
+      "hypothesis": "Hypothesis statement",
+      "confidence": 80,
+      "evidence": ["Evidence 1", "Evidence 2"],
+      "disciplines": ["Neurology", "Pharmacology"]
+    }
+  ]
+}
+
+The fullContent should include these sections in markdown format:
+1. Literature Review & Observations
+2. Knowledge Extraction
+3. Clinical Connections
+4. Novel Hypotheses
+5. Validation Analysis
+6. Recommendations & Adaptations
+7. Conclusions
+
+Be thorough, scientifically rigorous, and clinically relevant.`;
+
+    const query = `Generate a comprehensive academic research report for the Evolution Cycle run on ${formattedDate}.
+
+## OBSERVE PHASE - Literature Review & Recent Findings
+${phaseContent("observe", insightsByPhase.observe)}
+
+## LEARN PHASE - Knowledge Extraction & Analysis
+${phaseContent("learn", insightsByPhase.learn)}
+
+## CONNECT PHASE - Clinical Connections to Diagnosis
+${phaseContent("connect", insightsByPhase.connect)}
+
+## THEORIZE PHASE - Novel Hypotheses Generation
+${phaseContent("theorize", insightsByPhase.theorize)}
+
+## VALIDATE PHASE - Validation & Evidence Assessment
+${phaseContent("validate", insightsByPhase.validate)}
+
+## ADAPT PHASE - Recommendations & Adaptations
+${phaseContent("adapt", insightsByPhase.adapt)}
+
+Synthesize all of this into a cohesive, publication-quality academic report. Extract the most important findings, formulate clear hypotheses with evidence, and provide actionable clinical recommendations.`;
+
+    console.log(`[Evolution Engine] Calling Claude to synthesize report...`);
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: "user", content: query }],
+    });
+
+    const responseContent = response.content[0]?.type === "text" ? response.content[0].text : "{}";
+
+    let parsed: {
+      title?: string;
+      executiveSummary?: string;
+      fullContent?: string;
+      keyFindings?: string[];
+      synthesizedHypotheses?: { hypothesis: string; confidence: number; evidence: string[]; disciplines?: string[] }[];
+    } = {};
+
+    try {
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      console.error("[Evolution Engine] Failed to parse Claude response as JSON");
+      parsed = {
+        title: `Evolution Cycle Daily Research Report - ${formattedDate}`,
+        executiveSummary: responseContent.substring(0, 1000),
+        fullContent: responseContent,
+        keyFindings: [],
+        synthesizedHypotheses: [],
+      };
+    }
+
+    const titleEn = parsed.title || `Evolution Cycle Daily Research Report - ${formattedDate}`;
+    const summaryEn = parsed.executiveSummary || "";
+    const contentEn = parsed.fullContent || responseContent;
+    const keyFindingsEn = parsed.keyFindings || [];
+
+    console.log(`[Evolution Engine] Translating report to Georgian...`);
+
+    const [titleKa, summaryKa, contentKa] = await Promise.all([
+      translateToGeorgian(titleEn),
+      translateToGeorgian(summaryEn),
+      translateToGeorgian(contentEn),
+    ]);
+
+    const keyFindingsKa: string[] = [];
+    for (const finding of keyFindingsEn.slice(0, 10)) {
+      const translatedFinding = await translateToGeorgian(finding);
+      keyFindingsKa.push(translatedFinding);
+    }
+
+    const hypothesesGenerated = parsed.synthesizedHypotheses && parsed.synthesizedHypotheses.length > 0
+      ? parsed.synthesizedHypotheses
+      : allHypotheses.slice(0, 10);
+
+    const reportData: InsertEvolutionReport = {
+      dailyRunId,
+      reportDate,
+      titleEn,
+      titleKa,
+      summaryEn,
+      summaryKa,
+      contentEn,
+      contentKa,
+      keyFindingsEn,
+      keyFindingsKa,
+      hypothesesGenerated,
+      sourcesCompiled: allSources,
+    };
+
+    console.log(`[Evolution Engine] Creating report in database...`);
+
+    const report = await storage.createEvolutionReport(reportData);
+
+    console.log(`[Evolution Engine] Report ${report.id} created successfully`);
+
+    return report;
+  } catch (error) {
+    console.error(`[Evolution Engine] Failed to generate daily report:`, error);
+    return null;
   }
 }
 
