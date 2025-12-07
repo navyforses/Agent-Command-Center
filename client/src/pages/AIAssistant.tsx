@@ -311,6 +311,21 @@ export default function AIAssistant() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat/messages'] });
+    },
+    onError: (error: Error) => {
+      console.error("Chat mutation error:", error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "I apologize, but I encountered an error processing your request. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -328,18 +343,7 @@ export default function AIAssistant() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
 
-    try {
-      await sendMessage.mutateAsync(text);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        role: "assistant",
-        content: "I apologize, but I encountered an error processing your request. Please try again.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    }
+    sendMessage.mutate(text);
   };
 
   const handleQuickAction = (action: typeof quickActions[0]) => {
