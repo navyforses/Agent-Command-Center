@@ -24,6 +24,8 @@ import {
   processCommandCenterChat,
   type DocumentAnalysisResult,
   type ActionResult,
+  type SuggestedAction,
+  type CommandCenterChatResult,
 } from "./aiOrchestrator";
 
 export async function registerRoutes(
@@ -1213,20 +1215,38 @@ Format your response as JSON with the following structure:
         children
       );
 
-      // Save assistant response with action info
+      // Save assistant response message FIRST to get its ID for parent reference
+      const firstAction = result.suggestedActions?.[0];
       const assistantMessage = await storage.createChatMessage({
         userId,
         role: "assistant",
         content: result.content,
         documentIds: result.documentIds || null,
-        actionType: result.actions?.[0]?.actionType || null,
-        actionData: result.actions?.[0]?.data || null,
-        actionStatus: result.actions?.length ? "executed" : null,
+        actionType: firstAction?.actionType || null,
+        actionData: firstAction?.actionData || null,
+        actionStatus: result.suggestedActions?.length ? "pending" : null,
       });
+
+      // Store each suggested action as a separate pending action message with parentMessageId
+      const pendingActionMessages = [];
+      if (result.suggestedActions && result.suggestedActions.length > 0) {
+        for (const action of result.suggestedActions) {
+          const actionMessage = await storage.createChatMessage({
+            userId,
+            role: "assistant",
+            content: `${action.description}${action.descriptionKa ? `\n${action.descriptionKa}` : ''}`,
+            actionType: action.actionType,
+            actionData: { ...action.actionData, parentMessageId: assistantMessage.id },
+            actionStatus: "pending",
+          });
+          pendingActionMessages.push(actionMessage);
+        }
+      }
 
       res.json({
         message: assistantMessage,
-        actions: result.actions || [],
+        suggestedActions: result.suggestedActions || [],
+        pendingActionMessages,
       });
     } catch (error) {
       console.error("Error in AI Command Center chat:", error);
@@ -1236,15 +1256,17 @@ Format your response as JSON with the following structure:
 
   // Upload and analyze document via AI Command Center
   app.post("/api/assistant/upload", isAuthenticated, async (req: any, res) => {
+    let documentId: number | null = null;
+    const userId = req.user.claims.sub;
+    
     try {
-      const userId = req.user.claims.sub;
       const { title, filePath, fileType, fileSize, content } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Document title is required" });
       }
 
-      // Create document record with pending status
+      // Create document record with processing status
       const document = await storage.createDocument({
         userId,
         title,
@@ -1253,6 +1275,7 @@ Format your response as JSON with the following structure:
         fileSize: fileSize || null,
         processingStatus: "processing",
       });
+      documentId = document.id;
 
       // Analyze document with AI
       const analysis = await analyzeDocument(
@@ -1283,13 +1306,45 @@ Format your response as JSON with the following structure:
         actionStatus: "executed",
       });
 
+      // Store suggested actions as pending action messages with parentMessageId
+      // Note: DocumentAnalysisResult uses { type, data } for actions
+      const pendingActionMessages = [];
+      if (analysis.suggestedActions && analysis.suggestedActions.length > 0) {
+        for (const suggestedAction of analysis.suggestedActions) {
+          const actionMessage = await storage.createChatMessage({
+            userId,
+            role: "assistant",
+            content: `${suggestedAction.description}${suggestedAction.descriptionKa ? `\n${suggestedAction.descriptionKa}` : ''}`,
+            actionType: suggestedAction.type,
+            actionData: { ...suggestedAction.data, parentMessageId: uploadMessage.id },
+            actionStatus: "pending",
+            documentIds: [document.id],
+          });
+          pendingActionMessages.push(actionMessage);
+        }
+      }
+
       res.json({
         document: updatedDocument,
         analysis,
         message: uploadMessage,
+        suggestedActions: analysis.suggestedActions || [],
+        pendingActionMessages,
       });
     } catch (error) {
       console.error("Error uploading document to AI:", error);
+      
+      // Update document status to failed if it was created
+      if (documentId) {
+        try {
+          await storage.updateDocument(documentId, userId, {
+            processingStatus: "failed",
+          });
+        } catch (updateError) {
+          console.error("Error updating document status to failed:", updateError);
+        }
+      }
+      
       res.status(500).json({ message: "Failed to process document" });
     }
   });
@@ -1298,7 +1353,7 @@ Format your response as JSON with the following structure:
   app.post("/api/assistant/execute", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { actionType, actionData } = req.body;
+      const { actionType, actionData, messageId } = req.body;
 
       if (!actionType) {
         return res.status(400).json({ message: "Action type is required" });
@@ -1306,7 +1361,27 @@ Format your response as JSON with the following structure:
 
       const result = await executeAction(actionType, actionData, userId);
 
-      // Create chat message about the action
+      // If messageId provided, update the original pending action message's status
+      // and also update the parent assistant message's actionStatus
+      if (messageId) {
+        const pendingMessage = await storage.getChatMessage(messageId, userId);
+        
+        await storage.updateChatMessage(messageId, userId, {
+          actionStatus: result.success ? "executed" : "pending",
+        });
+
+        // Update parent message's actionStatus if parentMessageId exists in actionData
+        if (pendingMessage?.actionData && typeof pendingMessage.actionData === 'object') {
+          const parentMessageId = (pendingMessage.actionData as Record<string, unknown>).parentMessageId;
+          if (parentMessageId && typeof parentMessageId === 'number') {
+            await storage.updateChatMessage(parentMessageId, userId, {
+              actionStatus: "executed",
+            });
+          }
+        }
+      }
+
+      // Create chat message about the action result
       if (result.success) {
         await storage.createChatMessage({
           userId,
@@ -1322,6 +1397,52 @@ Format your response as JSON with the following structure:
     } catch (error) {
       console.error("Error executing AI action:", error);
       res.status(500).json({ message: "Failed to execute action" });
+    }
+  });
+
+  // Cancel a pending action
+  app.post("/api/assistant/cancel", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { messageId } = req.body;
+
+      if (!messageId) {
+        return res.status(400).json({ message: "Message ID is required" });
+      }
+
+      // Get the original message to verify it exists and is pending
+      const message = await storage.getChatMessage(messageId, userId);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+
+      if (message.actionStatus !== "pending") {
+        return res.status(400).json({ message: "Action is not pending" });
+      }
+
+      // Update the action status to cancelled
+      const updatedMessage = await storage.updateChatMessage(messageId, userId, {
+        actionStatus: "cancelled",
+      });
+
+      // Update parent message's actionStatus if parentMessageId exists in actionData
+      if (message.actionData && typeof message.actionData === 'object') {
+        const parentMessageId = (message.actionData as Record<string, unknown>).parentMessageId;
+        if (parentMessageId && typeof parentMessageId === 'number') {
+          await storage.updateChatMessage(parentMessageId, userId, {
+            actionStatus: "cancelled",
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Action cancelled",
+        updatedMessage,
+      });
+    } catch (error) {
+      console.error("Error cancelling AI action:", error);
+      res.status(500).json({ message: "Failed to cancel action" });
     }
   });
 
