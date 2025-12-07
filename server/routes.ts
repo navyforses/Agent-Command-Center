@@ -1986,5 +1986,263 @@ Format your response as JSON with the following structure:
     }
   });
 
+  // ============================================================================
+  // EVOLUTION CYCLE ROUTES - Autonomous 24-Hour Research Cycles
+  // ============================================================================
+
+  // Get all evolution cycles for user
+  app.get("/api/evolution/cycles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cycles = await storage.getEvolutionCycles(userId);
+      res.json(cycles);
+    } catch (error) {
+      console.error("Error fetching evolution cycles:", error);
+      res.status(500).json({ message: "Failed to fetch evolution cycles" });
+    }
+  });
+
+  // Get active evolution cycle
+  app.get("/api/evolution/cycles/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cycle = await storage.getActiveEvolutionCycle(userId);
+      res.json(cycle || null);
+    } catch (error) {
+      console.error("Error fetching active evolution cycle:", error);
+      res.status(500).json({ message: "Failed to fetch active cycle" });
+    }
+  });
+
+  // Get specific evolution cycle
+  app.get("/api/evolution/cycles/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cycle ID" });
+      }
+      const cycle = await storage.getEvolutionCycle(id, userId);
+      if (!cycle) {
+        return res.status(404).json({ message: "Evolution cycle not found" });
+      }
+      res.json(cycle);
+    } catch (error) {
+      console.error("Error fetching evolution cycle:", error);
+      res.status(500).json({ message: "Failed to fetch evolution cycle" });
+    }
+  });
+
+  // Start new evolution cycle
+  app.post("/api/evolution/cycles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { childId, endDate, triggerDocumentId, diagnosisContext } = req.body;
+      
+      if (!childId || !endDate || !diagnosisContext) {
+        return res.status(400).json({ message: "Missing required fields: childId, endDate, diagnosisContext" });
+      }
+
+      const { startEvolutionCycle } = await import("./evolutionCycleEngine");
+      const cycle = await startEvolutionCycle(
+        userId,
+        parseInt(childId, 10),
+        new Date(endDate),
+        triggerDocumentId ? parseInt(triggerDocumentId, 10) : undefined,
+        diagnosisContext
+      );
+      
+      res.status(201).json(cycle);
+    } catch (error) {
+      console.error("Error starting evolution cycle:", error);
+      res.status(500).json({ message: "Failed to start evolution cycle" });
+    }
+  });
+
+  // Update evolution cycle (pause/resume/cancel)
+  app.patch("/api/evolution/cycles/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cycle ID" });
+      }
+      const { status } = req.body;
+      if (!status || !["active", "paused", "completed", "cancelled"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const cycle = await storage.updateEvolutionCycle(id, userId, { status });
+      if (!cycle) {
+        return res.status(404).json({ message: "Evolution cycle not found" });
+      }
+      res.json(cycle);
+    } catch (error) {
+      console.error("Error updating evolution cycle:", error);
+      res.status(500).json({ message: "Failed to update evolution cycle" });
+    }
+  });
+
+  // Get daily runs for a cycle
+  app.get("/api/evolution/cycles/:cycleId/runs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cycleId = parseInt(req.params.cycleId, 10);
+      if (isNaN(cycleId)) {
+        return res.status(400).json({ message: "Invalid cycle ID" });
+      }
+      const cycle = await storage.getEvolutionCycle(cycleId, userId);
+      if (!cycle) {
+        return res.status(404).json({ message: "Evolution cycle not found" });
+      }
+      const runs = await storage.getEvolutionDailyRuns(cycleId);
+      res.json(runs);
+    } catch (error) {
+      console.error("Error fetching daily runs:", error);
+      res.status(500).json({ message: "Failed to fetch daily runs" });
+    }
+  });
+
+  // Get all evolution reports for user
+  app.get("/api/evolution/reports", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const reports = await storage.getEvolutionReports(userId);
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching evolution reports:", error);
+      res.status(500).json({ message: "Failed to fetch evolution reports" });
+    }
+  });
+
+  // Get specific evolution report
+  app.get("/api/evolution/reports/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid report ID" });
+      }
+      const report = await storage.getEvolutionReport(id, userId);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching evolution report:", error);
+      res.status(500).json({ message: "Failed to fetch report" });
+    }
+  });
+
+  // Get messages for a specific report (chat history)
+  app.get("/api/evolution/reports/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid report ID" });
+      }
+      const report = await storage.getEvolutionReport(id, userId);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+      const messages = await storage.getEvolutionReportMessages(id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching report messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Send message to report chat and get AI response
+  app.post("/api/evolution/reports/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const reportId = parseInt(req.params.id, 10);
+      if (isNaN(reportId)) {
+        return res.status(400).json({ message: "Invalid report ID" });
+      }
+      
+      const { content } = req.body;
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      const report = await storage.getEvolutionReport(reportId, userId);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      const userMessage = await storage.createEvolutionReportMessage({
+        reportId,
+        userId,
+        role: "user",
+        content,
+      });
+
+      const existingMessages = await storage.getEvolutionReportMessages(reportId);
+      const conversationHistory = existingMessages
+        .filter(m => m.id !== userMessage.id)
+        .slice(-10)
+        .map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
+
+      const reportContext = `
+## Report: ${report.titleEn}
+Date: ${report.reportDate}
+
+## Executive Summary
+${report.summaryEn}
+
+## Key Findings
+${(report.keyFindingsEn || []).map((f, i) => `${i + 1}. ${f}`).join("\n")}
+
+## Full Report Content
+${report.contentEn}
+`;
+
+      const systemPrompt = `You are an expert medical research assistant specializing in analyzing Evolution Cycle research reports about Hypoxic-Ischemic Encephalopathy (HIE) and related pediatric neurological conditions.
+
+You have access to the following daily research report. Answer questions about its contents accurately and helpfully. If asked about something not in the report, acknowledge the limitation.
+
+${reportContext}
+
+Respond in a clear, accessible manner suitable for parents and caregivers while maintaining medical accuracy. When relevant, reference specific sections or findings from the report.`;
+
+      const { processReportChat } = await import("./evolutionCycleEngine");
+      const aiResponse = await processReportChat(systemPrompt, conversationHistory, content);
+
+      const assistantMessage = await storage.createEvolutionReportMessage({
+        reportId,
+        userId,
+        role: "assistant",
+        content: aiResponse.contentEn,
+        contentKa: aiResponse.contentKa,
+      });
+
+      res.status(201).json({
+        userMessage,
+        assistantMessage,
+      });
+    } catch (error) {
+      console.error("Error processing report chat:", error);
+      res.status(500).json({ message: "Failed to process message" });
+    }
+  });
+
+  // Trigger evolution tick (for scheduler or manual triggering)
+  app.post("/api/evolution/tick", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { runEvolutionTick } = await import("./evolutionCycleEngine");
+      const result = await runEvolutionTick();
+      res.json(result);
+    } catch (error) {
+      console.error("Error running evolution tick:", error);
+      res.status(500).json({ message: "Failed to run evolution tick" });
+    }
+  });
+
   return httpServer;
 }
