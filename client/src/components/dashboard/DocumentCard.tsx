@@ -1,7 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Image, File, Download, Eye, Brain, Calendar, Building } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FileText, Image, File, Download, Eye, Brain, Calendar, Building, MessageSquare, ChevronDown, Target, Lightbulb } from "lucide-react";
+import { useState } from "react";
 
 interface DocumentCardProps {
   id: string;
@@ -12,9 +14,14 @@ interface DocumentCardProps {
   sourceClinic?: string;
   status: "processed" | "pending" | "analyzed";
   aiSummary?: string;
+  aiKeyFindings?: string[];
+  purpose?: string;
+  conversationId?: number;
+  language?: string;
   onClick?: () => void;
   onDownload?: () => void;
   onAnalyze?: () => void;
+  onViewConversation?: () => void;
 }
 
 export function DocumentCard({
@@ -26,10 +33,16 @@ export function DocumentCard({
   sourceClinic,
   status,
   aiSummary,
+  aiKeyFindings,
+  purpose,
+  conversationId,
+  language = "en",
   onClick,
   onDownload,
   onAnalyze,
+  onViewConversation,
 }: DocumentCardProps) {
+  const [showDetails, setShowDetails] = useState(false);
   const getFileIcon = () => {
     if (fileType.includes("image")) return Image;
     if (fileType.includes("pdf")) return FileText;
@@ -94,11 +107,50 @@ export function DocumentCard({
               )}
             </div>
 
+            {purpose && (
+              <div className="flex items-start gap-1.5 mt-2">
+                <Target className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                  <span className="font-medium">{language === "en" ? "Purpose:" : "მიზანი:"}</span> {purpose}
+                </p>
+              </div>
+            )}
+
             {aiSummary && (
               <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{aiSummary}</p>
             )}
 
-            <div className="flex gap-2 mt-3">
+            {status === "analyzed" && (aiKeyFindings && aiKeyFindings.length > 0) && (
+              <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 mt-2"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`button-toggle-findings-${id}`}
+                  >
+                    <ChevronDown className={`h-3 w-3 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+                    {showDetails 
+                      ? (language === "en" ? "Hide findings" : "აღმოჩენების დამალვა")
+                      : (language === "en" ? `Show ${aiKeyFindings.length} key findings` : `${aiKeyFindings.length} მთავარი აღმოჩენის ჩვენება`)
+                    }
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="space-y-1.5 pl-4 border-l-2 border-border">
+                    {aiKeyFindings.map((finding, i) => (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <Lightbulb className="h-3 w-3 text-chart-4 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-muted-foreground">{finding}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            <div className="flex flex-wrap gap-2 mt-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -110,7 +162,7 @@ export function DocumentCard({
                 data-testid={`button-download-${id}`}
               >
                 <Download className="h-3 w-3" />
-                Download
+                {language === "en" ? "Download" : "ჩამოტვირთვა"}
               </Button>
               <Button
                 variant="ghost"
@@ -123,7 +175,7 @@ export function DocumentCard({
                 data-testid={`button-view-${id}`}
               >
                 <Eye className="h-3 w-3" />
-                View
+                {language === "en" ? "View" : "ნახვა"}
               </Button>
               {status !== "analyzed" && (
                 <Button
@@ -137,7 +189,22 @@ export function DocumentCard({
                   data-testid={`button-analyze-${id}`}
                 >
                   <Brain className="h-3 w-3" />
-                  Analyze
+                  {language === "en" ? "Analyze" : "ანალიზი"}
+                </Button>
+              )}
+              {onViewConversation && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewConversation();
+                  }}
+                  data-testid={`button-view-conversation-${id}`}
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  {language === "en" ? "View AI Chat" : "AI ჩატის ნახვა"}
                 </Button>
               )}
             </div>
