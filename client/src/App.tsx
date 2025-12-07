@@ -15,6 +15,7 @@ import { LogIn, LogOut } from "lucide-react";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import ChildProfile from "@/pages/ChildProfile";
+import ChildrenList from "@/pages/ChildrenList";
 import Documents from "@/pages/Documents";
 import Therapy from "@/pages/Therapy";
 import ClinicalTrials from "@/pages/ClinicalTrials";
@@ -28,6 +29,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/child-profile" component={ChildrenList} />
       <Route path="/child/:id" component={ChildProfile} />
       <Route path="/documents" component={Documents} />
       <Route path="/therapy" component={Therapy} />
