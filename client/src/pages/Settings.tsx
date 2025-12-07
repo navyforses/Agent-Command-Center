@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Bell, Globe, Moon, Shield, User } from "lucide-react";
+import { TestimonialForm } from "@/components/TestimonialForm";
 
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
@@ -155,6 +156,8 @@ export default function Settings() {
             </Button>
           </CardContent>
         </Card>
+
+        <TestimonialForm />
       </div>
     </div>
   );
