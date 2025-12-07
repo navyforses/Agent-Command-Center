@@ -36,6 +36,16 @@ import {
 } from "./aiOrchestrator";
 import { runNexusResearch } from "./nexusOrchestrator";
 import { extractTextFromPDF, extractTextFromImage } from "./documentProcessor";
+import { 
+  searchOpenAlex, 
+  searchSemanticScholar, 
+  searchAcademicSources,
+  searchOpenAlexCrossDisciplinary,
+  searchSemanticScholarRecommendations,
+  formatAcademicResultsForAI,
+  type AcademicPaper,
+  type UnifiedAcademicSearchResult,
+} from "./academicSearch";
 
 const diagnosisUpload = multer({
   storage: multer.memoryStorage(),
@@ -2240,6 +2250,141 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     } catch (error) {
       console.error("Error running evolution tick:", error);
       res.status(500).json({ message: "Failed to run evolution tick" });
+    }
+  });
+
+  // Academic Research Routes - OpenAlex, Semantic Scholar, Cross-Disciplinary
+  app.post("/api/academic/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const { 
+        query, 
+        maxResults = 20, 
+        yearFrom, 
+        yearTo, 
+        openAccessOnly = false,
+        includeCrossDisciplinary = true,
+        targetDisciplines,
+      } = req.body;
+
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      const result = await searchAcademicSources(query, {
+        maxResults,
+        yearFrom,
+        yearTo,
+        openAccessOnly,
+        includeCrossDisciplinary,
+        targetDisciplines,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching academic sources:", error);
+      res.status(500).json({ message: "Failed to search academic sources" });
+    }
+  });
+
+  app.post("/api/academic/openalex", isAuthenticated, async (req: any, res) => {
+    try {
+      const { 
+        query, 
+        maxResults = 25, 
+        yearFrom, 
+        yearTo, 
+        openAccessOnly = false,
+        sortBy = "relevance",
+      } = req.body;
+
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      const result = await searchOpenAlex(query, {
+        maxResults,
+        yearFrom,
+        yearTo,
+        openAccessOnly,
+        sortBy,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching OpenAlex:", error);
+      res.status(500).json({ message: "Failed to search OpenAlex" });
+    }
+  });
+
+  app.post("/api/academic/semantic-scholar", isAuthenticated, async (req: any, res) => {
+    try {
+      const { 
+        query, 
+        maxResults = 25, 
+        yearFrom, 
+        yearTo, 
+        openAccessOnly = false,
+        fieldsOfStudy,
+      } = req.body;
+
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      const result = await searchSemanticScholar(query, {
+        maxResults,
+        yearFrom,
+        yearTo,
+        openAccessOnly,
+        fieldsOfStudy,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching Semantic Scholar:", error);
+      res.status(500).json({ message: "Failed to search Semantic Scholar" });
+    }
+  });
+
+  app.post("/api/academic/cross-disciplinary", isAuthenticated, async (req: any, res) => {
+    try {
+      const { 
+        medicalQuery, 
+        targetDisciplines = ["physics", "engineering", "mathematics", "computer science", "materials science"],
+        maxResultsPerDiscipline = 10,
+      } = req.body;
+
+      if (!medicalQuery || typeof medicalQuery !== "string") {
+        return res.status(400).json({ message: "Medical query is required" });
+      }
+
+      const result = await searchOpenAlexCrossDisciplinary(
+        medicalQuery,
+        targetDisciplines,
+        maxResultsPerDiscipline
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching cross-disciplinary:", error);
+      res.status(500).json({ message: "Failed to search cross-disciplinary sources" });
+    }
+  });
+
+  app.post("/api/academic/recommendations", isAuthenticated, async (req: any, res) => {
+    try {
+      const { paperIds, maxResults = 20 } = req.body;
+
+      if (!paperIds || !Array.isArray(paperIds) || paperIds.length === 0) {
+        return res.status(400).json({ message: "Paper IDs array is required" });
+      }
+
+      const recommendations = await searchSemanticScholarRecommendations(paperIds, maxResults);
+
+      res.json({ recommendations, count: recommendations.length });
+    } catch (error) {
+      console.error("Error getting recommendations:", error);
+      res.status(500).json({ message: "Failed to get paper recommendations" });
     }
   });
 
