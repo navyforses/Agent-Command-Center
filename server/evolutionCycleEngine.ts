@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
+import { searchAcademicSources, formatAcademicResultsForAI } from "./academicSearch";
 import type {
   EvolutionCycle,
   EvolutionDailyRun,
@@ -190,7 +191,7 @@ async function queryGemini(query: string, systemPrompt: string): Promise<AIRespo
   try {
     const prompt = `${systemPrompt}\n\n${query}`;
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-pro",
       contents: prompt,
     });
 
@@ -229,7 +230,7 @@ async function queryGemini(query: string, systemPrompt: string): Promise<AIRespo
 async function queryClaude(query: string, systemPrompt: string): Promise<AIResponse> {
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+      model: "claude-opus-4-5",
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: "user", content: query }],
@@ -267,6 +268,47 @@ async function queryClaude(query: string, systemPrompt: string): Promise<AIRespo
   }
 }
 
+async function queryOpenAIThinking(query: string, systemPrompt: string): Promise<AIResponse> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "o1",
+      messages: [
+        { role: "user", content: `${systemPrompt}\n\n${query}` },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content || "{}";
+    let parsed: Record<string, unknown> = {};
+
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      parsed = { summary: content };
+    }
+
+    return {
+      content: (parsed.summary as string) || content,
+      keyPoints: (parsed.keyPoints as string[]) || [],
+      sources: (parsed.sources as { title: string; url?: string; snippet?: string }[]) || [],
+      confidence: (parsed.confidence as number) || 85,
+      success: true,
+    };
+  } catch (error) {
+    console.error("OpenAI Thinking (o1) error:", error);
+    return {
+      content: "",
+      keyPoints: [],
+      sources: [],
+      confidence: 0,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 async function queryGrok(query: string, systemPrompt: string): Promise<AIResponse> {
   const apiKey = process.env.XAI_API_KEY;
 
@@ -283,7 +325,7 @@ async function queryGrok(query: string, systemPrompt: string): Promise<AIRespons
 
   try {
     const completion = await grok.chat.completions.create({
-      model: "grok-3-mini",
+      model: "grok-3",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: query },
@@ -323,9 +365,52 @@ async function queryGrok(query: string, systemPrompt: string): Promise<AIRespons
 }
 
 async function executeObservePhase(diagnosisContext: string): Promise<PhaseResult> {
+  const insights: InsertEvolutionInsight[] = [];
+
+  const academicSearchResult = await searchAcademicSources(diagnosisContext, {
+    maxResults: 25,
+    yearFrom: new Date().getFullYear() - 2,
+    openAccessOnly: false,
+    includeCrossDisciplinary: true,
+    targetDisciplines: ["physics", "engineering", "mathematics", "computer science", "materials science"],
+  });
+
+  const academicContext = formatAcademicResultsForAI(academicSearchResult);
+
+  if (academicSearchResult.papers.length > 0) {
+    const academicSummary = `Found ${academicSearchResult.totalResults} academic papers from ${academicSearchResult.sources.join(", ")}.\n\nTop papers include:\n${academicSearchResult.papers.slice(0, 5).map((p, i) => `${i + 1}. "${p.title}" (${p.year || "N/A"}) - ${p.citationCount || 0} citations`).join("\n")}`;
+
+    const academicContentKa = await translateToGeorgian(academicSummary);
+
+    insights.push({
+      phase: "observe",
+      insightType: "observation",
+      contentEn: academicSummary,
+      contentKa: academicContentKa,
+      sources: academicSearchResult.papers.slice(0, 10).map((p) => ({
+        title: p.title,
+        url: p.url || p.openAccessUrl,
+        snippet: p.abstract?.substring(0, 200),
+        source: p.source,
+      })),
+      metadata: {
+        keyPoints: academicSearchResult.papers.slice(0, 5).map((p) => p.title),
+        aiProvider: "academic-search",
+        searchType: "academic-databases",
+        sources: academicSearchResult.sources,
+        crossDisciplinaryInsights: academicSearchResult.crossDisciplinaryInsights,
+      },
+      confidence: 90,
+      relevanceScore: 95,
+    });
+  }
+
   const systemPrompt = `You are a medical research observer specializing in neurological conditions, particularly Hypoxic-Ischemic Encephalopathy (HIE) and related pediatric neurological disorders.
 
 Your task is to search for and compile the latest research, clinical trials, and medical news related to the diagnosis provided.
+
+You have access to the following academic research from OpenAlex and Semantic Scholar:
+${academicContext}
 
 Focus on:
 - Recent PubMed publications (last 6 months)
@@ -333,14 +418,16 @@ Focus on:
 - Medical news and breakthrough announcements
 - Emerging therapies and treatments
 - New diagnostic techniques
+- Cross-disciplinary insights from physics, engineering, and other fields
 
 Respond with a JSON object:
 {
   "summary": "Overview of recent findings and developments (2-3 paragraphs)",
   "keyPoints": ["Key finding 1", "Key finding 2", ...],
-  "sources": [{"title": "Source title", "url": "URL if available", "snippet": "Relevant excerpt", "source": "PubMed/ClinicalTrials/News"}],
+  "sources": [{"title": "Source title", "url": "URL if available", "snippet": "Relevant excerpt", "source": "PubMed/ClinicalTrials/News/Academic"}],
   "clinicalTrials": ["Trial 1 description", "Trial 2 description", ...],
   "emergingTherapies": ["Therapy 1", "Therapy 2", ...],
+  "crossDisciplinaryFindings": ["Finding from physics/engineering/etc", ...],
   "confidence": 85
 }`;
 
@@ -351,9 +438,8 @@ Focus on:
 2. Active clinical trials accepting patients
 3. Breakthrough research or discoveries
 4. New rehabilitation approaches
-5. Emerging technologies in this field`;
-
-  const insights: InsertEvolutionInsight[] = [];
+5. Emerging technologies in this field
+6. Cross-disciplinary applications from physics, engineering, materials science`;
 
   const perplexityResult = await queryPerplexity(query, systemPrompt);
 
@@ -600,8 +686,8 @@ Generate:
 
   const insights: InsertEvolutionInsight[] = [];
 
-  const [gptResult, geminiResult, claudeResult, grokResult, perplexityResult] = await Promise.all([
-    queryOpenAI(query, swarmPrompt),
+  const [gptThinkingResult, geminiResult, claudeResult, grokResult, perplexityResult] = await Promise.all([
+    queryOpenAIThinking(query, swarmPrompt),
     queryGemini(query, swarmPrompt),
     queryClaude(query, swarmPrompt),
     queryGrok(query, swarmPrompt),
@@ -609,10 +695,10 @@ Generate:
   ]);
 
   const allResults = [
-    { result: gptResult, provider: "gpt-4" },
-    { result: geminiResult, provider: "gemini" },
-    { result: claudeResult, provider: "claude" },
-    { result: grokResult, provider: "grok" },
+    { result: gptThinkingResult, provider: "gpt-o1-thinking" },
+    { result: geminiResult, provider: "gemini-2.5-pro" },
+    { result: claudeResult, provider: "claude-opus-4.5" },
+    { result: grokResult, provider: "grok-3" },
     { result: perplexityResult, provider: "perplexity" },
   ];
 
