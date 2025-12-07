@@ -43,6 +43,11 @@
   --chart-3: 262 83% 32%;
   --chart-4: 31 92% 35%;
   --chart-5: 340 82% 32%;
+  --ai-claude: 262 83% 58%;
+  --ai-chatgpt: 142 70% 40%;
+  --ai-grok: 201 82% 48%;
+  --ai-gemini: 43 96% 50%;
+  --ai-perplexity: 24 92% 50%;
   --font-sans: Inter, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: JetBrains Mono, monospace;
@@ -127,6 +132,11 @@
   --chart-3: 262 83% 68%;
   --chart-4: 31 92% 65%;
   --chart-5: 340 82% 68%;
+  --ai-claude: 262 83% 68%;
+  --ai-chatgpt: 142 70% 55%;
+  --ai-grok: 201 82% 58%;
+  --ai-gemini: 43 96% 60%;
+  --ai-perplexity: 24 92% 60%;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 1px 2px -1px hsl(0 0% 0% / 0.00);

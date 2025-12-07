@@ -32,16 +32,16 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface AIAgent {
   id: string;
   name: string;
-  color: string;
+  colorClass: string;
   status: "ready" | "searching" | "analyzing" | "idle";
 }
 
 const aiAgents: AIAgent[] = [
-  { id: "claude", name: "Claude", color: "bg-violet-500", status: "ready" },
-  { id: "chatgpt", name: "ChatGPT", color: "bg-emerald-500", status: "ready" },
-  { id: "grok", name: "Grok", color: "bg-blue-500", status: "ready" },
-  { id: "gemini", name: "Gemini", color: "bg-amber-500", status: "ready" },
-  { id: "perplexity", name: "Perplexity", color: "bg-orange-500", status: "ready" },
+  { id: "claude", name: "Claude", colorClass: "bg-[hsl(var(--ai-claude))]", status: "ready" },
+  { id: "chatgpt", name: "ChatGPT", colorClass: "bg-[hsl(var(--ai-chatgpt))]", status: "ready" },
+  { id: "grok", name: "Grok", colorClass: "bg-[hsl(var(--ai-grok))]", status: "ready" },
+  { id: "gemini", name: "Gemini", colorClass: "bg-[hsl(var(--ai-gemini))]", status: "ready" },
+  { id: "perplexity", name: "Perplexity", colorClass: "bg-[hsl(var(--ai-perplexity))]", status: "ready" },
 ];
 
 const disciplineCategories = [
@@ -122,22 +122,35 @@ export default function NexusOmega() {
     setQuery((prev) => `${command} ${prev}`.trim());
   };
 
+  const getStatusColor = (status: AIAgent["status"]) => {
+    switch (status) {
+      case "ready":
+        return "text-green-600 dark:text-green-400";
+      case "searching":
+        return "text-amber-600 dark:text-amber-400";
+      case "analyzing":
+        return "text-primary";
+      default:
+        return "text-muted-foreground";
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-background">
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-violet-600 rounded-md">
-            <Zap className="h-5 w-5 text-white" />
+          <div className="p-2 bg-primary rounded-md">
+            <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white" data-testid="text-page-title">
+            <h1 className="text-xl font-bold" data-testid="text-page-title">
               {t("nexusOmega")}
             </h1>
-            <p className="text-sm text-slate-400">Multi-AI Neuroregeneration Research Platform</p>
+            <p className="text-sm text-muted-foreground">Multi-AI Neuroregeneration Research Platform</p>
           </div>
         </div>
 
-        <Card className="bg-slate-900 border-slate-700">
+        <Card>
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
               {aiAgents.map((agent) => {
@@ -150,22 +163,14 @@ export default function NexusOmega() {
                     data-testid={`ai-agent-${agent.id}`}
                   >
                     <div
-                      className={`w-3 h-3 rounded-full ${agent.color} ${
+                      className={`w-3 h-3 rounded-full ${agent.colorClass} ${
                         isActive ? "animate-pulse" : ""
                       }`}
                     />
-                    <span className="text-sm font-medium text-slate-200">{agent.name}</span>
+                    <span className="text-sm font-medium">{agent.name}</span>
                     <Badge
                       variant="outline"
-                      className={`text-xs border-slate-600 ${
-                        status === "ready"
-                          ? "text-emerald-400"
-                          : status === "searching"
-                          ? "text-amber-400"
-                          : status === "analyzing"
-                          ? "text-violet-400"
-                          : "text-slate-500"
-                      }`}
+                      className={`text-xs ${getStatusColor(status)}`}
                       data-testid={`badge-status-${agent.id}`}
                     >
                       {status}
@@ -177,23 +182,22 @@ export default function NexusOmega() {
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-700">
+        <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Enter research topic or question..."
-                  className="pl-10 bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500 focus-visible:ring-violet-500"
+                  className="pl-10"
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   data-testid="input-search-query"
                 />
               </div>
               <Button
                 onClick={handleSearch}
-                className="bg-violet-600 hover:bg-violet-700 text-white font-bold px-6"
                 data-testid="button-omega-search"
               >
                 <Zap className="h-4 w-4 mr-2" />
@@ -208,7 +212,6 @@ export default function NexusOmega() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickCommand(cmd.label)}
-                  className="bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-slate-100"
                   data-testid={`button-command-${cmd.label.replace("/", "")}`}
                 >
                   {cmd.label}
@@ -220,10 +223,10 @@ export default function NexusOmega() {
 
         <div className="flex gap-4">
           <div className="w-64 flex-shrink-0 space-y-4">
-            <Card className="bg-slate-900 border-slate-700">
+            <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Beaker className="h-4 w-4 text-violet-400" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Beaker className="h-4 w-4 text-primary" />
                   Disciplines
                 </CardTitle>
               </CardHeader>
@@ -232,7 +235,7 @@ export default function NexusOmega() {
                   <div className="space-y-4">
                     {disciplineCategories.map((category) => (
                       <div key={category.name} className="space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                           <category.icon className="h-3 w-3" />
                           {category.name}
                         </div>
@@ -243,12 +246,11 @@ export default function NexusOmega() {
                                 id={`discipline-${discipline}`}
                                 checked={selectedDisciplines.includes(discipline)}
                                 onCheckedChange={() => handleDisciplineToggle(discipline)}
-                                className="border-slate-600 data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
                                 data-testid={`checkbox-discipline-${discipline.toLowerCase().replace(/\s+/g, "-")}`}
                               />
                               <Label
                                 htmlFor={`discipline-${discipline}`}
-                                className="text-sm text-slate-300 cursor-pointer"
+                                className="text-sm cursor-pointer"
                               >
                                 {discipline}
                               </Label>
@@ -262,10 +264,10 @@ export default function NexusOmega() {
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-900 border-slate-700">
+            <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-violet-400" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-primary" />
                   Research Focus
                 </CardTitle>
               </CardHeader>
@@ -280,12 +282,11 @@ export default function NexusOmega() {
                       <RadioGroupItem
                         value={option}
                         id={`focus-${option}`}
-                        className="border-slate-600 text-violet-600"
                         data-testid={`radio-focus-${option.toLowerCase().replace(/\s+/g, "-")}`}
                       />
                       <Label
                         htmlFor={`focus-${option}`}
-                        className="text-sm text-slate-300 cursor-pointer"
+                        className="text-sm cursor-pointer"
                       >
                         {option}
                       </Label>
@@ -297,13 +298,12 @@ export default function NexusOmega() {
           </div>
 
           <div className="flex-1 min-w-0">
-            <Card className="bg-slate-900 border-slate-700">
+            <Card>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <CardHeader className="pb-0">
-                  <TabsList className="bg-slate-800 border border-slate-700">
+                  <TabsList>
                     <TabsTrigger
                       value="consensus"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-consensus"
                     >
                       <Activity className="h-4 w-4 mr-1" />
@@ -311,7 +311,6 @@ export default function NexusOmega() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="individual"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-individual"
                     >
                       <MessageSquare className="h-4 w-4 mr-1" />
@@ -319,7 +318,6 @@ export default function NexusOmega() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="cross"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-cross-disciplinary"
                     >
                       <Network className="h-4 w-4 mr-1" />
@@ -327,7 +325,6 @@ export default function NexusOmega() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="hypotheses"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-hypotheses"
                     >
                       <Lightbulb className="h-4 w-4 mr-1" />
@@ -335,7 +332,6 @@ export default function NexusOmega() {
                     </TabsTrigger>
                     <TabsTrigger
                       value="debates"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-debates"
                     >
                       <MessageSquare className="h-4 w-4 mr-1" />
@@ -346,47 +342,47 @@ export default function NexusOmega() {
                 <CardContent className="p-4">
                   <ScrollArea className="h-[400px]">
                     <TabsContent value="consensus" className="m-0">
-                      <div className="bg-slate-800/50 rounded-md p-6 text-center">
-                        <Activity className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-slate-300 mb-2">AI Consensus View</h3>
-                        <p className="text-sm text-slate-500">
+                      <div className="bg-muted/50 rounded-md p-6 text-center">
+                        <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <h3 className="text-lg font-medium mb-2">AI Consensus View</h3>
+                        <p className="text-sm text-muted-foreground">
                           Enter a research query to see synthesized consensus from all AI agents across
                           selected disciplines.
                         </p>
                       </div>
                     </TabsContent>
                     <TabsContent value="individual" className="m-0">
-                      <div className="bg-slate-800/50 rounded-md p-6 text-center">
-                        <MessageSquare className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-slate-300 mb-2">Individual AI Responses</h3>
-                        <p className="text-sm text-slate-500">
+                      <div className="bg-muted/50 rounded-md p-6 text-center">
+                        <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <h3 className="text-lg font-medium mb-2">Individual AI Responses</h3>
+                        <p className="text-sm text-muted-foreground">
                           View separate responses from each AI agent for detailed comparison.
                         </p>
                       </div>
                     </TabsContent>
                     <TabsContent value="cross" className="m-0">
-                      <div className="bg-slate-800/50 rounded-md p-6 text-center">
-                        <Network className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-slate-300 mb-2">Cross-Disciplinary Insights</h3>
-                        <p className="text-sm text-slate-500">
+                      <div className="bg-muted/50 rounded-md p-6 text-center">
+                        <Network className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <h3 className="text-lg font-medium mb-2">Cross-Disciplinary Insights</h3>
+                        <p className="text-sm text-muted-foreground">
                           Discover connections between different fields of research.
                         </p>
                       </div>
                     </TabsContent>
                     <TabsContent value="hypotheses" className="m-0">
-                      <div className="bg-slate-800/50 rounded-md p-6 text-center">
-                        <Lightbulb className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-slate-300 mb-2">Generated Hypotheses</h3>
-                        <p className="text-sm text-slate-500">
+                      <div className="bg-muted/50 rounded-md p-6 text-center">
+                        <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <h3 className="text-lg font-medium mb-2">Generated Hypotheses</h3>
+                        <p className="text-sm text-muted-foreground">
                           AI-generated research hypotheses based on cross-disciplinary analysis.
                         </p>
                       </div>
                     </TabsContent>
                     <TabsContent value="debates" className="m-0">
-                      <div className="bg-slate-800/50 rounded-md p-6 text-center">
-                        <MessageSquare className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium text-slate-300 mb-2">AI Debates</h3>
-                        <p className="text-sm text-slate-500">
+                      <div className="bg-muted/50 rounded-md p-6 text-center">
+                        <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <h3 className="text-lg font-medium mb-2">AI Debates</h3>
+                        <p className="text-sm text-muted-foreground">
                           Watch AI agents debate different perspectives on research topics.
                         </p>
                       </div>
@@ -399,16 +395,16 @@ export default function NexusOmega() {
         </div>
 
         <Collapsible open={knowledgeGraphOpen} onOpenChange={setKnowledgeGraphOpen}>
-          <Card className="bg-slate-900 border-slate-700">
+          <Card>
             <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-slate-800/50 transition-colors">
-                <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <CardHeader className="cursor-pointer hover-elevate">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   {knowledgeGraphOpen ? (
-                    <ChevronDown className="h-4 w-4 text-violet-400" />
+                    <ChevronDown className="h-4 w-4 text-primary" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-violet-400" />
+                    <ChevronRight className="h-4 w-4 text-primary" />
                   )}
-                  <Network className="h-4 w-4 text-violet-400" />
+                  <Network className="h-4 w-4 text-primary" />
                   Knowledge Graph
                 </CardTitle>
               </CardHeader>
@@ -416,13 +412,13 @@ export default function NexusOmega() {
             <CollapsibleContent>
               <CardContent className="pt-0">
                 <div
-                  className="bg-slate-800/50 rounded-md h-48 flex items-center justify-center border border-slate-700"
+                  className="bg-muted/50 rounded-md h-48 flex items-center justify-center border"
                   data-testid="knowledge-graph-placeholder"
                 >
                   <div className="text-center">
-                    <Network className="h-10 w-10 text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">Knowledge Graph Visualization</p>
-                    <p className="text-xs text-slate-600">Interactive concept mapping will appear here</p>
+                    <Network className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Knowledge Graph Visualization</p>
+                    <p className="text-xs text-muted-foreground">Interactive concept mapping will appear here</p>
                   </div>
                 </div>
               </CardContent>
@@ -431,16 +427,16 @@ export default function NexusOmega() {
         </Collapsible>
 
         <Collapsible open={bottomPanelOpen} onOpenChange={setBottomPanelOpen}>
-          <Card className="bg-slate-900 border-slate-700">
+          <Card>
             <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-slate-800/50 transition-colors">
-                <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <CardHeader className="cursor-pointer hover-elevate">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   {bottomPanelOpen ? (
-                    <ChevronDown className="h-4 w-4 text-violet-400" />
+                    <ChevronDown className="h-4 w-4 text-primary" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-violet-400" />
+                    <ChevronRight className="h-4 w-4 text-primary" />
                   )}
-                  <BookOpen className="h-4 w-4 text-violet-400" />
+                  <BookOpen className="h-4 w-4 text-primary" />
                   Research Tools
                 </CardTitle>
               </CardHeader>
@@ -448,46 +444,43 @@ export default function NexusOmega() {
             <CollapsibleContent>
               <CardContent className="pt-0">
                 <Tabs value={bottomActiveTab} onValueChange={setBottomActiveTab}>
-                  <TabsList className="bg-slate-800 border border-slate-700 mb-3">
+                  <TabsList className="mb-3">
                     <TabsTrigger
                       value="hypotheses"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-bottom-hypotheses"
                     >
                       Hypothesis Tracker
                     </TabsTrigger>
                     <TabsTrigger
                       value="actions"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-bottom-actions"
                     >
                       Actions Queue
                     </TabsTrigger>
                     <TabsTrigger
                       value="bibliography"
-                      className="data-[state=active]:bg-violet-600 data-[state=active]:text-white"
                       data-testid="tab-bottom-bibliography"
                     >
                       Bibliography
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="hypotheses" className="m-0">
-                    <div className="bg-slate-800/50 rounded-md p-4 border border-slate-700">
-                      <p className="text-sm text-slate-500 text-center">
+                    <div className="bg-muted/50 rounded-md p-4 border">
+                      <p className="text-sm text-muted-foreground text-center">
                         Track and manage research hypotheses generated during your sessions.
                       </p>
                     </div>
                   </TabsContent>
                   <TabsContent value="actions" className="m-0">
-                    <div className="bg-slate-800/50 rounded-md p-4 border border-slate-700">
-                      <p className="text-sm text-slate-500 text-center">
+                    <div className="bg-muted/50 rounded-md p-4 border">
+                      <p className="text-sm text-muted-foreground text-center">
                         Queue of research actions and follow-up tasks.
                       </p>
                     </div>
                   </TabsContent>
                   <TabsContent value="bibliography" className="m-0">
-                    <div className="bg-slate-800/50 rounded-md p-4 border border-slate-700">
-                      <p className="text-sm text-slate-500 text-center">
+                    <div className="bg-muted/50 rounded-md p-4 border">
+                      <p className="text-sm text-muted-foreground text-center">
                         Auto-generated bibliography from research sources.
                       </p>
                     </div>
