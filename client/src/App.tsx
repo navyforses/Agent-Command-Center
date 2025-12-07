@@ -23,6 +23,7 @@ import EmailHub from "@/pages/EmailHub";
 import CalendarPage from "@/pages/CalendarPage";
 import AIAssistant from "@/pages/AIAssistant";
 import NexusOmega from "@/pages/NexusOmega";
+import Evolution from "@/pages/Evolution";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/assistant" component={AIAssistant} />
       <Route path="/nexus" component={NexusOmega} />
+      <Route path="/evolution" component={Evolution} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
