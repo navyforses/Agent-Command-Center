@@ -4,8 +4,7 @@ import { objectStorageClient, ObjectStorageService } from "./objectStorage";
 import type { File } from "@google-cloud/storage";
 
 const require = createRequire(import.meta.url);
-const pdfParseModule = require("pdf-parse");
-const pdfParse = pdfParseModule.default || pdfParseModule;
+const pdfParse = require("pdf-parse");
 
 export interface ExtractedContent {
   text: string;
