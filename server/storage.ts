@@ -6,6 +6,7 @@ import {
   therapySessions,
   appointments,
   emails,
+  conversations,
   chatMessages,
   testimonials,
   type User,
@@ -22,6 +23,8 @@ import {
   type InsertAppointment,
   type Email,
   type InsertEmail,
+  type Conversation,
+  type InsertConversation,
   type ChatMessage,
   type InsertChatMessage,
   type Testimonial,
@@ -73,11 +76,19 @@ export interface IStorage {
   updateEmail(id: number, userId: string, email: Partial<InsertEmail>): Promise<Email | undefined>;
   deleteEmail(id: number, userId: string): Promise<boolean>;
 
+  getConversations(userId: string): Promise<Conversation[]>;
+  getConversation(id: number, userId: string): Promise<Conversation | undefined>;
+  createConversation(conversation: InsertConversation): Promise<Conversation>;
+  updateConversation(id: number, userId: string, conversation: Partial<InsertConversation>): Promise<Conversation | undefined>;
+  deleteConversation(id: number, userId: string): Promise<boolean>;
+
   getChatMessages(userId: string): Promise<ChatMessage[]>;
+  getChatMessagesByConversation(conversationId: number, userId: string): Promise<ChatMessage[]>;
   getChatMessage(id: number, userId: string): Promise<ChatMessage | undefined>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: number, userId: string, message: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
   clearChatMessages(userId: string): Promise<boolean>;
+  clearConversationMessages(conversationId: number, userId: string): Promise<boolean>;
 
   getApprovedTestimonials(): Promise<Testimonial[]>;
   getUserTestimonial(userId: string): Promise<Testimonial | undefined>;
@@ -341,8 +352,49 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
+  async getConversations(userId: string): Promise<Conversation[]> {
+    return db.select().from(conversations)
+      .where(eq(conversations.userId, userId))
+      .orderBy(desc(conversations.updatedAt));
+  }
+
+  async getConversation(id: number, userId: string): Promise<Conversation | undefined> {
+    const [conversation] = await db.select().from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
+    return conversation;
+  }
+
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    const [newConversation] = await db.insert(conversations).values(conversation).returning();
+    return newConversation;
+  }
+
+  async updateConversation(id: number, userId: string, conversation: Partial<InsertConversation>): Promise<Conversation | undefined> {
+    const [updatedConversation] = await db
+      .update(conversations)
+      .set({ ...conversation, updatedAt: new Date() })
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+      .returning();
+    return updatedConversation;
+  }
+
+  async deleteConversation(id: number, userId: string): Promise<boolean> {
+    await db.delete(chatMessages)
+      .where(and(eq(chatMessages.conversationId, id), eq(chatMessages.userId, userId)));
+    const result = await db.delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
   async getChatMessages(userId: string): Promise<ChatMessage[]> {
     return db.select().from(chatMessages).where(eq(chatMessages.userId, userId));
+  }
+
+  async getChatMessagesByConversation(conversationId: number, userId: string): Promise<ChatMessage[]> {
+    return db.select().from(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.userId, userId)))
+      .orderBy(chatMessages.createdAt);
   }
 
   async getChatMessage(id: number, userId: string): Promise<ChatMessage | undefined> {
@@ -368,6 +420,15 @@ export class DatabaseStorage implements IStorage {
   async clearChatMessages(userId: string): Promise<boolean> {
     const result = await db.delete(chatMessages)
       .where(eq(chatMessages.userId, userId))
+      .returning();
+    return result.length >= 0;
+  }
+
+  async clearConversationMessages(conversationId: number, userId: string): Promise<boolean> {
+    const conversation = await this.getConversation(conversationId, userId);
+    if (!conversation) return false;
+    const result = await db.delete(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.userId, userId)))
       .returning();
     return result.length >= 0;
   }
