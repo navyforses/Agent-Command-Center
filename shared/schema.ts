@@ -10,6 +10,7 @@ import {
   jsonb,
   timestamp,
   index,
+  real,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -301,3 +302,320 @@ export const insertTestimonialSchema = createInsertSchema(testimonials).omit({
 
 export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
 export type Testimonial = typeof testimonials.$inferSelect;
+
+// ============================================================================
+// NEXUS OMEGA - Multi-AI Research Platform Tables
+// ============================================================================
+
+// AI Agents table - defines the AI systems in the NEXUS collective
+export const nexusAiAgents = pgTable("nexus_ai_agents", {
+  id: varchar("id", { length: 50 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 7 }),
+  description: text("description"),
+  strengths: text("strengths").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNexusAiAgentSchema = createInsertSchema(nexusAiAgents).omit({
+  createdAt: true,
+});
+
+export type InsertNexusAiAgent = z.infer<typeof insertNexusAiAgentSchema>;
+export type NexusAiAgent = typeof nexusAiAgents.$inferSelect;
+
+// AI status enum for tracking agent states
+export const nexusAiStatusEnum = z.enum([
+  "ready",
+  "searching",
+  "analyzing",
+  "error",
+  "offline"
+]);
+export type NexusAiStatus = z.infer<typeof nexusAiStatusEnum>;
+
+// Research Queries table - stores multi-AI research queries
+export const nexusResearchQueries = pgTable("nexus_research_queries", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  queryText: text("query_text").notNull(),
+  disciplines: text("disciplines").array(),
+  researchFocus: text("research_focus").array(),
+  aiAgents: text("ai_agents").array(),
+  status: varchar("status", { length: 50 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertNexusResearchQuerySchema = createInsertSchema(nexusResearchQueries).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertNexusResearchQuery = z.infer<typeof insertNexusResearchQuerySchema>;
+export type NexusResearchQuery = typeof nexusResearchQueries.$inferSelect;
+
+// Research query status enum
+export const nexusQueryStatusEnum = z.enum([
+  "pending",
+  "searching",
+  "analyzing",
+  "consensus",
+  "completed",
+  "failed"
+]);
+export type NexusQueryStatus = z.infer<typeof nexusQueryStatusEnum>;
+
+// Findings table - stores research findings from multi-AI analysis
+export const nexusFindings = pgTable("nexus_findings", {
+  id: serial("id").primaryKey(),
+  queryId: integer("query_id").references(() => nexusResearchQueries.id),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  consensusLevel: varchar("consensus_level", { length: 10 }),
+  confidenceScore: integer("confidence_score"),
+  relevanceScore: integer("relevance_score"),
+  sources: jsonb("sources"),
+  hypothesesGenerated: text("hypotheses_generated").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNexusFindingSchema = createInsertSchema(nexusFindings, {
+  sources: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    doi: z.string().optional(),
+    snippet: z.string().optional(),
+  })).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusFinding = z.infer<typeof insertNexusFindingSchema>;
+export type NexusFinding = typeof nexusFindings.$inferSelect;
+
+// AI Analyses table - individual AI perspectives on findings
+export const nexusAiAnalyses = pgTable("nexus_ai_analyses", {
+  id: serial("id").primaryKey(),
+  findingId: integer("finding_id").references(() => nexusFindings.id),
+  aiAgentId: varchar("ai_agent_id", { length: 50 }).references(() => nexusAiAgents.id),
+  perspective: text("perspective"),
+  confidence: integer("confidence"),
+  keyPoints: text("key_points").array(),
+  concerns: text("concerns").array(),
+  uniqueInsights: text("unique_insights").array(),
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNexusAiAnalysisSchema = createInsertSchema(nexusAiAnalyses, {
+  rawResponse: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusAiAnalysis = z.infer<typeof insertNexusAiAnalysisSchema>;
+export type NexusAiAnalysis = typeof nexusAiAnalyses.$inferSelect;
+
+// Disciplinary Analyses table - scientific discipline perspectives
+export const nexusDisciplinaryAnalyses = pgTable("nexus_disciplinary_analyses", {
+  id: serial("id").primaryKey(),
+  findingId: integer("finding_id").references(() => nexusFindings.id),
+  discipline: varchar("discipline", { length: 100 }).notNull(),
+  analysis: text("analysis"),
+  crossConnections: jsonb("cross_connections"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNexusDisciplinaryAnalysisSchema = createInsertSchema(nexusDisciplinaryAnalyses, {
+  crossConnections: z.array(z.object({
+    toDiscipline: z.string(),
+    connection: z.string(),
+    strength: z.number().optional(),
+  })).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusDisciplinaryAnalysis = z.infer<typeof insertNexusDisciplinaryAnalysisSchema>;
+export type NexusDisciplinaryAnalysis = typeof nexusDisciplinaryAnalyses.$inferSelect;
+
+// Knowledge Nodes table - concepts in the knowledge graph
+export const nexusKnowledgeNodes = pgTable("nexus_knowledge_nodes", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(),
+  nodeType: varchar("node_type", { length: 50 }),
+  relevanceScore: integer("relevance_score"),
+  evidenceLevel: integer("evidence_level"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const nexusNodeTypeEnum = z.enum([
+  "concept",
+  "therapy",
+  "mechanism",
+  "pathway",
+  "trial",
+  "hypothesis"
+]);
+export type NexusNodeType = z.infer<typeof nexusNodeTypeEnum>;
+
+export const insertNexusKnowledgeNodeSchema = createInsertSchema(nexusKnowledgeNodes, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusKnowledgeNode = z.infer<typeof insertNexusKnowledgeNodeSchema>;
+export type NexusKnowledgeNode = typeof nexusKnowledgeNodes.$inferSelect;
+
+// Knowledge Edges table - relationships in the knowledge graph
+export const nexusKnowledgeEdges = pgTable("nexus_knowledge_edges", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").references(() => nexusKnowledgeNodes.id),
+  targetId: integer("target_id").references(() => nexusKnowledgeNodes.id),
+  relationship: varchar("relationship", { length: 100 }),
+  strength: real("strength"),
+  discoveredBy: text("discovered_by").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNexusKnowledgeEdgeSchema = createInsertSchema(nexusKnowledgeEdges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusKnowledgeEdge = z.infer<typeof insertNexusKnowledgeEdgeSchema>;
+export type NexusKnowledgeEdge = typeof nexusKnowledgeEdges.$inferSelect;
+
+// Hypotheses table - generated research hypotheses
+export const nexusHypotheses = pgTable("nexus_hypotheses", {
+  id: serial("id").primaryKey(),
+  hypothesisCode: varchar("hypothesis_code", { length: 20 }).unique(),
+  statement: text("statement").notNull(),
+  status: varchar("status", { length: 50 }).default("nascent"),
+  confidenceScore: integer("confidence_score"),
+  proposedBy: varchar("proposed_by", { length: 50 }),
+  supportedBy: text("supported_by").array(),
+  supportingEvidence: jsonb("supporting_evidence"),
+  contradictingEvidence: jsonb("contradicting_evidence"),
+  crossDisciplinaryBasis: jsonb("cross_disciplinary_basis"),
+  testability: text("testability"),
+  actionItems: jsonb("action_items"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const nexusHypothesisStatusEnum = z.enum([
+  "nascent",
+  "developing",
+  "strong",
+  "validated",
+  "refuted",
+  "superseded"
+]);
+export type NexusHypothesisStatus = z.infer<typeof nexusHypothesisStatusEnum>;
+
+export const insertNexusHypothesisSchema = createInsertSchema(nexusHypotheses, {
+  supportingEvidence: z.array(z.object({
+    source: z.string(),
+    description: z.string(),
+    strength: z.number().optional(),
+  })).nullable().optional(),
+  contradictingEvidence: z.array(z.object({
+    source: z.string(),
+    description: z.string(),
+    strength: z.number().optional(),
+  })).nullable().optional(),
+  crossDisciplinaryBasis: z.array(z.object({
+    fromDiscipline: z.string(),
+    toDiscipline: z.string(),
+    analogy: z.string(),
+  })).nullable().optional(),
+  actionItems: z.array(z.object({
+    title: z.string(),
+    description: z.string().optional(),
+    priority: z.string().optional(),
+  })).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNexusHypothesis = z.infer<typeof insertNexusHypothesisSchema>;
+export type NexusHypothesis = typeof nexusHypotheses.$inferSelect;
+
+// Debates table - unresolved questions between AI perspectives
+export const nexusDebates = pgTable("nexus_debates", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  positionA: jsonb("position_a"),
+  positionB: jsonb("position_b"),
+  resolutionNeeded: text("resolution_needed"),
+  priority: varchar("priority", { length: 20 }).default("medium"),
+  status: varchar("status", { length: 50 }).default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const nexusDebatePriorityEnum = z.enum([
+  "high",
+  "medium",
+  "low"
+]);
+export type NexusDebatePriority = z.infer<typeof nexusDebatePriorityEnum>;
+
+export const insertNexusDebateSchema = createInsertSchema(nexusDebates, {
+  positionA: z.object({
+    statement: z.string(),
+    supportingAIs: z.array(z.string()),
+    evidence: z.array(z.string()),
+  }).nullable().optional(),
+  positionB: z.object({
+    statement: z.string(),
+    supportingAIs: z.array(z.string()),
+    evidence: z.array(z.string()),
+  }).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNexusDebate = z.infer<typeof insertNexusDebateSchema>;
+export type NexusDebate = typeof nexusDebates.$inferSelect;
+
+// Nexus Action Items table - research-related action items
+export const nexusActionItems = pgTable("nexus_action_items", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  priority: varchar("priority", { length: 20 }).default("medium"),
+  sourceType: varchar("source_type", { length: 50 }),
+  sourceId: integer("source_id"),
+  status: varchar("status", { length: 50 }).default("pending"),
+  dueDate: date("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const nexusActionSourceTypeEnum = z.enum([
+  "finding",
+  "hypothesis",
+  "debate"
+]);
+export type NexusActionSourceType = z.infer<typeof nexusActionSourceTypeEnum>;
+
+export const insertNexusActionItemSchema = createInsertSchema(nexusActionItems).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertNexusActionItem = z.infer<typeof insertNexusActionItemSchema>;
+export type NexusActionItem = typeof nexusActionItems.$inferSelect;
