@@ -187,3 +187,26 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Testimonials table for public reviews
+export const testimonials = pgTable("testimonials", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  authorName: varchar("author_name").notNull(),
+  authorRole: varchar("author_role"),
+  authorRoleKa: varchar("author_role_ka"),
+  content: text("content").notNull(),
+  contentKa: text("content_ka"),
+  rating: integer("rating").notNull(),
+  isApproved: boolean("is_approved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTestimonialSchema = createInsertSchema(testimonials).omit({
+  id: true,
+  createdAt: true,
+  isApproved: true,
+});
+
+export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
+export type Testimonial = typeof testimonials.$inferSelect;
