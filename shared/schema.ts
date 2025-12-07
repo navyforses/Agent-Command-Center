@@ -258,11 +258,11 @@ export type ActionStatus = z.infer<typeof actionStatusEnum>;
 
 export const attachmentSchema = z.object({
   id: z.string(),
-  name: z.string(),
-  type: z.string(),
-  size: z.number(),
-  url: z.string().optional(),
-  documentId: z.number().optional(),
+  fileName: z.string(),
+  fileType: z.string(),
+  fileSize: z.number(),
+  filePath: z.string(),
+  thumbnailPath: z.string().optional(),
 });
 export type Attachment = z.infer<typeof attachmentSchema>;
 
