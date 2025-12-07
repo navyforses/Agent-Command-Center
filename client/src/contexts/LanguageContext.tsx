@@ -227,6 +227,22 @@ const translations: Record<string, Record<Language, string>> = {
   moreDebates: { en: "more debates", ka: "მეტი დისკუსია" },
   ais: { en: "AIs", ka: "AI-ები" },
   vs: { en: "vs", ka: "vs" },
+
+  // Start Cycle Dialog
+  selectChild: { en: "Select Child", ka: "აირჩიეთ ბავშვი" },
+  selectChildPlaceholder: { en: "Choose a child...", ka: "აირჩიეთ ბავშვი..." },
+  cycleDuration: { en: "Cycle End Date", ka: "ციკლის დასრულების თარიღი" },
+  selectDate: { en: "Select date", ka: "აირჩიეთ თარიღი" },
+  diagnosisContext: { en: "Diagnosis Context", ka: "დიაგნოზის კონტექსტი" },
+  diagnosisContextPlaceholder: { en: "Describe your child's condition and what you want the AI to research...", ka: "აღწერეთ თქვენი შვილის მდგომარეობა და რა გსურთ AI-მ გამოიკვლიოს..." },
+  diagnosisContextHelp: { en: "The more details you provide, the more relevant the research findings will be.", ka: "რაც უფრო მეტ დეტალს მოგვაწოდებთ, მით უფრო რელევანტური იქნება კვლევის შედეგები." },
+  cycleStarted: { en: "Evolution Cycle Started", ka: "ევოლუციის ციკლი დაიწყო" },
+  cycleStartedDesc: { en: "Your research cycle has begun and will run autonomously.", ka: "თქვენი კვლევითი ციკლი დაიწყო და ავტონომიურად იმუშავებს." },
+  errorStartingCycle: { en: "Error Starting Cycle", ka: "ციკლის დაწყების შეცდომა" },
+  missingFields: { en: "Missing Fields", ka: "არასრული ველები" },
+  fillAllFields: { en: "Please fill in all required fields.", ka: "გთხოვთ შეავსოთ ყველა სავალდებულო ველი." },
+  addChildFirst: { en: "Add a child profile first to start an Evolution Cycle", ka: "ჯერ დაამატეთ ბავშვის პროფილი ევოლუციის ციკლის დასაწყებად" },
+  cancel: { en: "Cancel", ka: "გაუქმება" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

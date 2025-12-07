@@ -11,7 +11,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { addDays } from "date-fns";
+import type { Child } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
@@ -617,6 +624,164 @@ function ReportsList() {
   );
 }
 
+function StartCycleDialog({
+  isOpen,
+  onClose,
+  children,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  children: Child[];
+  onSuccess: () => void;
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [selectedChildId, setSelectedChildId] = useState<string>("");
+  const [endDate, setEndDate] = useState<Date | undefined>(addDays(new Date(), 7));
+  const [diagnosisContext, setDiagnosisContext] = useState("");
+
+  const startCycleMutation = useMutation({
+    mutationFn: async (data: { childId: number; endDate: Date; diagnosisContext: string }) => {
+      return apiRequest("POST", "/api/evolution/cycles", {
+        childId: data.childId,
+        endDate: data.endDate.toISOString(),
+        diagnosisContext: data.diagnosisContext,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/cycles"] });
+      toast({
+        title: t("cycleStarted") || "Evolution Cycle Started",
+        description: t("cycleStartedDesc") || "Your research cycle has begun and will run autonomously.",
+      });
+      onSuccess();
+      onClose();
+      setSelectedChildId("");
+      setEndDate(addDays(new Date(), 7));
+      setDiagnosisContext("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("errorStartingCycle") || "Error Starting Cycle",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStart = () => {
+    if (!selectedChildId || !endDate || !diagnosisContext.trim()) {
+      toast({
+        title: t("missingFields") || "Missing Fields",
+        description: t("fillAllFields") || "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    startCycleMutation.mutate({
+      childId: parseInt(selectedChildId, 10),
+      endDate,
+      diagnosisContext: diagnosisContext.trim(),
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md" data-testid="dialog-start-cycle">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            {t("startEvolutionCycle")}
+          </DialogTitle>
+          <DialogDescription>
+            {t("evolutionCycleDescription")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="child-select">{t("selectChild") || "Select Child"}</Label>
+            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+              <SelectTrigger id="child-select" data-testid="select-child">
+                <SelectValue placeholder={t("selectChildPlaceholder") || "Choose a child..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {children.map((child) => (
+                  <SelectItem key={child.id} value={child.id.toString()}>
+                    {child.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("cycleDuration") || "Cycle End Date"}</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                  data-testid="button-select-date"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP") : t("selectDate") || "Select date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={endDate}
+                  onSelect={setEndDate}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="diagnosis-context">{t("diagnosisContext") || "Diagnosis Context"}</Label>
+            <Textarea
+              id="diagnosis-context"
+              value={diagnosisContext}
+              onChange={(e) => setDiagnosisContext(e.target.value)}
+              placeholder={t("diagnosisContextPlaceholder") || "Describe your child's condition and what you want the AI to research..."}
+              className="min-h-[100px]"
+              data-testid="textarea-diagnosis-context"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("diagnosisContextHelp") || "The more details you provide, the more relevant the research findings will be."}
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} data-testid="button-cancel-cycle">
+            {t("cancel")}
+          </Button>
+          <Button
+            onClick={handleStart}
+            disabled={startCycleMutation.isPending || !selectedChildId || !endDate || !diagnosisContext.trim()}
+            data-testid="button-confirm-start-cycle"
+          >
+            {startCycleMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4 mr-2" />
+            )}
+            {t("startCycle") || "Start Cycle"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function NexusOmega() {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -638,6 +803,7 @@ export default function NexusOmega() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [diagnosisFile, setDiagnosisFile] = useState<File | null>(null);
+  const [startCycleDialogOpen, setStartCycleDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const statusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -648,6 +814,10 @@ export default function NexusOmega() {
       }
     };
   }, []);
+
+  const { data: childrenData } = useQuery<Child[]>({
+    queryKey: ["/api/children"],
+  });
 
   const { data: cycles } = useQuery<EvolutionCycle[]>({
     queryKey: ["/api/evolution/cycles"],
@@ -1379,12 +1549,31 @@ export default function NexusOmega() {
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                   <Zap className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="font-medium mb-2">{t("noActiveCycle")}</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm">
-                    {t("evolutionCycleDesc")}
+                  <p className="text-sm text-muted-foreground max-w-sm mb-6">
+                    {t("noActiveCycleDescription")}
                   </p>
+                  <Button
+                    onClick={() => setStartCycleDialogOpen(true)}
+                    disabled={!childrenData || childrenData.length === 0}
+                    data-testid="button-start-evolution-cycle"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    {t("startEvolutionCycle")}
+                  </Button>
+                  {(!childrenData || childrenData.length === 0) && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {t("addChildFirst") || "Please add a child profile first from the Dashboard."}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
+            <StartCycleDialog
+              isOpen={startCycleDialogOpen}
+              onClose={() => setStartCycleDialogOpen(false)}
+              children={childrenData || []}
+              onSuccess={() => setMainTab("evolution")}
+            />
           </TabsContent>
 
           <TabsContent value="reports" className="m-0">
