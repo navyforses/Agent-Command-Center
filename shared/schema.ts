@@ -197,15 +197,36 @@ export const insertEmailSchema = createInsertSchema(emails).omit({
 export type InsertEmail = z.infer<typeof insertEmailSchema>;
 export type Email = typeof emails.$inferSelect;
 
+// Conversations table for chat history
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  title: varchar("title").notNull(),
+  preview: text("preview"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
 // Chat messages table
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
+  conversationId: integer("conversation_id").references(() => conversations.id),
   role: varchar("role"),
   content: text("content").notNull(),
   searchSources: jsonb("search_sources"),
   isSearchResult: boolean("is_search_result").default(false),
   documentIds: integer("document_ids").array(),
+  attachments: jsonb("attachments"),
   actionType: varchar("action_type"),
   actionData: jsonb("action_data"),
   actionStatus: varchar("action_status"),
@@ -235,9 +256,20 @@ export const actionStatusEnum = z.enum([
 ]);
 export type ActionStatus = z.infer<typeof actionStatusEnum>;
 
+export const attachmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  size: z.number(),
+  url: z.string().optional(),
+  documentId: z.number().optional(),
+});
+export type Attachment = z.infer<typeof attachmentSchema>;
+
 export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   searchSources: z.array(searchSourceSchema).nullable().optional(),
   actionData: z.record(z.any()).nullable().optional(),
+  attachments: z.array(attachmentSchema).nullable().optional(),
 }).omit({
   id: true,
   createdAt: true,
