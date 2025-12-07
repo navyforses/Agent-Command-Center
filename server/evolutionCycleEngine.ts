@@ -1359,6 +1359,37 @@ Synthesize all of this into a cohesive, publication-quality academic report. Ext
   }
 }
 
+export async function processReportChat(
+  systemPrompt: string,
+  conversationHistory: { role: "user" | "assistant"; content: string }[],
+  userMessage: string
+): Promise<{ contentEn: string; contentKa: string }> {
+  try {
+    const messages = [
+      ...conversationHistory.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: userMessage }
+    ];
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages,
+    });
+
+    const contentEn = response.content[0]?.type === "text" ? response.content[0].text : "";
+    const contentKa = await translateToGeorgian(contentEn);
+
+    return { contentEn, contentKa };
+  } catch (error) {
+    console.error("[Evolution Engine] Report chat error:", error);
+    return { 
+      contentEn: "I apologize, but I encountered an error processing your question. Please try again.", 
+      contentKa: "ბოდიში, თქვენი კითხვის დამუშავებისას შეცდომა მოხდა. გთხოვთ, სცადოთ ხელახლა." 
+    };
+  }
+}
+
 export async function startEvolutionCycle(
   userId: string,
   childId: number,
