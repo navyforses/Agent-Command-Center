@@ -12,6 +12,9 @@ import {
   insertConversationSchema,
   insertChatMessageSchema,
   insertTestimonialSchema,
+  insertNexusResearchQuerySchema,
+  insertNexusHypothesisSchema,
+  insertNexusActionItemSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
 import { getConsensusResponse, getConsensusSearchResponse } from "./multiAI";
@@ -1606,6 +1609,308 @@ Format your response as JSON with the following structure:
     } catch (error) {
       console.error("Error fetching knowledge base:", error);
       res.status(500).json({ message: "Failed to fetch knowledge base" });
+    }
+  });
+
+  // ============================================================================
+  // NEXUS OMEGA - Multi-AI Research Platform Routes
+  // ============================================================================
+
+  // AI Status - Get all AI agents with their status
+  app.get("/api/nexus/ai-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const agents = await storage.getNexusAiAgents();
+      res.json(agents);
+    } catch (error) {
+      console.error("Error fetching NEXUS AI agents:", error);
+      res.status(500).json({ message: "Failed to fetch AI agents" });
+    }
+  });
+
+  // Research Queries - Start new multi-AI research
+  app.post("/api/nexus/query", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertNexusResearchQuerySchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid query data", errors: parseResult.error.errors });
+      }
+      const query = await storage.createNexusResearchQuery(parseResult.data);
+      res.status(201).json(query);
+    } catch (error) {
+      console.error("Error creating NEXUS research query:", error);
+      res.status(500).json({ message: "Failed to create research query" });
+    }
+  });
+
+  // Get user's research queries
+  app.get("/api/nexus/queries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const queries = await storage.getNexusResearchQueries(userId);
+      res.json(queries);
+    } catch (error) {
+      console.error("Error fetching NEXUS research queries:", error);
+      res.status(500).json({ message: "Failed to fetch research queries" });
+    }
+  });
+
+  // Get specific research query status and results
+  app.get("/api/nexus/query/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid query ID" });
+      }
+      const query = await storage.getNexusResearchQuery(id, userId);
+      if (!query) {
+        return res.status(404).json({ message: "Research query not found" });
+      }
+      res.json(query);
+    } catch (error) {
+      console.error("Error fetching NEXUS research query:", error);
+      res.status(500).json({ message: "Failed to fetch research query" });
+    }
+  });
+
+  // Update research query status
+  app.patch("/api/nexus/query/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid query ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertNexusResearchQuerySchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid query data", errors: parseResult.error.errors });
+      }
+      const query = await storage.updateNexusResearchQuery(id, userId, parseResult.data);
+      if (!query) {
+        return res.status(404).json({ message: "Research query not found" });
+      }
+      res.json(query);
+    } catch (error) {
+      console.error("Error updating NEXUS research query:", error);
+      res.status(500).json({ message: "Failed to update research query" });
+    }
+  });
+
+  // Findings - List all findings (optionally filter by queryId)
+  app.get("/api/nexus/findings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const queryId = req.query.queryId ? parseInt(req.query.queryId as string, 10) : undefined;
+      if (req.query.queryId && isNaN(queryId!)) {
+        return res.status(400).json({ message: "Invalid query ID filter" });
+      }
+      const findings = await storage.getNexusFindings(userId, queryId);
+      res.json(findings);
+    } catch (error) {
+      console.error("Error fetching NEXUS findings:", error);
+      res.status(500).json({ message: "Failed to fetch findings" });
+    }
+  });
+
+  // Get consensus findings only (high/unanimous)
+  app.get("/api/nexus/findings/consensus", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const findings = await storage.getNexusConsensusFindingsOnly(userId);
+      res.json(findings);
+    } catch (error) {
+      console.error("Error fetching NEXUS consensus findings:", error);
+      res.status(500).json({ message: "Failed to fetch consensus findings" });
+    }
+  });
+
+  // Get finding details with AI analyses
+  app.get("/api/nexus/findings/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid finding ID" });
+      }
+      const finding = await storage.getNexusFinding(id, userId);
+      if (!finding) {
+        return res.status(404).json({ message: "Finding not found" });
+      }
+      const aiAnalyses = await storage.getNexusAiAnalyses(id, userId);
+      const disciplinaryAnalyses = await storage.getNexusDisciplinaryAnalyses(id, userId);
+      res.json({ 
+        ...finding, 
+        aiAnalyses, 
+        disciplinaryAnalyses 
+      });
+    } catch (error) {
+      console.error("Error fetching NEXUS finding:", error);
+      res.status(500).json({ message: "Failed to fetch finding" });
+    }
+  });
+
+  // Hypotheses - List all hypotheses
+  app.get("/api/nexus/hypotheses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const hypotheses = await storage.getNexusHypotheses(userId);
+      res.json(hypotheses);
+    } catch (error) {
+      console.error("Error fetching NEXUS hypotheses:", error);
+      res.status(500).json({ message: "Failed to fetch hypotheses" });
+    }
+  });
+
+  // Get specific hypothesis
+  app.get("/api/nexus/hypotheses/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid hypothesis ID" });
+      }
+      const hypothesis = await storage.getNexusHypothesis(id, userId);
+      if (!hypothesis) {
+        return res.status(404).json({ message: "Hypothesis not found" });
+      }
+      res.json(hypothesis);
+    } catch (error) {
+      console.error("Error fetching NEXUS hypothesis:", error);
+      res.status(500).json({ message: "Failed to fetch hypothesis" });
+    }
+  });
+
+  // Update hypothesis status
+  app.patch("/api/nexus/hypotheses/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid hypothesis ID" });
+      }
+      const parseResult = insertNexusHypothesisSchema.partial().safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid hypothesis data", errors: parseResult.error.errors });
+      }
+      const hypothesis = await storage.updateNexusHypothesis(id, userId, parseResult.data);
+      if (!hypothesis) {
+        return res.status(404).json({ message: "Hypothesis not found" });
+      }
+      res.json(hypothesis);
+    } catch (error) {
+      console.error("Error updating NEXUS hypothesis:", error);
+      res.status(500).json({ message: "Failed to update hypothesis" });
+    }
+  });
+
+  // Debates - List all debates
+  app.get("/api/nexus/debates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const debates = await storage.getNexusDebates(userId);
+      res.json(debates);
+    } catch (error) {
+      console.error("Error fetching NEXUS debates:", error);
+      res.status(500).json({ message: "Failed to fetch debates" });
+    }
+  });
+
+  // Get specific debate
+  app.get("/api/nexus/debates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid debate ID" });
+      }
+      const debate = await storage.getNexusDebate(id, userId);
+      if (!debate) {
+        return res.status(404).json({ message: "Debate not found" });
+      }
+      res.json(debate);
+    } catch (error) {
+      console.error("Error fetching NEXUS debate:", error);
+      res.status(500).json({ message: "Failed to fetch debate" });
+    }
+  });
+
+  // Action Items - List all action items
+  app.get("/api/nexus/actions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const actions = await storage.getNexusActionItems(userId);
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching NEXUS action items:", error);
+      res.status(500).json({ message: "Failed to fetch action items" });
+    }
+  });
+
+  // Get specific action item
+  app.get("/api/nexus/actions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid action ID" });
+      }
+      const action = await storage.getNexusActionItem(id, userId);
+      if (!action) {
+        return res.status(404).json({ message: "Action item not found" });
+      }
+      res.json(action);
+    } catch (error) {
+      console.error("Error fetching NEXUS action item:", error);
+      res.status(500).json({ message: "Failed to fetch action item" });
+    }
+  });
+
+  // Update action item status
+  app.patch("/api/nexus/actions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid action ID" });
+      }
+      const parseResult = insertNexusActionItemSchema.partial().safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid action data", errors: parseResult.error.errors });
+      }
+      const action = await storage.updateNexusActionItem(id, userId, parseResult.data);
+      if (!action) {
+        return res.status(404).json({ message: "Action item not found" });
+      }
+      res.json(action);
+    } catch (error) {
+      console.error("Error updating NEXUS action item:", error);
+      res.status(500).json({ message: "Failed to update action item" });
+    }
+  });
+
+  // Knowledge Graph - Get all nodes
+  app.get("/api/nexus/knowledge/nodes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const nodes = await storage.getNexusKnowledgeNodes(userId);
+      res.json(nodes);
+    } catch (error) {
+      console.error("Error fetching NEXUS knowledge nodes:", error);
+      res.status(500).json({ message: "Failed to fetch knowledge nodes" });
+    }
+  });
+
+  // Knowledge Graph - Get all edges
+  app.get("/api/nexus/knowledge/edges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const edges = await storage.getNexusKnowledgeEdges(userId);
+      res.json(edges);
+    } catch (error) {
+      console.error("Error fetching NEXUS knowledge edges:", error);
+      res.status(500).json({ message: "Failed to fetch knowledge edges" });
     }
   });
 

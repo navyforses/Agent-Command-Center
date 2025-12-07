@@ -9,6 +9,16 @@ import {
   conversations,
   chatMessages,
   testimonials,
+  nexusAiAgents,
+  nexusResearchQueries,
+  nexusFindings,
+  nexusAiAnalyses,
+  nexusDisciplinaryAnalyses,
+  nexusKnowledgeNodes,
+  nexusKnowledgeEdges,
+  nexusHypotheses,
+  nexusDebates,
+  nexusActionItems,
   type User,
   type UpsertUser,
   type Child,
@@ -29,9 +39,29 @@ import {
   type InsertChatMessage,
   type Testimonial,
   type InsertTestimonial,
+  type NexusAiAgent,
+  type InsertNexusAiAgent,
+  type NexusResearchQuery,
+  type InsertNexusResearchQuery,
+  type NexusFinding,
+  type InsertNexusFinding,
+  type NexusAiAnalysis,
+  type InsertNexusAiAnalysis,
+  type NexusDisciplinaryAnalysis,
+  type InsertNexusDisciplinaryAnalysis,
+  type NexusKnowledgeNode,
+  type InsertNexusKnowledgeNode,
+  type NexusKnowledgeEdge,
+  type InsertNexusKnowledgeEdge,
+  type NexusHypothesis,
+  type InsertNexusHypothesis,
+  type NexusDebate,
+  type InsertNexusDebate,
+  type NexusActionItem,
+  type InsertNexusActionItem,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull, or } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -95,6 +125,48 @@ export interface IStorage {
   createTestimonial(testimonial: InsertTestimonial): Promise<Testimonial>;
   updateTestimonial(id: number, userId: string, testimonial: Partial<InsertTestimonial>): Promise<Testimonial | undefined>;
   deleteTestimonial(id: number, userId: string): Promise<boolean>;
+
+  // NEXUS OMEGA - Multi-AI Research Platform Storage
+  getNexusAiAgents(): Promise<NexusAiAgent[]>;
+  getNexusAiAgent(id: string): Promise<NexusAiAgent | undefined>;
+  createNexusAiAgent(agent: InsertNexusAiAgent): Promise<NexusAiAgent>;
+  
+  getNexusResearchQueries(userId: string): Promise<NexusResearchQuery[]>;
+  getNexusResearchQuery(id: number, userId: string): Promise<NexusResearchQuery | undefined>;
+  createNexusResearchQuery(query: InsertNexusResearchQuery): Promise<NexusResearchQuery>;
+  updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery>): Promise<NexusResearchQuery | undefined>;
+  
+  getNexusFindings(userId: string, queryId?: number): Promise<NexusFinding[]>;
+  getNexusFinding(id: number, userId: string): Promise<NexusFinding | undefined>;
+  getNexusConsensusFindingsOnly(userId: string): Promise<NexusFinding[]>;
+  createNexusFinding(finding: InsertNexusFinding): Promise<NexusFinding>;
+  
+  getNexusAiAnalyses(findingId: number, userId: string): Promise<NexusAiAnalysis[]>;
+  createNexusAiAnalysis(analysis: InsertNexusAiAnalysis): Promise<NexusAiAnalysis>;
+  
+  getNexusDisciplinaryAnalyses(findingId: number, userId: string): Promise<NexusDisciplinaryAnalysis[]>;
+  createNexusDisciplinaryAnalysis(analysis: InsertNexusDisciplinaryAnalysis): Promise<NexusDisciplinaryAnalysis>;
+  
+  getNexusKnowledgeNodes(userId: string): Promise<NexusKnowledgeNode[]>;
+  getNexusKnowledgeNode(id: number, userId: string): Promise<NexusKnowledgeNode | undefined>;
+  createNexusKnowledgeNode(node: InsertNexusKnowledgeNode): Promise<NexusKnowledgeNode>;
+  
+  getNexusKnowledgeEdges(userId: string): Promise<NexusKnowledgeEdge[]>;
+  createNexusKnowledgeEdge(edge: InsertNexusKnowledgeEdge): Promise<NexusKnowledgeEdge>;
+  
+  getNexusHypotheses(userId: string): Promise<NexusHypothesis[]>;
+  getNexusHypothesis(id: number, userId: string): Promise<NexusHypothesis | undefined>;
+  createNexusHypothesis(hypothesis: InsertNexusHypothesis): Promise<NexusHypothesis>;
+  updateNexusHypothesis(id: number, userId: string, hypothesis: Partial<InsertNexusHypothesis>): Promise<NexusHypothesis | undefined>;
+  
+  getNexusDebates(userId: string): Promise<NexusDebate[]>;
+  getNexusDebate(id: number, userId: string): Promise<NexusDebate | undefined>;
+  createNexusDebate(debate: InsertNexusDebate): Promise<NexusDebate>;
+  
+  getNexusActionItems(userId: string): Promise<NexusActionItem[]>;
+  getNexusActionItem(id: number, userId: string): Promise<NexusActionItem | undefined>;
+  createNexusActionItem(action: InsertNexusActionItem): Promise<NexusActionItem>;
+  updateNexusActionItem(id: number, userId: string, action: Partial<InsertNexusActionItem>): Promise<NexusActionItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -464,6 +536,200 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
       .returning();
     return result.length > 0;
+  }
+
+  async getNexusAiAgents(): Promise<NexusAiAgent[]> {
+    return db.select().from(nexusAiAgents);
+  }
+
+  async getNexusAiAgent(id: string): Promise<NexusAiAgent | undefined> {
+    const [agent] = await db.select().from(nexusAiAgents).where(eq(nexusAiAgents.id, id));
+    return agent;
+  }
+
+  async createNexusAiAgent(agent: InsertNexusAiAgent): Promise<NexusAiAgent> {
+    const [newAgent] = await db.insert(nexusAiAgents).values(agent).returning();
+    return newAgent;
+  }
+
+  async getNexusResearchQueries(userId: string): Promise<NexusResearchQuery[]> {
+    return db.select().from(nexusResearchQueries)
+      .where(eq(nexusResearchQueries.userId, userId))
+      .orderBy(desc(nexusResearchQueries.createdAt));
+  }
+
+  async getNexusResearchQuery(id: number, userId: string): Promise<NexusResearchQuery | undefined> {
+    const [query] = await db.select().from(nexusResearchQueries)
+      .where(and(eq(nexusResearchQueries.id, id), eq(nexusResearchQueries.userId, userId)));
+    return query;
+  }
+
+  async createNexusResearchQuery(query: InsertNexusResearchQuery): Promise<NexusResearchQuery> {
+    const [newQuery] = await db.insert(nexusResearchQueries).values(query).returning();
+    return newQuery;
+  }
+
+  async updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery>): Promise<NexusResearchQuery | undefined> {
+    const [updatedQuery] = await db
+      .update(nexusResearchQueries)
+      .set(query)
+      .where(and(eq(nexusResearchQueries.id, id), eq(nexusResearchQueries.userId, userId)))
+      .returning();
+    return updatedQuery;
+  }
+
+  async getNexusFindings(userId: string, queryId?: number): Promise<NexusFinding[]> {
+    if (queryId) {
+      const query = await this.getNexusResearchQuery(queryId, userId);
+      if (!query) return [];
+      return db.select().from(nexusFindings)
+        .where(eq(nexusFindings.queryId, queryId))
+        .orderBy(desc(nexusFindings.createdAt));
+    }
+    const userQueries = await this.getNexusResearchQueries(userId);
+    const queryIds = userQueries.map(q => q.id);
+    if (queryIds.length === 0) return [];
+    const allFindings = await db.select().from(nexusFindings).orderBy(desc(nexusFindings.createdAt));
+    return allFindings.filter(f => f.queryId && queryIds.includes(f.queryId));
+  }
+
+  async getNexusFinding(id: number, userId: string): Promise<NexusFinding | undefined> {
+    const [finding] = await db.select().from(nexusFindings).where(eq(nexusFindings.id, id));
+    if (!finding || !finding.queryId) return undefined;
+    const query = await this.getNexusResearchQuery(finding.queryId, userId);
+    if (!query) return undefined;
+    return finding;
+  }
+
+  async getNexusConsensusFindingsOnly(userId: string): Promise<NexusFinding[]> {
+    const userQueries = await this.getNexusResearchQueries(userId);
+    const queryIds = userQueries.map(q => q.id);
+    if (queryIds.length === 0) return [];
+    const allFindings = await db.select().from(nexusFindings)
+      .where(or(eq(nexusFindings.consensusLevel, 'high'), eq(nexusFindings.consensusLevel, 'unanimous')))
+      .orderBy(desc(nexusFindings.createdAt));
+    return allFindings.filter(f => f.queryId && queryIds.includes(f.queryId));
+  }
+
+  async createNexusFinding(finding: InsertNexusFinding): Promise<NexusFinding> {
+    const [newFinding] = await db.insert(nexusFindings).values(finding).returning();
+    return newFinding;
+  }
+
+  async getNexusAiAnalyses(findingId: number, userId: string): Promise<NexusAiAnalysis[]> {
+    const finding = await this.getNexusFinding(findingId, userId);
+    if (!finding) return [];
+    return db.select().from(nexusAiAnalyses).where(eq(nexusAiAnalyses.findingId, findingId));
+  }
+
+  async createNexusAiAnalysis(analysis: InsertNexusAiAnalysis): Promise<NexusAiAnalysis> {
+    const [newAnalysis] = await db.insert(nexusAiAnalyses).values(analysis).returning();
+    return newAnalysis;
+  }
+
+  async getNexusDisciplinaryAnalyses(findingId: number, userId: string): Promise<NexusDisciplinaryAnalysis[]> {
+    const finding = await this.getNexusFinding(findingId, userId);
+    if (!finding) return [];
+    return db.select().from(nexusDisciplinaryAnalyses)
+      .where(eq(nexusDisciplinaryAnalyses.findingId, findingId));
+  }
+
+  async createNexusDisciplinaryAnalysis(analysis: InsertNexusDisciplinaryAnalysis): Promise<NexusDisciplinaryAnalysis> {
+    const [newAnalysis] = await db.insert(nexusDisciplinaryAnalyses).values(analysis).returning();
+    return newAnalysis;
+  }
+
+  async getNexusKnowledgeNodes(userId: string): Promise<NexusKnowledgeNode[]> {
+    return db.select().from(nexusKnowledgeNodes).where(eq(nexusKnowledgeNodes.userId, userId));
+  }
+
+  async getNexusKnowledgeNode(id: number, userId: string): Promise<NexusKnowledgeNode | undefined> {
+    const [node] = await db.select().from(nexusKnowledgeNodes)
+      .where(and(eq(nexusKnowledgeNodes.id, id), eq(nexusKnowledgeNodes.userId, userId)));
+    return node;
+  }
+
+  async createNexusKnowledgeNode(node: InsertNexusKnowledgeNode): Promise<NexusKnowledgeNode> {
+    const [newNode] = await db.insert(nexusKnowledgeNodes).values(node).returning();
+    return newNode;
+  }
+
+  async getNexusKnowledgeEdges(userId: string): Promise<NexusKnowledgeEdge[]> {
+    return db.select().from(nexusKnowledgeEdges).where(eq(nexusKnowledgeEdges.userId, userId));
+  }
+
+  async createNexusKnowledgeEdge(edge: InsertNexusKnowledgeEdge): Promise<NexusKnowledgeEdge> {
+    const [newEdge] = await db.insert(nexusKnowledgeEdges).values(edge).returning();
+    return newEdge;
+  }
+
+  async getNexusHypotheses(userId: string): Promise<NexusHypothesis[]> {
+    return db.select().from(nexusHypotheses)
+      .where(eq(nexusHypotheses.userId, userId))
+      .orderBy(desc(nexusHypotheses.createdAt));
+  }
+
+  async getNexusHypothesis(id: number, userId: string): Promise<NexusHypothesis | undefined> {
+    const [hypothesis] = await db.select().from(nexusHypotheses)
+      .where(and(eq(nexusHypotheses.id, id), eq(nexusHypotheses.userId, userId)));
+    return hypothesis;
+  }
+
+  async createNexusHypothesis(hypothesis: InsertNexusHypothesis): Promise<NexusHypothesis> {
+    const [newHypothesis] = await db.insert(nexusHypotheses).values(hypothesis).returning();
+    return newHypothesis;
+  }
+
+  async updateNexusHypothesis(id: number, userId: string, hypothesis: Partial<InsertNexusHypothesis>): Promise<NexusHypothesis | undefined> {
+    const [updatedHypothesis] = await db
+      .update(nexusHypotheses)
+      .set({ ...hypothesis, updatedAt: new Date() })
+      .where(and(eq(nexusHypotheses.id, id), eq(nexusHypotheses.userId, userId)))
+      .returning();
+    return updatedHypothesis;
+  }
+
+  async getNexusDebates(userId: string): Promise<NexusDebate[]> {
+    return db.select().from(nexusDebates)
+      .where(eq(nexusDebates.userId, userId))
+      .orderBy(desc(nexusDebates.createdAt));
+  }
+
+  async getNexusDebate(id: number, userId: string): Promise<NexusDebate | undefined> {
+    const [debate] = await db.select().from(nexusDebates)
+      .where(and(eq(nexusDebates.id, id), eq(nexusDebates.userId, userId)));
+    return debate;
+  }
+
+  async createNexusDebate(debate: InsertNexusDebate): Promise<NexusDebate> {
+    const [newDebate] = await db.insert(nexusDebates).values(debate).returning();
+    return newDebate;
+  }
+
+  async getNexusActionItems(userId: string): Promise<NexusActionItem[]> {
+    return db.select().from(nexusActionItems)
+      .where(eq(nexusActionItems.userId, userId))
+      .orderBy(desc(nexusActionItems.createdAt));
+  }
+
+  async getNexusActionItem(id: number, userId: string): Promise<NexusActionItem | undefined> {
+    const [action] = await db.select().from(nexusActionItems)
+      .where(and(eq(nexusActionItems.id, id), eq(nexusActionItems.userId, userId)));
+    return action;
+  }
+
+  async createNexusActionItem(action: InsertNexusActionItem): Promise<NexusActionItem> {
+    const [newAction] = await db.insert(nexusActionItems).values(action).returning();
+    return newAction;
+  }
+
+  async updateNexusActionItem(id: number, userId: string, action: Partial<InsertNexusActionItem>): Promise<NexusActionItem | undefined> {
+    const [updatedAction] = await db
+      .update(nexusActionItems)
+      .set(action)
+      .where(and(eq(nexusActionItems.id, id), eq(nexusActionItems.userId, userId)))
+      .returning();
+    return updatedAction;
   }
 }
 

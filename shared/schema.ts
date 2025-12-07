@@ -447,6 +447,7 @@ export type NexusDisciplinaryAnalysis = typeof nexusDisciplinaryAnalyses.$inferS
 // Knowledge Nodes table - concepts in the knowledge graph
 export const nexusKnowledgeNodes = pgTable("nexus_knowledge_nodes", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   label: text("label").notNull(),
   nodeType: varchar("node_type", { length: 50 }),
   relevanceScore: integer("relevance_score"),
@@ -478,6 +479,7 @@ export type NexusKnowledgeNode = typeof nexusKnowledgeNodes.$inferSelect;
 // Knowledge Edges table - relationships in the knowledge graph
 export const nexusKnowledgeEdges = pgTable("nexus_knowledge_edges", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   sourceId: integer("source_id").references(() => nexusKnowledgeNodes.id),
   targetId: integer("target_id").references(() => nexusKnowledgeNodes.id),
   relationship: varchar("relationship", { length: 100 }),
@@ -497,6 +499,7 @@ export type NexusKnowledgeEdge = typeof nexusKnowledgeEdges.$inferSelect;
 // Hypotheses table - generated research hypotheses
 export const nexusHypotheses = pgTable("nexus_hypotheses", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   hypothesisCode: varchar("hypothesis_code", { length: 20 }).unique(),
   statement: text("statement").notNull(),
   status: varchar("status", { length: 50 }).default("nascent"),
@@ -555,6 +558,7 @@ export type NexusHypothesis = typeof nexusHypotheses.$inferSelect;
 // Debates table - unresolved questions between AI perspectives
 export const nexusDebates = pgTable("nexus_debates", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   question: text("question").notNull(),
   positionA: jsonb("position_a"),
   positionB: jsonb("position_b"),
@@ -593,6 +597,7 @@ export type NexusDebate = typeof nexusDebates.$inferSelect;
 // Nexus Action Items table - research-related action items
 export const nexusActionItems = pgTable("nexus_action_items", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   title: text("title").notNull(),
   description: text("description"),
   priority: varchar("priority", { length: 20 }).default("medium"),
