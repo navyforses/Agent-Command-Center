@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
@@ -34,6 +35,20 @@ import {
   type FullDocumentProcessingResult,
 } from "./aiOrchestrator";
 import { runNexusResearch } from "./nexusOrchestrator";
+import { extractTextFromPDF, extractTextFromImage } from "./documentProcessor";
+
+const diagnosisUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only PDF and image files are allowed."));
+    }
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1645,17 +1660,35 @@ Format your response as JSON with the following structure:
   });
 
   // Run multi-AI research - orchestrates all AI agents and stores results
-  app.post("/api/nexus/research", isAuthenticated, async (req: any, res) => {
+  app.post("/api/nexus/research", isAuthenticated, diagnosisUpload.single("diagnosis"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { queryText, disciplines = [] } = req.body;
+      const queryText = req.body.queryText || "";
+      const disciplines = req.body.disciplines ? JSON.parse(req.body.disciplines) : [];
       
-      if (!queryText || typeof queryText !== "string" || queryText.trim().length === 0) {
-        return res.status(400).json({ message: "queryText is required" });
+      let diagnosisContext: string | undefined;
+      
+      if (req.file) {
+        const file = req.file;
+        if (file.mimetype === "application/pdf") {
+          const result = await extractTextFromPDF(file.buffer);
+          if (result.success) {
+            diagnosisContext = result.text;
+          }
+        } else if (file.mimetype.startsWith("image/")) {
+          const result = await extractTextFromImage(file.buffer, file.mimetype);
+          if (result.success) {
+            diagnosisContext = result.text;
+          }
+        }
+      }
+      
+      if (!queryText.trim() && !diagnosisContext) {
+        return res.status(400).json({ message: "queryText or diagnosis file is required" });
       }
 
       const parseResult = insertNexusResearchQuerySchema.safeParse({ 
-        queryText: queryText.trim(),
+        queryText: queryText.trim() || "Analyze diagnosis and recommend treatment",
         disciplines,
         userId,
         status: "pending",
@@ -1669,9 +1702,10 @@ Format your response as JSON with the following structure:
 
       const result = await runNexusResearch(
         query.id,
-        queryText.trim(),
+        queryText.trim() || "Analyze diagnosis and recommend treatment",
         disciplines,
-        userId
+        userId,
+        diagnosisContext
       );
 
       res.status(201).json(result);

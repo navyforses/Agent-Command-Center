@@ -30,6 +30,11 @@ import {
   GitBranch,
   AlertCircle,
   Loader2,
+  Upload,
+  FileText,
+  X,
+  Stethoscope,
+  Users,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { FindingCard, Finding } from "@/components/dashboard/FindingCard";
@@ -55,6 +60,19 @@ interface DisciplinaryPerspective {
   crossConnections: { toDiscipline: string; connection: string; strength?: number }[];
 }
 
+interface TreatmentPlan {
+  phase: string;
+  duration: string;
+  interventions: string[];
+  goals: string[];
+}
+
+interface SpecialistRecommendation {
+  specialty: string;
+  role: string;
+  priority: "critical" | "important" | "supportive";
+}
+
 interface ResearchOrchestrationResult {
   query: {
     id: number;
@@ -69,11 +87,16 @@ interface ResearchOrchestrationResult {
     confidenceScore: number;
     relevanceScore: number;
     sources: Array<{ title: string; url?: string; doi?: string }> | null;
+    treatmentPlan?: TreatmentPlan[];
+    specialists?: SpecialistRecommendation[];
+    criticalRisks?: string[];
+    followUpInvestigations?: string[];
   };
   aiAnalyses: AIResearchResponse[];
   disciplinaryPerspectives: DisciplinaryPerspective[];
   consensusLevel: "low" | "moderate" | "high" | "unanimous";
   processingTimeMs: number;
+  diagnosisAnalyzed?: boolean;
 }
 
 interface AIAgent {
@@ -178,6 +201,8 @@ export default function NexusOmega() {
   const [bottomActiveTab, setBottomActiveTab] = useState("hypotheses");
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [diagnosisFile, setDiagnosisFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const statusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -269,8 +294,20 @@ export default function NexusOmega() {
   };
 
   const researchMutation = useMutation({
-    mutationFn: async (params: { queryText: string; disciplines: string[] }) => {
-      const response = await apiRequest("POST", "/api/nexus/research", params);
+    mutationFn: async (params: { queryText: string; disciplines: string[]; diagnosisFile?: File }) => {
+      const formData = new FormData();
+      formData.append("queryText", params.queryText);
+      formData.append("disciplines", JSON.stringify(params.disciplines));
+      if (params.diagnosisFile) {
+        formData.append("diagnosis", params.diagnosisFile);
+      }
+      
+      const response = await fetch("/api/nexus/research", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
       if (!response.ok) {
         let errorMessage = `Request failed with status ${response.status}`;
         try {
@@ -329,11 +366,44 @@ export default function NexusOmega() {
   };
 
   const handleSearch = () => {
-    if (!query.trim()) return;
+    if (!query.trim() && !diagnosisFile) return;
     researchMutation.mutate({
-      queryText: query,
+      queryText: query || (diagnosisFile ? t("analyzeDiagnosis") || "Analyze this diagnosis and recommend treatment" : ""),
       disciplines: selectedDisciplines,
+      diagnosisFile: diagnosisFile || undefined,
     });
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: t("fileTooLarge") || "File too large",
+          description: t("maxFileSize") || "Maximum file size is 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: t("invalidFileType") || "Invalid file type",
+          description: t("allowedFileTypes") || "Please upload PDF or image files (JPEG, PNG, WebP)",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDiagnosisFile(file);
+    }
+  };
+
+  const removeDiagnosisFile = () => {
+    setDiagnosisFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleQuickCommand = (command: string) => {
@@ -414,14 +484,54 @@ export default function NexusOmega() {
                   data-testid="input-search-query"
                 />
               </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                data-testid="input-diagnosis-file"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                title={t("uploadDiagnosis") || "Upload Diagnosis"}
+                data-testid="button-upload-diagnosis"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
               <Button
                 onClick={handleSearch}
+                disabled={researchMutation.isPending}
                 data-testid="button-omega-search"
               >
-                <Zap className="h-4 w-4 mr-2" />
+                {researchMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
                 OMEGA
               </Button>
             </div>
+
+            {diagnosisFile && (
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="text-sm flex-1 truncate">{diagnosisFile.name}</span>
+                <Badge variant="secondary" className="text-xs">
+                  {(diagnosisFile.size / 1024).toFixed(0)} KB
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={removeDiagnosisFile}
+                  data-testid="button-remove-diagnosis"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {quickCommands.map((cmd) => (

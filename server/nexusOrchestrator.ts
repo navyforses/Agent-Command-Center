@@ -52,13 +52,32 @@ interface DisciplinaryPerspective {
   crossConnections: { toDiscipline: string; connection: string; strength?: number }[];
 }
 
+interface TreatmentPlan {
+  phase: string;
+  duration: string;
+  interventions: string[];
+  goals: string[];
+}
+
+interface SpecialistRecommendation {
+  specialty: string;
+  role: string;
+  priority: "critical" | "important" | "supportive";
+}
+
 interface ResearchOrchestrationResult {
   query: NexusResearchQuery;
-  finding: NexusFinding;
+  finding: NexusFinding & {
+    treatmentPlan?: TreatmentPlan[];
+    specialists?: SpecialistRecommendation[];
+    criticalRisks?: string[];
+    followUpInvestigations?: string[];
+  };
   aiAnalyses: AIResearchResponse[];
   disciplinaryPerspectives: DisciplinaryPerspective[];
   consensusLevel: "low" | "moderate" | "high" | "unanimous";
   processingTimeMs: number;
+  diagnosisAnalyzed?: boolean;
 }
 
 const NEXUS_RESEARCH_SYSTEM_PROMPT = `You are an advanced research AI agent analyzing medical and scientific queries related to Hypoxic-Ischemic Encephalopathy (HIE) and related neurological conditions.
@@ -82,12 +101,64 @@ Focus on:
 
 Be thorough but concise. Always cite confidence level (0-100) based on evidence strength.`;
 
-async function queryOpenAIResearch(query: string): Promise<AIResearchResponse> {
+const DIAGNOSIS_TREATMENT_SYSTEM_PROMPT = `You are an advanced medical AI specializing in treatment planning for Hypoxic-Ischemic Encephalopathy (HIE) and related neurological conditions.
+
+You are analyzing a diagnosis document and must provide a comprehensive treatment research analysis.
+
+Respond with a JSON object containing:
+{
+  "summary": "A concise summary of the diagnosis and recommended treatment approach (2-3 paragraphs)",
+  "keyPoints": ["Key finding 1", "Key finding 2", ...],
+  "concerns": ["Risk or concern 1", "Risk 2", ...],
+  "uniqueInsights": ["Novel treatment approach 1", ...],
+  "confidence": 85,
+  "treatmentPlan": [
+    {
+      "phase": "Acute/Immediate",
+      "duration": "0-72 hours",
+      "interventions": ["Intervention 1", "Intervention 2"],
+      "goals": ["Goal 1", "Goal 2"]
+    },
+    {
+      "phase": "Rehabilitation",
+      "duration": "3-12 months",
+      "interventions": ["Therapy 1", "Therapy 2"],
+      "goals": ["Goal 1", "Goal 2"]
+    }
+  ],
+  "specialists": [
+    {
+      "specialty": "Pediatric Neurologist",
+      "role": "Primary diagnosis confirmation and treatment oversight",
+      "priority": "critical"
+    },
+    {
+      "specialty": "Physical Therapist",
+      "role": "Motor development and rehabilitation",
+      "priority": "important"
+    }
+  ],
+  "criticalRisks": ["Risk that requires immediate attention 1", ...],
+  "followUpInvestigations": ["Recommended test or scan 1", ...],
+  "sources": [{"title": "Source name", "snippet": "Relevant excerpt"}]
+}
+
+Focus on:
+- Evidence-based treatment protocols for the specific diagnosis
+- Required medical specialists and their roles (prioritize as critical/important/supportive)
+- Phased treatment approach with clear timelines
+- Potential risks and contraindications
+- Follow-up investigations needed
+- Cross-disciplinary treatment integration
+
+Be thorough and specific to the diagnosis provided.`;
+
+async function queryOpenAIResearchWithPrompt(query: string, systemPrompt: string): Promise<AIResearchResponse> {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: NEXUS_RESEARCH_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: `Research query: ${query}\n\nProvide your structured analysis in JSON format.` },
       ],
       response_format: { type: "json_object" },
@@ -123,9 +194,9 @@ async function queryOpenAIResearch(query: string): Promise<AIResearchResponse> {
   }
 }
 
-async function queryGeminiResearch(query: string): Promise<AIResearchResponse> {
+async function queryGeminiResearchWithPrompt(query: string, systemPrompt: string): Promise<AIResearchResponse> {
   try {
-    const prompt = `${NEXUS_RESEARCH_SYSTEM_PROMPT}
+    const prompt = `${systemPrompt}
 
 Research query: ${query}
 
@@ -175,12 +246,12 @@ Provide your structured analysis in JSON format.`;
   }
 }
 
-async function queryAnthropicResearch(query: string): Promise<AIResearchResponse> {
+async function queryAnthropicResearchWithPrompt(query: string, systemPrompt: string): Promise<AIResearchResponse> {
   try {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 4096,
-      system: NEXUS_RESEARCH_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [
         { role: "user", content: `Research query: ${query}\n\nProvide your structured analysis in JSON format.` },
       ],
@@ -225,7 +296,7 @@ async function queryAnthropicResearch(query: string): Promise<AIResearchResponse
   }
 }
 
-async function queryPerplexityResearch(query: string): Promise<AIResearchResponse> {
+async function queryPerplexityResearchWithPrompt(query: string, systemPrompt: string): Promise<AIResearchResponse> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   
   if (!apiKey) {
@@ -252,7 +323,7 @@ async function queryPerplexityResearch(query: string): Promise<AIResearchRespons
       body: JSON.stringify({
         model: "sonar",
         messages: [
-          { role: "system", content: NEXUS_RESEARCH_SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: `Research query: ${query}\n\nProvide your structured analysis in JSON format.` },
         ],
         max_tokens: 4096,
@@ -304,7 +375,7 @@ async function queryPerplexityResearch(query: string): Promise<AIResearchRespons
   }
 }
 
-async function queryGrokResearch(query: string): Promise<AIResearchResponse> {
+async function queryGrokResearchWithPrompt(query: string, systemPrompt: string): Promise<AIResearchResponse> {
   const apiKey = process.env.XAI_API_KEY;
   
   if (!apiKey) {
@@ -325,7 +396,7 @@ async function queryGrokResearch(query: string): Promise<AIResearchResponse> {
     const completion = await grok.chat.completions.create({
       model: "grok-3-mini",
       messages: [
-        { role: "system", content: NEXUS_RESEARCH_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: `Research query: ${query}\n\nProvide your structured analysis in JSON format.` },
       ],
     });
@@ -499,18 +570,26 @@ export async function runNexusResearch(
   queryId: number,
   queryText: string,
   disciplines: string[] = [],
-  userId: string
+  userId: string,
+  diagnosisContext?: string
 ): Promise<ResearchOrchestrationResult> {
   const startTime = Date.now();
+  const hasDiagnosis = !!diagnosisContext && diagnosisContext.trim().length > 0;
 
   await storage.updateNexusResearchQuery(queryId, userId, { status: "searching" });
 
+  const effectiveQuery = hasDiagnosis 
+    ? `DIAGNOSIS DOCUMENT:\n${diagnosisContext}\n\nRESEARCH QUERY: ${queryText}\n\nAnalyze this diagnosis and provide treatment recommendations with required specialists.`
+    : queryText;
+
+  const systemPrompt = hasDiagnosis ? DIAGNOSIS_TREATMENT_SYSTEM_PROMPT : NEXUS_RESEARCH_SYSTEM_PROMPT;
+
   const responses = await Promise.all([
-    queryOpenAIResearch(queryText),
-    queryGeminiResearch(queryText),
-    queryAnthropicResearch(queryText),
-    queryPerplexityResearch(queryText),
-    queryGrokResearch(queryText),
+    queryOpenAIResearchWithPrompt(effectiveQuery, systemPrompt),
+    queryGeminiResearchWithPrompt(effectiveQuery, systemPrompt),
+    queryAnthropicResearchWithPrompt(effectiveQuery, systemPrompt),
+    queryPerplexityResearchWithPrompt(effectiveQuery, systemPrompt),
+    queryGrokResearchWithPrompt(effectiveQuery, systemPrompt),
   ]);
 
   const successfulResponses = responses.filter(r => r.success);
@@ -527,6 +606,11 @@ export async function runNexusResearch(
     : 0;
 
   const allSources: { title: string; url?: string; doi?: string; snippet?: string }[] = [];
+  let treatmentPlans: TreatmentPlan[] = [];
+  let specialists: SpecialistRecommendation[] = [];
+  let criticalRisks: string[] = [];
+  let followUpInvestigations: string[] = [];
+  
   for (const r of successfulResponses) {
     const rawSources = (r.rawResponse?.sources as Array<{ title?: string; url?: string; doi?: string; snippet?: string }>) || [];
     for (const s of rawSources) {
@@ -537,6 +621,40 @@ export async function runNexusResearch(
           doi: s.doi,
           snippet: s.snippet,
         });
+      }
+    }
+    
+    if (hasDiagnosis && r.rawResponse) {
+      const rawTreatmentPlan = r.rawResponse.treatmentPlan as TreatmentPlan[] | undefined;
+      if (rawTreatmentPlan && Array.isArray(rawTreatmentPlan) && treatmentPlans.length === 0) {
+        treatmentPlans = rawTreatmentPlan;
+      }
+      
+      const rawSpecialists = r.rawResponse.specialists as SpecialistRecommendation[] | undefined;
+      if (rawSpecialists && Array.isArray(rawSpecialists)) {
+        for (const spec of rawSpecialists) {
+          if (!specialists.find(s => s.specialty === spec.specialty)) {
+            specialists.push(spec);
+          }
+        }
+      }
+      
+      const rawRisks = r.rawResponse.criticalRisks as string[] | undefined;
+      if (rawRisks && Array.isArray(rawRisks)) {
+        for (const risk of rawRisks) {
+          if (!criticalRisks.includes(risk)) {
+            criticalRisks.push(risk);
+          }
+        }
+      }
+      
+      const rawFollowUps = r.rawResponse.followUpInvestigations as string[] | undefined;
+      if (rawFollowUps && Array.isArray(rawFollowUps)) {
+        for (const fu of rawFollowUps) {
+          if (!followUpInvestigations.includes(fu)) {
+            followUpInvestigations.push(fu);
+          }
+        }
       }
     }
   }
@@ -593,12 +711,23 @@ export async function runNexusResearch(
 
   const updatedQuery = await storage.getNexusResearchQuery(queryId, userId);
 
+  const enrichedFinding = {
+    ...finding,
+    ...(hasDiagnosis && {
+      treatmentPlan: treatmentPlans.length > 0 ? treatmentPlans : undefined,
+      specialists: specialists.length > 0 ? specialists : undefined,
+      criticalRisks: criticalRisks.length > 0 ? criticalRisks : undefined,
+      followUpInvestigations: followUpInvestigations.length > 0 ? followUpInvestigations : undefined,
+    }),
+  };
+
   return {
     query: updatedQuery!,
-    finding,
+    finding: enrichedFinding,
     aiAnalyses: responses,
     disciplinaryPerspectives,
     consensusLevel,
     processingTimeMs: Date.now() - startTime,
+    diagnosisAnalyzed: hasDiagnosis,
   };
 }
