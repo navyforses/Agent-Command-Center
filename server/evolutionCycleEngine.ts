@@ -1062,8 +1062,7 @@ export async function runEvolutionTick(): Promise<{
   };
 
   try {
-    const allCycles = await storage.getEvolutionCycles("");
-    const activeCycles = allCycles.filter((c) => c.status === "active");
+    const activeCycles = await storage.getAllActiveEvolutionCycles();
 
     if (activeCycles.length === 0) {
       console.log("[Evolution Engine] No active cycles found");

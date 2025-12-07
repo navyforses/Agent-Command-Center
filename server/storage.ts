@@ -185,6 +185,7 @@ export interface IStorage {
 
   // Evolution Cycle - Autonomous 24-Hour Research Cycles
   getEvolutionCycles(userId: string): Promise<EvolutionCycle[]>;
+  getAllActiveEvolutionCycles(): Promise<EvolutionCycle[]>;
   getEvolutionCycle(id: number, userId: string): Promise<EvolutionCycle | undefined>;
   getActiveEvolutionCycle(userId: string): Promise<EvolutionCycle | undefined>;
   createEvolutionCycle(cycle: InsertEvolutionCycle): Promise<EvolutionCycle>;
@@ -777,6 +778,12 @@ export class DatabaseStorage implements IStorage {
   async getEvolutionCycles(userId: string): Promise<EvolutionCycle[]> {
     return db.select().from(evolutionCycles)
       .where(eq(evolutionCycles.userId, userId))
+      .orderBy(desc(evolutionCycles.createdAt));
+  }
+
+  async getAllActiveEvolutionCycles(): Promise<EvolutionCycle[]> {
+    return db.select().from(evolutionCycles)
+      .where(eq(evolutionCycles.status, "active"))
       .orderBy(desc(evolutionCycles.createdAt));
   }
 

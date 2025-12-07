@@ -2234,9 +2234,8 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // Trigger evolution tick (for scheduler or manual triggering)
   app.post("/api/evolution/tick", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const { runEvolutionTick } = await import("./evolutionCycleEngine");
-      const result = await runEvolutionTick();
+      const { triggerManualTick } = await import("./evolutionScheduler");
+      const result = await triggerManualTick();
       res.json(result);
     } catch (error) {
       console.error("Error running evolution tick:", error);
