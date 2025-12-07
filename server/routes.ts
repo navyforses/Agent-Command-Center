@@ -18,6 +18,13 @@ import { searchWeb, shouldTriggerSearch } from "./search";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { sendEmail } from "./resend";
+import { 
+  analyzeDocument, 
+  executeAction, 
+  processCommandCenterChat,
+  type DocumentAnalysisResult,
+  type ActionResult,
+} from "./aiOrchestrator";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1154,6 +1161,185 @@ Format your response as JSON with the following structure:
     } catch (error) {
       console.error("Error deleting testimonial:", error);
       res.status(500).json({ message: "Failed to delete testimonial" });
+    }
+  });
+
+  // AI Command Center Routes
+  
+  // Enhanced AI chat with function calling for actions
+  app.post("/api/assistant/chat", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { content, documentIds } = req.body;
+
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      // Get user context
+      const [chatHistory, documents, children] = await Promise.all([
+        storage.getChatMessages(userId),
+        storage.getDocuments(userId),
+        storage.getChildren(userId),
+      ]);
+
+      // Sort chat history
+      chatHistory.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      // Save user message
+      const userMessage = await storage.createChatMessage({
+        userId,
+        role: "user",
+        content,
+        documentIds: documentIds || null,
+      });
+
+      // Format history for AI
+      const formattedHistory = chatHistory
+        .filter(msg => msg.role === "user" || msg.role === "assistant")
+        .slice(-20)
+        .map(msg => ({ role: msg.role as "user" | "assistant", content: msg.content }));
+
+      // Process with Command Center AI
+      const result = await processCommandCenterChat(
+        userId,
+        content,
+        formattedHistory,
+        documents,
+        children
+      );
+
+      // Save assistant response with action info
+      const assistantMessage = await storage.createChatMessage({
+        userId,
+        role: "assistant",
+        content: result.content,
+        documentIds: result.documentIds || null,
+        actionType: result.actions?.[0]?.actionType || null,
+        actionData: result.actions?.[0]?.data || null,
+        actionStatus: result.actions?.length ? "executed" : null,
+      });
+
+      res.json({
+        message: assistantMessage,
+        actions: result.actions || [],
+      });
+    } catch (error) {
+      console.error("Error in AI Command Center chat:", error);
+      res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  // Upload and analyze document via AI Command Center
+  app.post("/api/assistant/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, filePath, fileType, fileSize, content } = req.body;
+
+      if (!title) {
+        return res.status(400).json({ message: "Document title is required" });
+      }
+
+      // Create document record with pending status
+      const document = await storage.createDocument({
+        userId,
+        title,
+        filePath: filePath || null,
+        fileType: fileType || null,
+        fileSize: fileSize || null,
+        processingStatus: "processing",
+      });
+
+      // Analyze document with AI
+      const analysis = await analyzeDocument(
+        content || "",
+        title,
+        fileType || "unknown"
+      );
+
+      // Update document with analysis results
+      const updatedDocument = await storage.updateDocument(document.id, userId, {
+        category: analysis.category,
+        documentType: analysis.documentType,
+        aiSummary: analysis.summary,
+        aiSummaryKa: analysis.summaryKa,
+        aiKeyFindings: analysis.keyFindings,
+        purpose: analysis.purpose,
+        extractedText: content || null,
+        processingStatus: "completed",
+      });
+
+      // Create chat message about the upload
+      const uploadMessage = await storage.createChatMessage({
+        userId,
+        role: "assistant",
+        content: `I've analyzed your document "${title}".\n\n**Summary:** ${analysis.summary}\n\n**Category:** ${analysis.category}\n**Document Type:** ${analysis.documentType}${analysis.keyFindings.length > 0 ? `\n\n**Key Findings:**\n${analysis.keyFindings.map(f => `- ${f}`).join('\n')}` : ''}${analysis.suggestedActions?.length ? `\n\n**Suggested Actions:**\n${analysis.suggestedActions.map(a => `- ${a.description}`).join('\n')}` : ''}`,
+        documentIds: [document.id],
+        actionType: "analyze_document",
+        actionStatus: "executed",
+      });
+
+      res.json({
+        document: updatedDocument,
+        analysis,
+        message: uploadMessage,
+      });
+    } catch (error) {
+      console.error("Error uploading document to AI:", error);
+      res.status(500).json({ message: "Failed to process document" });
+    }
+  });
+
+  // Execute a suggested action from AI
+  app.post("/api/assistant/execute", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { actionType, actionData } = req.body;
+
+      if (!actionType) {
+        return res.status(400).json({ message: "Action type is required" });
+      }
+
+      const result = await executeAction(actionType, actionData, userId);
+
+      // Create chat message about the action
+      if (result.success) {
+        await storage.createChatMessage({
+          userId,
+          role: "assistant",
+          content: `${result.message}\n\n${result.messageKa || ''}`,
+          actionType: result.actionType,
+          actionData: result.data,
+          actionStatus: "executed",
+        });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing AI action:", error);
+      res.status(500).json({ message: "Failed to execute action" });
+    }
+  });
+
+  // Get documents with AI analysis for knowledge base
+  app.get("/api/assistant/knowledge", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const documents = await storage.getDocuments(userId);
+      
+      // Filter to only include analyzed documents
+      const analyzedDocs = documents.filter(doc => 
+        doc.processingStatus === "completed" && doc.aiSummary
+      );
+
+      res.json(analyzedDocs);
+    } catch (error) {
+      console.error("Error fetching knowledge base:", error);
+      res.status(500).json({ message: "Failed to fetch knowledge base" });
     }
   });
 

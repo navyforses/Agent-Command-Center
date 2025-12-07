@@ -71,7 +71,13 @@ export const documents = pgTable("documents", {
   fileType: varchar("file_type"),
   fileSize: integer("file_size"),
   aiSummary: text("ai_summary"),
+  aiSummaryKa: text("ai_summary_ka"),
   aiKeyFindings: text("ai_key_findings").array(),
+  documentType: varchar("document_type"),
+  processingStatus: varchar("processing_status").default("pending"),
+  purpose: text("purpose"),
+  extractedText: text("extracted_text"),
+  conversationId: integer("conversation_id"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
@@ -82,6 +88,26 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+export const documentTypeEnum = z.enum([
+  "form_100",
+  "diagnosis",
+  "mri_report",
+  "therapy_note",
+  "research",
+  "prescription",
+  "lab_result",
+  "other"
+]);
+export type DocumentType = z.infer<typeof documentTypeEnum>;
+
+export const processingStatusEnum = z.enum([
+  "pending",
+  "processing",
+  "completed",
+  "failed"
+]);
+export type ProcessingStatus = z.infer<typeof processingStatusEnum>;
 
 // Therapies table
 export const therapies = pgTable("therapies", {
@@ -179,6 +205,10 @@ export const chatMessages = pgTable("chat_messages", {
   content: text("content").notNull(),
   searchSources: jsonb("search_sources"),
   isSearchResult: boolean("is_search_result").default(false),
+  documentIds: integer("document_ids").array(),
+  actionType: varchar("action_type"),
+  actionData: jsonb("action_data"),
+  actionStatus: varchar("action_status"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -188,8 +218,26 @@ export const searchSourceSchema = z.object({
   snippet: z.string(),
 });
 
+export const actionTypeEnum = z.enum([
+  "create_child",
+  "add_therapy",
+  "schedule_appointment",
+  "draft_email",
+  "analyze_document"
+]);
+export type ActionType = z.infer<typeof actionTypeEnum>;
+
+export const actionStatusEnum = z.enum([
+  "pending",
+  "confirmed",
+  "executed",
+  "cancelled"
+]);
+export type ActionStatus = z.infer<typeof actionStatusEnum>;
+
 export const insertChatMessageSchema = createInsertSchema(chatMessages, {
   searchSources: z.array(searchSourceSchema).nullable().optional(),
+  actionData: z.record(z.any()).nullable().optional(),
 }).omit({
   id: true,
   createdAt: true,
