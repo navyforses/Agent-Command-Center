@@ -726,7 +726,7 @@ If the user doesn't specify a recipient email address, ask them for it before se
       if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
         const toolCall = responseMessage.tool_calls[0];
         
-        if (toolCall.function.name === "sendEmail") {
+        if ('function' in toolCall && toolCall.function.name === "sendEmail") {
           const args = JSON.parse(toolCall.function.arguments);
           
           // Validate email format
