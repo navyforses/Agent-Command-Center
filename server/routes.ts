@@ -979,6 +979,64 @@ Format your response as JSON with the following structure:
     res.json({ uploadURL });
   });
 
+  app.post("/api/objects/acl", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const objectStorageService = new ObjectStorageService();
+    
+    const { uploadURL, aclPolicy } = req.body;
+    if (!uploadURL || typeof uploadURL !== 'string') {
+      return res.status(400).json({ message: "uploadURL is required" });
+    }
+    
+    if (!aclPolicy || typeof aclPolicy !== 'object') {
+      return res.status(400).json({ message: "aclPolicy is required and must be an object" });
+    }
+    
+    const { visibility } = aclPolicy;
+    if (!visibility || (visibility !== 'public' && visibility !== 'private')) {
+      return res.status(400).json({ 
+        message: "aclPolicy.visibility is required and must be 'public' or 'private'" 
+      });
+    }
+    
+    try {
+      const url = new URL(uploadURL);
+      if (!url.hostname.includes('storage.googleapis.com') && !url.hostname.includes('replit')) {
+        return res.status(403).json({ message: "Invalid storage URL" });
+      }
+    } catch {
+      return res.status(400).json({ message: "Invalid URL format" });
+    }
+    
+    try {
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        uploadURL,
+        {
+          owner: userId,
+          visibility: visibility,
+        }
+      );
+      
+      if (!objectPath) {
+        return res.status(500).json({ message: "Failed to set ACL policy: no object path returned" });
+      }
+      
+      if (!objectPath.startsWith('/')) {
+        return res.status(400).json({ 
+          message: "Failed to set ACL policy: object path could not be normalized. Ensure the upload URL points to a valid private object." 
+        });
+      }
+      
+      res.json({ objectPath });
+    } catch (error) {
+      console.error("Error setting object ACL:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ message: "Object not found. The file may not have been uploaded yet or the URL is incorrect." });
+      }
+      res.status(500).json({ message: "Failed to set object ACL" });
+    }
+  });
+
   app.put("/api/documents/:id/file", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const id = parseInt(req.params.id, 10);

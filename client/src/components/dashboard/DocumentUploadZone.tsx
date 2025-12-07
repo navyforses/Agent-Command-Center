@@ -19,9 +19,10 @@ interface UploadedFile {
 
 interface DocumentUploadZoneProps {
   onUploadComplete?: () => void;
+  childId?: number;
 }
 
-export function DocumentUploadZone({ onUploadComplete }: DocumentUploadZoneProps) {
+export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const { toast } = useToast();
@@ -56,6 +57,10 @@ export function DocumentUploadZone({ onUploadComplete }: DocumentUploadZoneProps
       );
 
       const uploadUrlResponse = await apiRequest("POST", "/api/objects/upload");
+      if (!uploadUrlResponse.ok) {
+        const errorData = await uploadUrlResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to get upload URL");
+      }
       const { uploadURL } = await uploadUrlResponse.json();
 
       setUploadedFiles((prev) =>
@@ -81,12 +86,17 @@ export function DocumentUploadZone({ onUploadComplete }: DocumentUploadZoneProps
       const url = new URL(uploadURL);
       const filePath = url.pathname;
 
-      await apiRequest("POST", "/api/objects/acl", {
+      const aclResponse = await apiRequest("POST", "/api/objects/acl", {
         uploadURL: uploadURL,
         aclPolicy: {
           visibility: "private",
         },
       });
+
+      if (!aclResponse.ok) {
+        const errorData = await aclResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to set file permissions");
+      }
 
       setUploadedFiles((prev) =>
         prev.map((f) => f.id === id ? { ...f, progress: 85 } : f)
@@ -94,19 +104,48 @@ export function DocumentUploadZone({ onUploadComplete }: DocumentUploadZoneProps
 
       const category = getCategoryFromFileType(file.type, file.name);
 
-      await apiRequest("POST", "/api/documents", {
+      const docResponse = await apiRequest("POST", "/api/documents", {
         title: file.name,
         category,
         filePath,
         fileType: file.type,
         fileSize: file.size,
+        childId: childId || null,
       });
+      
+      if (!docResponse.ok) {
+        const errorData = await docResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create document record");
+      }
+      
+      const createdDoc = await docResponse.json();
+
+      setUploadedFiles((prev) =>
+        prev.map((f) => f.id === id ? { ...f, progress: 90, status: "processing" } : f)
+      );
+
+      try {
+        await apiRequest("POST", `/api/documents/${createdDoc.id}/analyze`);
+        toast({
+          title: "Document Analyzed",
+          description: "AI analysis completed successfully",
+        });
+      } catch (analysisError) {
+        console.warn("AI analysis failed, document still saved:", analysisError);
+        toast({
+          title: "Document Saved",
+          description: "Document uploaded but AI analysis is pending",
+        });
+      }
 
       setUploadedFiles((prev) =>
         prev.map((f) => f.id === id ? { ...f, progress: 100, status: "complete" } : f)
       );
 
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      if (childId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/children', String(childId), 'documents'] });
+      }
 
     } catch (error) {
       console.error("Upload error:", error);
