@@ -1170,6 +1170,18 @@ Format your response as JSON with the following structure:
 
   // AI Command Center Routes
   
+  // Get assistant messages with action metadata
+  app.get("/api/assistant/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const messages = await storage.getChatMessages(userId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching assistant messages:", error);
+      res.status(500).json({ message: "Failed to fetch assistant messages" });
+    }
+  });
+
   // Enhanced AI chat with function calling for actions
   app.post("/api/assistant/chat", isAuthenticated, async (req: any, res) => {
     try {
