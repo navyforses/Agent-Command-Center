@@ -909,6 +909,29 @@ export default function AIAssistant() {
     },
   });
 
+  const deleteDocument = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/documents/${id}`);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      setUploadedFiles((prev) => prev.filter((f) => f.document?.id !== deletedId));
+      toast({
+        title: language === "en" ? "Document deleted" : "დოკუმენტი წაიშალა",
+        description: language === "en" ? "The document has been removed." : "დოკუმენტი წაიშალა.",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Delete document error:", error);
+      toast({
+        title: language === "en" ? "Error" : "შეცდომა",
+        description: language === "en" ? "Failed to delete document." : "დოკუმენტის წაშლა ვერ მოხერხდა.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const sendMessage = useMutation({
     mutationFn: async ({ content, documentIds, conversationId, attachments }: { content: string; documentIds?: number[]; conversationId?: number; attachments?: Attachment[] }) => {
       const response = await apiRequest("POST", "/api/assistant/chat", { content, documentIds, conversationId, attachments });
@@ -1262,7 +1285,12 @@ export default function AIAssistant() {
   };
 
   const handleRemoveFile = (id: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+    const file = uploadedFiles.find((f) => f.id === id);
+    if (file?.document?.id) {
+      deleteDocument.mutate(file.document.id);
+    } else {
+      setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+    }
   };
 
   const handleExecuteSuggestedAction = (action: SuggestedAction) => {
