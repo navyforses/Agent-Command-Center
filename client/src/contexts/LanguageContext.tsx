@@ -158,6 +158,10 @@ const translations: Record<string, Record<Language, string>> = {
   proposedBy: { en: "Proposed by", ka: "შემოთავაზებულია" },
   supportedBy: { en: "Supported by:", ka: "მხარდაჭერილია:" },
   moreHypotheses: { en: "more hypotheses", ka: "მეტი ჰიპოთეზა" },
+  originNexus: { en: "NEXUS", ka: "NEXUS" },
+  originEvolution: { en: "Evolution", ka: "ევოლუცია" },
+  originMerged: { en: "Merged", ka: "გაერთიანებული" },
+  filterByOrigin: { en: "Filter by origin:", ka: "ფილტრაცია წარმოშობით:" },
   
   // Evolution Cycle Dashboard
   evolutionDashboard: { en: "Evolution Dashboard", ka: "ევოლუციის პანელი" },

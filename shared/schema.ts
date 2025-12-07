@@ -496,12 +496,13 @@ export const insertNexusKnowledgeEdgeSchema = createInsertSchema(nexusKnowledgeE
 export type InsertNexusKnowledgeEdge = z.infer<typeof insertNexusKnowledgeEdgeSchema>;
 export type NexusKnowledgeEdge = typeof nexusKnowledgeEdges.$inferSelect;
 
-// Hypotheses table - generated research hypotheses
+// Hypotheses table - generated research hypotheses (unified: NEXUS + Evolution)
 export const nexusHypotheses = pgTable("nexus_hypotheses", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
   hypothesisCode: varchar("hypothesis_code", { length: 20 }).unique(),
   statement: text("statement").notNull(),
+  statementKa: text("statement_ka"),
   status: varchar("status", { length: 50 }).default("nascent"),
   confidenceScore: integer("confidence_score"),
   proposedBy: varchar("proposed_by", { length: 50 }),
@@ -511,6 +512,9 @@ export const nexusHypotheses = pgTable("nexus_hypotheses", {
   crossDisciplinaryBasis: jsonb("cross_disciplinary_basis"),
   testability: text("testability"),
   actionItems: jsonb("action_items"),
+  origin: varchar("origin", { length: 20 }).default("nexus"),
+  evolutionInsightId: integer("evolution_insight_id").references(() => evolutionInsights.id),
+  evolutionCycleId: integer("evolution_cycle_id").references(() => evolutionCycles.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -524,6 +528,13 @@ export const nexusHypothesisStatusEnum = z.enum([
   "superseded"
 ]);
 export type NexusHypothesisStatus = z.infer<typeof nexusHypothesisStatusEnum>;
+
+export const nexusHypothesisOriginEnum = z.enum([
+  "nexus",
+  "evolution",
+  "merged"
+]);
+export type NexusHypothesisOrigin = z.infer<typeof nexusHypothesisOriginEnum>;
 
 export const insertNexusHypothesisSchema = createInsertSchema(nexusHypotheses, {
   supportingEvidence: z.array(z.object({

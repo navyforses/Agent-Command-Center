@@ -17,6 +17,9 @@ import {
   Clock,
   TrendingUp,
   AlertTriangle,
+  Zap,
+  Search,
+  GitMerge,
 } from "lucide-react";
 import { useState } from "react";
 import type { NexusHypothesis } from "@shared/schema";
@@ -25,7 +28,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 interface HypothesisTrackerProps {
   variant?: "full" | "compact";
+  originFilter?: "all" | "nexus" | "evolution";
 }
+
+const getOriginConfig = (t: (key: string) => string) => ({
+  nexus: { label: t("originNexus"), icon: Search, colorClass: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
+  evolution: { label: t("originEvolution"), icon: Zap, colorClass: "text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30" },
+  merged: { label: t("originMerged"), icon: GitMerge, colorClass: "text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30" },
+});
 
 const getStatusConfig = (t: (key: string) => string) => ({
   nascent: { label: t("nascent"), icon: Clock, colorClass: "text-muted-foreground bg-muted" },
@@ -46,12 +56,16 @@ const aiAgentColors: Record<string, string> = {
 
 function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
   const [expanded, setExpanded] = useState(false);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   
   const statusConfig = getStatusConfig(t);
+  const originConfig = getOriginConfig(t);
   const status = hypothesis.status as keyof typeof statusConfig || "nascent";
+  const origin = (hypothesis.origin as keyof typeof originConfig) || "nexus";
   const config = statusConfig[status] || statusConfig.nascent;
+  const originCfg = originConfig[origin] || originConfig.nexus;
   const StatusIcon = config.icon;
+  const OriginIcon = originCfg.icon;
   
   const supportingEvidence = hypothesis.supportingEvidence as Array<{ source: string; description: string; strength?: number }> | null;
   const contradictingEvidence = hypothesis.contradictingEvidence as Array<{ source: string; description: string; strength?: number }> | null;
@@ -73,7 +87,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 {hypothesis.hypothesisCode && (
                   <Badge variant="outline" className="text-xs font-mono" data-testid={`badge-code-${hypothesis.id}`}>
                     {hypothesis.hypothesisCode}
@@ -82,6 +96,10 @@ function HypothesisCard({ hypothesis }: { hypothesis: NexusHypothesis }) {
                 <Badge className={`text-xs ${config.colorClass}`} data-testid={`badge-status-${hypothesis.id}`}>
                   <StatusIcon className="h-3 w-3 mr-1" />
                   {config.label}
+                </Badge>
+                <Badge className={`text-xs ${originCfg.colorClass}`} data-testid={`badge-origin-${hypothesis.id}`}>
+                  <OriginIcon className="h-3 w-3 mr-1" />
+                  {originCfg.label}
                 </Badge>
               </div>
               <CollapsibleTrigger asChild>
@@ -257,13 +275,20 @@ function HypothesisTrackerSkeleton() {
   );
 }
 
-export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) {
+export function HypothesisTracker({ variant = "full", originFilter = "all" }: HypothesisTrackerProps) {
   const { t } = useLanguage();
+  const [selectedOrigin, setSelectedOrigin] = useState<"all" | "nexus" | "evolution">(originFilter);
   const statusConfig = getStatusConfig(t);
+  const originConfig = getOriginConfig(t);
   
   const { data: hypotheses, isLoading, error } = useQuery<NexusHypothesis[]>({
     queryKey: ["/api/nexus/hypotheses"],
   });
+  
+  const filteredHypotheses = hypotheses?.filter(h => {
+    if (selectedOrigin === "all") return true;
+    return h.origin === selectedOrigin;
+  }) || [];
 
   if (isLoading) {
     return <HypothesisTrackerSkeleton />;
@@ -290,7 +315,7 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
     );
   }
 
-  const groupedByStatus = hypotheses.reduce((acc, h) => {
+  const groupedByStatus = filteredHypotheses.reduce((acc, h) => {
     const status = h.status || "nascent";
     if (!acc[status]) acc[status] = [];
     acc[status].push(h);
@@ -298,24 +323,30 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
   }, {} as Record<string, NexusHypothesis[]>);
 
   if (variant === "compact") {
+    const compactHypotheses = filteredHypotheses.slice(0, 5);
     return (
       <div className="space-y-2">
-        {hypotheses.slice(0, 5).map((hypothesis) => (
-          <div
-            key={hypothesis.id}
-            className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
-            data-testid={`hypothesis-compact-${hypothesis.id}`}
-          >
-            <Lightbulb className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="text-sm truncate flex-1">{hypothesis.statement}</span>
-            <Badge variant="outline" className="text-xs flex-shrink-0">
-              {hypothesis.status || "nascent"}
-            </Badge>
-          </div>
-        ))}
-        {hypotheses.length > 5 && (
+        {compactHypotheses.map((hypothesis) => {
+          const origin = (hypothesis.origin as keyof typeof originConfig) || "nexus";
+          const originCfg = originConfig[origin] || originConfig.nexus;
+          const OriginIcon = originCfg.icon;
+          return (
+            <div
+              key={hypothesis.id}
+              className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
+              data-testid={`hypothesis-compact-${hypothesis.id}`}
+            >
+              <OriginIcon className={`h-4 w-4 flex-shrink-0 ${originCfg.colorClass.split(" ")[0]}`} />
+              <span className="text-sm truncate flex-1">{hypothesis.statement}</span>
+              <Badge variant="outline" className="text-xs flex-shrink-0">
+                {hypothesis.status || "nascent"}
+              </Badge>
+            </div>
+          );
+        })}
+        {filteredHypotheses.length > 5 && (
           <p className="text-xs text-muted-foreground text-center">
-            +{hypotheses.length - 5} {t("moreHypotheses")}
+            +{filteredHypotheses.length - 5} {t("moreHypotheses")}
           </p>
         )}
       </div>
@@ -323,9 +354,34 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
   }
 
   return (
-    <ScrollArea className="h-[400px] pr-2">
-      <div className="space-y-4">
-        {Object.entries(statusConfig).map(([status, config]) => {
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap pb-2 border-b border-muted">
+        <span className="text-xs text-muted-foreground">{t("filterByOrigin")}</span>
+        {(["all", "nexus", "evolution"] as const).map((origin) => {
+          const isAll = origin === "all";
+          const cfg = isAll ? null : originConfig[origin];
+          const Icon = isAll ? Lightbulb : cfg!.icon;
+          const label = isAll ? t("all") : cfg!.label;
+          return (
+            <Button
+              key={origin}
+              variant={selectedOrigin === origin ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedOrigin(origin)}
+              data-testid={`button-filter-${origin}`}
+            >
+              <Icon className="h-3 w-3 mr-1" />
+              {label}
+            </Button>
+          );
+        })}
+        <Badge variant="outline" className="text-xs ml-auto">
+          {filteredHypotheses.length} / {hypotheses?.length || 0}
+        </Badge>
+      </div>
+      <ScrollArea className="h-[350px] pr-2">
+        <div className="space-y-4">
+          {Object.entries(statusConfig).map(([status, config]) => {
           const items = groupedByStatus[status];
           if (!items || items.length === 0) return null;
           
@@ -344,8 +400,9 @@ export function HypothesisTracker({ variant = "full" }: HypothesisTrackerProps) 
             </div>
           );
         })}
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
