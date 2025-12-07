@@ -194,6 +194,20 @@ const translations: Record<string, Record<Language, string>> = {
   typeYourQuestion: { en: "Type your question...", ka: "შეიყვანეთ თქვენი შეკითხვა..." },
   downloadPdf: { en: "Download PDF", ka: "PDF ჩამოტვირთვა" },
 
+  // Evolution Cycle Activation
+  startEvolutionCycle: { en: "Start Evolution Cycle", ka: "ევოლუციის ციკლის დაწყება" },
+  evolutionCycleDescription: { en: "Start an autonomous 24-hour research cycle that continuously monitors the latest medical findings relevant to your child's condition.", ka: "დაიწყეთ ავტონომიური 24-საათიანი კვლევითი ციკლი, რომელიც მუდმივად აკვირდება უახლეს სამედიცინო აღმოჩენებს თქვენი შვილის მდგომარეობისთვის." },
+  selectEndDate: { en: "Select End Date", ka: "აირჩიეთ დასრულების თარიღი" },
+  endDateDescription: { en: "The cycle will run autonomously until this date, generating daily research reports.", ka: "ციკლი ავტონომიურად იმუშავებს ამ თარიღამდე, აგენერირებს ყოველდღიურ კვლევით ანგარიშებს." },
+  startCycle: { en: "Start Cycle", ka: "ციკლის დაწყება" },
+  cycleCreated: { en: "Evolution Cycle Started", ka: "ევოლუციის ციკლი დაიწყო" },
+  cycleCreatedDescription: { en: "The autonomous research cycle has begun. You'll receive daily reports.", ka: "ავტონომიური კვლევითი ციკლი დაიწყო. მიიღებთ ყოველდღიურ ანგარიშებს." },
+  cycleCreationFailed: { en: "Failed to Start Cycle", ka: "ციკლის დაწყება ვერ მოხერხდა" },
+  documentUploadedSuccessfully: { en: "Document Uploaded", ka: "დოკუმენტი აიტვირთა" },
+  wouldYouLikeToStartCycle: { en: "Would you like to start an Evolution Cycle?", ka: "გსურთ ევოლუციის ციკლის დაწყება?" },
+  skipForNow: { en: "Skip for Now", ka: "გამოტოვება" },
+  analyzingDocument: { en: "Analyzing document to extract diagnosis context...", ka: "დოკუმენტის ანალიზი დიაგნოზის კონტექსტის ამოსაღებად..." },
+
   // Debate Panel
   highPriority: { en: "High Priority", ka: "მაღალი პრიორიტეტი" },
   mediumPriority: { en: "Medium Priority", ka: "საშუალო პრიორიტეტი" },
