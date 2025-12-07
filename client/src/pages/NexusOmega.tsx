@@ -199,6 +199,68 @@ const phases = [
   { id: "adapt", icon: RefreshCw, duration: "2h", labelKey: "phaseAdapt" },
 ];
 
+function EvolutionStatusBar({ cycle, currentRun }: { cycle: EvolutionCycle; currentRun?: EvolutionDailyRun }) {
+  const { t } = useLanguage();
+  const startDate = new Date(cycle.startDate);
+  const endDate = new Date(cycle.endDate);
+  const today = new Date();
+  const daysTotal = Math.max(1, differenceInDays(endDate, startDate));
+  const daysElapsed = Math.max(0, Math.min(daysTotal, differenceInDays(today, startDate)));
+  const daysRemaining = Math.max(0, daysTotal - daysElapsed);
+  const progress = Math.min(100, Math.max(0, (daysElapsed / daysTotal) * 100));
+  
+  const currentPhase = currentRun?.currentPhase;
+  const currentPhaseData = phases.find(p => p.id === currentPhase);
+  const CurrentPhaseIcon = currentPhaseData?.icon || Activity;
+
+  return (
+    <div 
+      className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-md"
+      data-testid="evolution-status-bar"
+    >
+      <div className="flex items-center gap-2">
+        <div className="p-1.5 bg-primary/10 rounded">
+          <Zap className="h-4 w-4 text-primary" />
+        </div>
+        <span className="text-sm font-medium">{t("evolutionActive")}</span>
+      </div>
+      
+      <div className="h-4 w-px bg-border" />
+      
+      {currentPhase && (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-accent rounded">
+              <CurrentPhaseIcon className="h-3 w-3" />
+            </div>
+            <span className="text-sm">{t(currentPhaseData?.labelKey || currentPhase)}</span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+        </>
+      )}
+      
+      <div className="flex items-center gap-2 flex-1 min-w-[120px]">
+        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-primary transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <span className="text-xs font-medium text-muted-foreground">{Math.round(progress)}%</span>
+      </div>
+      
+      <div className="h-4 w-px bg-border" />
+      
+      <div className="flex items-center gap-1.5">
+        <Clock className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">
+          {daysRemaining} {t("daysRemaining")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PhaseTimeline({ currentPhase, phasesCompleted }: { currentPhase: string | null; phasesCompleted: string[] | null }) {
   const { t } = useLanguage();
   const completedSet = new Set(phasesCompleted || []);
@@ -824,6 +886,10 @@ export default function NexusOmega() {
             <p className="text-sm text-muted-foreground">{t("nexusOmegaSubtitle")}</p>
           </div>
         </div>
+
+        {activeCycle && (
+          <EvolutionStatusBar cycle={activeCycle} currentRun={currentRun} />
+        )}
 
         <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
           <TabsList>
