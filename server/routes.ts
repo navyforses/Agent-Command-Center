@@ -9,6 +9,7 @@ import {
   insertTherapySessionSchema,
   insertAppointmentSchema,
   insertEmailSchema,
+  insertConversationSchema,
   insertChatMessageSchema,
   insertTestimonialSchema,
 } from "@shared/schema";
@@ -606,6 +607,111 @@ export async function registerRoutes(
     }
   });
 
+  // Conversation routes
+  app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversations = await storage.getConversations(userId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  app.post("/api/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertConversationSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid conversation data", errors: parseResult.error.errors });
+      }
+      const conversation = await storage.createConversation(parseResult.data);
+      res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  app.get("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+      const conversation = await storage.getConversation(id, userId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+      res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  app.patch("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertConversationSchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid conversation data", errors: parseResult.error.errors });
+      }
+      const conversation = await storage.updateConversation(id, userId, parseResult.data);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating conversation:", error);
+      res.status(500).json({ message: "Failed to update conversation" });
+    }
+  });
+
+  app.delete("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+      const deleted = await storage.deleteConversation(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      res.json({ message: "Conversation deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  app.get("/api/conversations/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+      const conversation = await storage.getConversation(id, userId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      const messages = await storage.getChatMessagesByConversation(id, userId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching conversation messages:", error);
+      res.status(500).json({ message: "Failed to fetch conversation messages" });
+    }
+  });
+
   // Chat Messages routes
   app.get("/api/chat/messages", isAuthenticated, async (req: any, res) => {
     try {
@@ -1186,15 +1292,28 @@ Format your response as JSON with the following structure:
   app.post("/api/assistant/chat", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { content, documentIds } = req.body;
+      const { content, documentIds, conversationId: providedConversationId } = req.body;
 
       if (!content || typeof content !== "string") {
         return res.status(400).json({ message: "Message content is required" });
       }
 
-      // Get user context
+      // Auto-create conversation if none provided
+      let activeConversationId = providedConversationId;
+      if (!activeConversationId) {
+        // Create a new conversation with title from first message (max 50 chars)
+        const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
+        const newConversation = await storage.createConversation({
+          userId,
+          title,
+          preview: null,
+        });
+        activeConversationId = newConversation.id;
+      }
+
+      // Get user context - use conversation-specific history
       const [chatHistory, documents, children] = await Promise.all([
-        storage.getChatMessages(userId),
+        storage.getChatMessagesByConversation(activeConversationId, userId),
         storage.getDocuments(userId),
         storage.getChildren(userId),
       ]);
@@ -1206,12 +1325,13 @@ Format your response as JSON with the following structure:
         return dateA - dateB;
       });
 
-      // Save user message
+      // Save user message with conversationId
       const userMessage = await storage.createChatMessage({
         userId,
         role: "user",
         content,
         documentIds: documentIds || null,
+        conversationId: activeConversationId,
       });
 
       // Format history for AI
@@ -1239,7 +1359,12 @@ Format your response as JSON with the following structure:
         actionType: firstAction?.actionType || null,
         actionData: firstAction?.actionData || null,
         actionStatus: result.suggestedActions?.length ? "pending" : null,
+        conversationId: activeConversationId,
       });
+
+      // Update conversation preview
+      const preview = result.content.substring(0, 100) + (result.content.length > 100 ? '...' : '');
+      await storage.updateConversation(activeConversationId, userId, { preview });
 
       // Store each suggested action as a separate pending action message with parentMessageId
       const pendingActionMessages = [];
@@ -1252,6 +1377,7 @@ Format your response as JSON with the following structure:
             actionType: action.actionType,
             actionData: { ...action.actionData, parentMessageId: assistantMessage.id },
             actionStatus: "pending",
+            conversationId: activeConversationId,
           });
           pendingActionMessages.push(actionMessage);
         }
@@ -1261,6 +1387,7 @@ Format your response as JSON with the following structure:
         message: assistantMessage,
         suggestedActions: result.suggestedActions || [],
         pendingActionMessages,
+        conversationId: activeConversationId,
       });
     } catch (error) {
       console.error("Error in AI Command Center chat:", error);

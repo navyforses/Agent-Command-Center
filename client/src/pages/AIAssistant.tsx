@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { ChatMessage, Document } from "@shared/schema";
+import type { ChatMessage, Document, Conversation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+import {
   Bot,
   Send,
   User,
@@ -28,7 +41,6 @@ import {
   Activity,
   Mail,
   HelpCircle,
-  Globe,
   Copy,
   Check,
   Download,
@@ -43,7 +55,13 @@ import {
   UserPlus,
   Calendar,
   Stethoscope,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Paperclip,
+  Video,
 } from "lucide-react";
+import type { Attachment } from "@shared/schema";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -59,6 +77,7 @@ interface AssistantChatResponse {
   message: ChatMessage;
   suggestedActions: SuggestedAction[];
   pendingActionMessages: ChatMessage[];
+  conversationId?: number;
 }
 
 interface UploadResponse {
@@ -105,6 +124,20 @@ interface Message {
   actionData?: any;
   actionStatus?: string | null;
   suggestedActions?: SuggestedAction[];
+  attachments?: Attachment[];
+}
+
+interface PendingAttachment {
+  id: string;
+  file: File;
+  name: string;
+  type: string;
+  size: number;
+  previewUrl?: string;
+  status: "pending" | "uploading" | "complete" | "error";
+  progress: number;
+  filePath?: string;
+  errorMessage?: string;
 }
 
 const quickActions = [
@@ -133,6 +166,7 @@ function transformChatMessage(chatMessage: ChatMessage): Message {
     actionType: chatMessage.actionType,
     actionData: chatMessage.actionData,
     actionStatus: chatMessage.actionStatus,
+    attachments: chatMessage.attachments as Attachment[] | undefined,
   };
 }
 
@@ -261,6 +295,19 @@ interface MessageItemProps {
   language: string;
 }
 
+function getAttachmentIcon(fileType: string) {
+  if (fileType.startsWith("image/")) return Image;
+  if (fileType.startsWith("video/")) return Video;
+  if (fileType === "application/pdf") return FileText;
+  return File;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function MessageItem({
   message,
   onCopy,
@@ -294,6 +341,49 @@ function MessageItem({
         </div>
         <Card className={`${isUser ? "bg-primary text-primary-foreground" : ""}`}>
           <CardContent className="p-4">
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-border/50">
+                <div className="flex flex-wrap gap-2">
+                  {message.attachments.map((attachment) => {
+                    const AttachmentIcon = getAttachmentIcon(attachment.fileType);
+                    const isImage = attachment.fileType.startsWith("image/");
+                    
+                    return (
+                      <div
+                        key={attachment.id}
+                        className={`flex items-center gap-2 rounded-md border p-2 ${
+                          isUser ? "border-primary-foreground/30 bg-primary-foreground/10" : "border-border bg-muted/50"
+                        }`}
+                        data-testid={`message-attachment-${attachment.id}`}
+                      >
+                        {isImage && attachment.filePath ? (
+                          <div className="h-10 w-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                            <img
+                              src={`/api/objects${attachment.filePath}`}
+                              alt={attachment.fileName}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`h-10 w-10 rounded flex items-center justify-center flex-shrink-0 ${
+                            isUser ? "bg-primary-foreground/20" : "bg-muted"
+                          }`}>
+                            <AttachmentIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate max-w-[120px]">{attachment.fileName}</p>
+                          <p className={`text-xs ${isUser ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                            {formatFileSize(attachment.fileSize)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
             {!isUser && message.actionType && message.actionStatus && (
@@ -557,6 +647,110 @@ function DocumentUploadPanel({
   );
 }
 
+function ConversationSidebar({
+  conversations,
+  activeConversationId,
+  onSelectConversation,
+  onNewChat,
+  onDeleteConversation,
+  isLoading,
+  language,
+}: {
+  conversations: Conversation[] | undefined;
+  activeConversationId: number | null;
+  onSelectConversation: (id: number) => void;
+  onNewChat: () => void;
+  onDeleteConversation: (id: number) => void;
+  isLoading: boolean;
+  language: string;
+}) {
+  const formatDate = (date: Date | string | null | undefined) => {
+    if (!date) return "";
+    const d = new Date(date);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } else if (diffDays === 1) {
+      return language === "en" ? "Yesterday" : "გუშინ";
+    } else if (diffDays < 7) {
+      return d.toLocaleDateString(language === "en" ? "en-US" : "ka-GE", { weekday: "short" });
+    } else {
+      return d.toLocaleDateString(language === "en" ? "en-US" : "ka-GE", { month: "short", day: "numeric" });
+    }
+  };
+
+  return (
+    <Sidebar>
+      <SidebarHeader className="p-4 border-b border-sidebar-border">
+        <Button 
+          onClick={onNewChat} 
+          className="w-full gap-2"
+          data-testid="button-new-chat"
+        >
+          <Plus className="h-4 w-4" />
+          {language === "en" ? "New Chat" : "ახალი ჩატი"}
+        </Button>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {isLoading ? (
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : conversations && conversations.length > 0 ? (
+                conversations.map((conversation) => (
+                  <SidebarMenuItem key={conversation.id}>
+                    <SidebarMenuButton
+                      isActive={activeConversationId === conversation.id}
+                      onClick={() => onSelectConversation(conversation.id)}
+                      className="w-full justify-start group"
+                      data-testid={`conversation-item-${conversation.id}`}
+                    >
+                      <div className="flex items-center gap-3 w-full min-w-0">
+                        <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-sm font-medium truncate">
+                            {conversation.title || (language === "en" ? "New Conversation" : "ახალი საუბარი")}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conversation.preview || formatDate(conversation.updatedAt || conversation.createdAt)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteConversation(conversation.id);
+                          }}
+                          data-testid={`button-delete-conversation-${conversation.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))
+              ) : (
+                <div className="p-4 text-center text-muted-foreground text-sm">
+                  {language === "en" ? "No conversations yet" : "საუბრები ჯერ არ არის"}
+                </div>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
+}
+
 export default function AIAssistant() {
   const { language, t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -564,23 +758,39 @@ export default function AIAssistant() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: chatHistory, isLoading: historyLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/assistant/messages"],
+  const sidebarStyle = {
+    "--sidebar-width": "18rem",
+    "--sidebar-width-icon": "3rem",
+  };
+
+  const { data: conversations, isLoading: conversationsLoading } = useQuery<Conversation[]>({
+    queryKey: ["/api/conversations"],
+  });
+
+  const { data: conversationMessages, isLoading: messagesLoading } = useQuery<ChatMessage[]>({
+    queryKey: ["/api/conversations", activeConversationId, "messages"],
+    enabled: !!activeConversationId,
   });
 
   useEffect(() => {
-    if (chatHistory) {
-      const sortedHistory = [...chatHistory].sort((a, b) => {
+    if (conversationMessages && activeConversationId) {
+      const sortedMessages = [...conversationMessages].sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateA - dateB;
       });
-      setMessages(sortedHistory.map(transformChatMessage));
+      setMessages(sortedMessages.map(transformChatMessage));
+    } else if (!activeConversationId) {
+      setMessages([]);
     }
-  }, [chatHistory]);
+  }, [conversationMessages, activeConversationId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -652,13 +862,62 @@ export default function AIAssistant() {
     });
   };
 
+  const createConversation = useMutation({
+    mutationFn: async (title: string) => {
+      const response = await apiRequest("POST", "/api/conversations", { title });
+      return response.json() as Promise<Conversation>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setActiveConversationId(data.id);
+    },
+    onError: (error: Error) => {
+      console.error("Create conversation error:", error);
+      toast({
+        title: language === "en" ? "Error" : "შეცდომა",
+        description: language === "en" ? "Failed to create conversation." : "საუბრის შექმნა ვერ მოხერხდა.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteConversation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/conversations/${id}`);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      if (activeConversationId === deletedId) {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+      toast({
+        title: language === "en" ? "Conversation deleted" : "საუბარი წაიშალა",
+        description: language === "en" ? "The conversation has been removed." : "საუბარი წაიშალა.",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Delete conversation error:", error);
+      toast({
+        title: language === "en" ? "Error" : "შეცდომა",
+        description: language === "en" ? "Failed to delete conversation." : "საუბრის წაშლა ვერ მოხერხდა.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const sendMessage = useMutation({
-    mutationFn: async ({ content, documentIds }: { content: string; documentIds?: number[] }) => {
-      const response = await apiRequest("POST", "/api/assistant/chat", { content, documentIds });
+    mutationFn: async ({ content, documentIds, conversationId, attachments }: { content: string; documentIds?: number[]; conversationId?: number; attachments?: Attachment[] }) => {
+      const response = await apiRequest("POST", "/api/assistant/chat", { content, documentIds, conversationId, attachments });
       return response.json() as Promise<AssistantChatResponse>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assistant/messages"] });
+      if (data.conversationId) {
+        setActiveConversationId(data.conversationId);
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations", data.conversationId, "messages"] });
+      }
       if (data.suggestedActions && data.suggestedActions.length > 0) {
         toast({
           title: language === "en" ? "Actions Available" : "ხელმისაწვდომი მოქმედებები",
@@ -698,7 +957,9 @@ export default function AIAssistant() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assistant/messages"] });
+      if (activeConversationId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations", activeConversationId, "messages"] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/children"] });
       queryClient.invalidateQueries({ queryKey: ["/api/therapies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
@@ -727,7 +988,9 @@ export default function AIAssistant() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assistant/messages"] });
+      if (activeConversationId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations", activeConversationId, "messages"] });
+      }
       toast({
         title: language === "en" ? "Action Cancelled" : "მოქმედება გაუქმდა",
         description: language === "en" ? "The suggested action has been cancelled." : "შემოთავაზებული მოქმედება გაუქმდა.",
@@ -745,13 +1008,39 @@ export default function AIAssistant() {
 
   const handleSend = async (message?: string) => {
     const text = message || input;
-    if (!text.trim()) return;
+    if (!text.trim() && pendingAttachments.length === 0) return;
+
+    let uploadedAttachments: Attachment[] = [];
+
+    if (pendingAttachments.length > 0) {
+      setIsUploadingAttachments(true);
+      try {
+        uploadedAttachments = await Promise.all(
+          pendingAttachments.map((attachment) => uploadAttachment(attachment))
+        );
+        pendingAttachments.forEach((a) => {
+          if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+        });
+        setPendingAttachments([]);
+      } catch (error) {
+        console.error("Attachment upload error:", error);
+        toast({
+          title: language === "en" ? "Upload Failed" : "ატვირთვა ვერ მოხერხდა",
+          description: language === "en" ? "Failed to upload attachments." : "ფაილების ატვირთვა ვერ მოხერხდა.",
+          variant: "destructive",
+        });
+        setIsUploadingAttachments(false);
+        return;
+      }
+      setIsUploadingAttachments(false);
+    }
 
     const userMessage: Message = {
       id: `temp-user-${Date.now()}`,
       role: "user",
-      content: text,
+      content: text || (language === "en" ? "Attached files" : "მიმაგრებული ფაილები"),
       timestamp: new Date(),
+      attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -761,9 +1050,11 @@ export default function AIAssistant() {
       .filter((f) => f.status === "complete" && f.document?.id)
       .map((f) => f.document!.id);
 
-    sendMessage.mutate({ 
-      content: text, 
-      documentIds: completedDocIds.length > 0 ? completedDocIds : undefined 
+    sendMessage.mutate({
+      content: text || (language === "en" ? "Attached files" : "მიმაგრებული ფაილები"),
+      documentIds: completedDocIds.length > 0 ? completedDocIds : undefined,
+      conversationId: activeConversationId || undefined,
+      attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
     });
   };
 
@@ -794,6 +1085,66 @@ export default function AIAssistant() {
 
   const handleCancelAction = (messageId: string) => {
     cancelAction.mutate(messageId);
+  };
+
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newAttachments: PendingAttachment[] = files.map((file) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      status: "pending" as const,
+      progress: 0,
+    }));
+    setPendingAttachments((prev) => [...prev, ...newAttachments]);
+    e.target.value = "";
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setPendingAttachments((prev) => {
+      const attachment = prev.find((a) => a.id === id);
+      if (attachment?.previewUrl) {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  const uploadAttachment = async (attachment: PendingAttachment): Promise<Attachment> => {
+    const uploadUrlResponse = await apiRequest("POST", "/api/objects/upload");
+    if (!uploadUrlResponse.ok) {
+      throw new Error("Failed to get upload URL");
+    }
+    const { uploadURL } = await uploadUrlResponse.json();
+
+    const uploadResponse = await fetch(uploadURL, {
+      method: "PUT",
+      body: attachment.file,
+      headers: { "Content-Type": attachment.type || "application/octet-stream" },
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error("Failed to upload file");
+    }
+
+    const url = new URL(uploadURL);
+    const filePath = url.pathname;
+
+    await apiRequest("POST", "/api/objects/acl", {
+      uploadURL: uploadURL,
+      aclPolicy: { visibility: "private" },
+    });
+
+    return {
+      id: attachment.id,
+      fileName: attachment.name,
+      fileType: attachment.type,
+      fileSize: attachment.size,
+      filePath: filePath,
+    };
   };
 
   const uploadFile = async (file: File) => {
@@ -920,138 +1271,88 @@ export default function AIAssistant() {
     });
   };
 
-  if (historyLoading) {
-    return (
-      <div className="flex flex-col h-[calc(100vh-4rem)]">
-        <div className="p-6 pb-0">
-          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-md">
-                <Bot className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <Skeleton className="h-8 w-40 mb-2" />
-                <Skeleton className="h-4 w-56" />
-              </div>
-            </div>
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </div>
-        <div className="flex-1 p-6">
-          <div className="space-y-4 max-w-3xl mx-auto">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-3/4 ml-auto" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleNewChat = () => {
+    setActiveConversationId(null);
+    setMessages([]);
+    setUploadedFiles([]);
+  };
+
+  const handleSelectConversation = (id: number) => {
+    setActiveConversationId(id);
+    setUploadedFiles([]);
+  };
+
+  const handleDeleteConversation = (id: number) => {
+    deleteConversation.mutate(id);
+  };
+
+  const isLoading = conversationsLoading || (activeConversationId && messagesLoading);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="p-6 pb-0">
-        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary rounded-md">
-              <Bot className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="text-ai-title">{t("aiAssistant")}</h1>
-              <p className="text-muted-foreground">
-                {language === "en" ? "Your personal medical AI helper" : "თქვენი პირადი სამედიცინო AI დამხმარე"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1.5">
-              <Sparkles className="h-3 w-3" />
-              {language === "en" ? "AI Command Center" : "AI სამართავი ცენტრი"}
-            </Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" data-testid="button-chat-menu">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleDownload("txt")} data-testid="button-download-txt">
-                  <Download className="h-4 w-4 mr-2" />
-                  {language === "en" ? "Download as TXT" : "ჩამოტვირთვა TXT-ად"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownload("md")} data-testid="button-download-md">
-                  <Download className="h-4 w-4 mr-2" />
-                  {language === "en" ? "Download as Markdown" : "ჩამოტვირთვა Markdown-ად"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden px-6">
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col max-w-3xl mx-auto py-4">
-            <DocumentUploadPanel
-              uploadedFiles={uploadedFiles}
-              onFilesSelected={handleFilesSelected}
-              onRemoveFile={handleRemoveFile}
-              onExecuteAction={handleExecuteSuggestedAction}
-              language={language}
-            />
-
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="p-4 bg-primary/10 rounded-full mb-6">
-                <Bot className="h-12 w-12 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2">
-                {language === "en" ? "How can I help you today?" : "როგორ შემიძლია დაგეხმაროთ დღეს?"}
-              </h2>
-              <p className="text-muted-foreground text-center mb-8">
-                {language === "en"
-                  ? "I can analyze documents, find clinical trials, help with therapy recommendations, and more."
-                  : "შემიძლია დოკუმენტების ანალიზი, კლინიკური კვლევების ძებნა, თერაპიის რეკომენდაციები და სხვა."}
-              </p>
-
-              <div className="flex flex-wrap justify-center gap-2 mb-8">
-                {quickActions.map((action, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => handleQuickAction(action)}
-                    data-testid={`button-quick-action-${i}`}
-                  >
-                    <action.icon className="h-4 w-4" />
-                    {language === "en" ? action.label : action.labelKa}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="w-full">
-                <p className="text-sm text-muted-foreground mb-3">
-                  {language === "en" ? "Or try one of these:" : "ან სცადეთ ერთ-ერთი ამათგანი:"}
-                </p>
-                <div className="grid gap-2">
-                  {suggestedPrompts.slice(0, 4).map((prompt, i) => (
-                    <Button
-                      key={i}
-                      variant="ghost"
-                      className="justify-start text-left h-auto py-3 px-4"
-                      onClick={() => handleSend(language === "en" ? prompt.en : prompt.ka)}
-                      data-testid={`button-suggested-${i}`}
-                    >
-                      {language === "en" ? prompt.en : prompt.ka}
-                    </Button>
-                  ))}
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex h-[calc(100vh-4rem)] w-full">
+        <ConversationSidebar
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={handleSelectConversation}
+          onNewChat={handleNewChat}
+          onDeleteConversation={handleDeleteConversation}
+          isLoading={conversationsLoading}
+          language={language}
+        />
+        
+        <SidebarInset className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 pb-0">
+            <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <div className="p-2 bg-primary rounded-md">
+                  <Bot className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold" data-testid="text-ai-title">{t("aiAssistant")}</h1>
+                  <p className="text-muted-foreground">
+                    {language === "en" ? "Your personal medical AI helper" : "თქვენი პირადი სამედიცინო AI დამხმარე"}
+                  </p>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="gap-1.5">
+                  <Sparkles className="h-3 w-3" />
+                  {language === "en" ? "AI Command Center" : "AI სამართავი ცენტრი"}
+                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" data-testid="button-chat-menu">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleDownload("txt")} data-testid="button-download-txt">
+                      <Download className="h-4 w-4 mr-2" />
+                      {language === "en" ? "Download as TXT" : "ჩამოტვირთვა TXT-ად"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownload("md")} data-testid="button-download-md">
+                      <Download className="h-4 w-4 mr-2" />
+                      {language === "en" ? "Download as Markdown" : "ჩამოტვირთვა Markdown-ად"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
-        ) : (
-          <ScrollArea className="h-full" ref={scrollRef}>
-            <div className="py-4 max-w-3xl mx-auto">
-              {uploadedFiles.length > 0 && (
+
+          <div className="flex-1 overflow-hidden px-6">
+            {isLoading ? (
+              <div className="h-full flex flex-col max-w-3xl mx-auto py-4">
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-3/4 ml-auto" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="h-full flex flex-col max-w-3xl mx-auto py-4">
                 <DocumentUploadPanel
                   uploadedFiles={uploadedFiles}
                   onFilesSelected={handleFilesSelected}
@@ -1059,71 +1360,202 @@ export default function AIAssistant() {
                   onExecuteAction={handleExecuteSuggestedAction}
                   language={language}
                 />
-              )}
-              <div className="space-y-6">
-                {messages.map((message) => (
-                  <MessageItem
-                    key={message.id}
-                    message={message}
-                    onCopy={handleCopy}
-                    copiedId={copiedId}
-                    onExecuteAction={handleExecuteAction}
-                    onCancelAction={handleCancelAction}
-                    isExecuting={executingActionId === message.id}
-                    language={language}
-                  />
-                ))}
-                {sendMessage.isPending && (
-                  <div className="flex gap-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        <Bot className="h-5 w-5" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col items-start">
-                      <span className="text-sm font-medium mb-1.5">
-                        {language === "en" ? "AI Assistant" : "AI ასისტენტი"}
-                      </span>
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            <span className="text-sm text-muted-foreground">
-                              {language === "en" ? "Thinking..." : "ფიქრობს..."}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
+
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="p-4 bg-primary/10 rounded-full mb-6">
+                    <Bot className="h-12 w-12 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">
+                    {language === "en" ? "How can I help you today?" : "როგორ შემიძლია დაგეხმაროთ დღეს?"}
+                  </h2>
+                  <p className="text-muted-foreground text-center mb-8">
+                    {language === "en"
+                      ? "I can analyze documents, find clinical trials, help with therapy recommendations, and more."
+                      : "შემიძლია დოკუმენტების ანალიზი, კლინიკური კვლევების ძებნა, თერაპიის რეკომენდაციები და სხვა."}
+                  </p>
+
+                  <div className="flex flex-wrap justify-center gap-2 mb-8">
+                    {quickActions.map((action, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleQuickAction(action)}
+                        data-testid={`button-quick-action-${i}`}
+                      >
+                        <action.icon className="h-4 w-4" />
+                        {language === "en" ? action.label : action.labelKa}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="w-full">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {language === "en" ? "Or try one of these:" : "ან სცადეთ ერთ-ერთი ამათგანი:"}
+                    </p>
+                    <div className="grid gap-2">
+                      {suggestedPrompts.slice(0, 4).map((prompt, i) => (
+                        <Button
+                          key={i}
+                          variant="ghost"
+                          className="justify-start text-left h-auto py-3 px-4"
+                          onClick={() => handleSend(language === "en" ? prompt.en : prompt.ka)}
+                          data-testid={`button-suggested-${i}`}
+                        >
+                          {language === "en" ? prompt.en : prompt.ka}
+                        </Button>
+                      ))}
                     </div>
                   </div>
-                )}
+                </div>
+              </div>
+            ) : (
+              <ScrollArea className="h-full" ref={scrollRef}>
+                <div className="py-4 max-w-3xl mx-auto">
+                  {uploadedFiles.length > 0 && (
+                    <DocumentUploadPanel
+                      uploadedFiles={uploadedFiles}
+                      onFilesSelected={handleFilesSelected}
+                      onRemoveFile={handleRemoveFile}
+                      onExecuteAction={handleExecuteSuggestedAction}
+                      language={language}
+                    />
+                  )}
+                  <div className="space-y-6">
+                    {messages.map((message) => (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        onCopy={handleCopy}
+                        copiedId={copiedId}
+                        onExecuteAction={handleExecuteAction}
+                        onCancelAction={handleCancelAction}
+                        isExecuting={executingActionId === message.id}
+                        language={language}
+                      />
+                    ))}
+                    {sendMessage.isPending && (
+                      <div className="flex gap-4">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary text-primary-foreground">
+                            <Bot className="h-5 w-5" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col items-start">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-sm font-medium">
+                              {language === "en" ? "AI Assistant" : "AI ასისტენტი"}
+                            </span>
+                          </div>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <p className="text-sm text-muted-foreground">
+                                  {language === "en" ? "Thinking..." : "ვფიქრობ..."}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <div className="p-6 pt-4 border-t">
+            <div className="max-w-3xl mx-auto">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleAttachmentSelect}
+                multiple
+                accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                className="hidden"
+                data-testid="input-file-attachment"
+              />
+
+              {pendingAttachments.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2" data-testid="attachment-preview-container">
+                  {pendingAttachments.map((attachment) => {
+                    const AttachmentIcon = getAttachmentIcon(attachment.type);
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center gap-2 rounded-md border bg-muted/50 p-2"
+                        data-testid={`attachment-preview-${attachment.id}`}
+                      >
+                        {attachment.previewUrl ? (
+                          <div className="h-10 w-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                            <img src={attachment.previewUrl} alt={attachment.name} className="h-full w-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <AttachmentIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate max-w-[100px]">{attachment.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 flex-shrink-0"
+                          onClick={() => handleRemoveAttachment(attachment.id)}
+                          data-testid={`button-remove-attachment-${attachment.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendMessage.isPending || isUploadingAttachments}
+                  data-testid="button-attach-file"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Input
+                  placeholder={language === "en" ? "Ask me anything about your child's care..." : "მკითხეთ ნებისმიერი კითხვა თქვენი შვილის მოვლის შესახებ..."}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  disabled={sendMessage.isPending || isUploadingAttachments}
+                  className="flex-1"
+                  data-testid="input-chat-message"
+                />
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={(!input.trim() && pendingAttachments.length === 0) || sendMessage.isPending || isUploadingAttachments}
+                  data-testid="button-send-message"
+                >
+                  {(sendMessage.isPending || isUploadingAttachments) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </div>
-          </ScrollArea>
-        )}
+          </div>
+        </SidebarInset>
       </div>
-
-      <div className="p-6 pt-4 border-t bg-muted/30">
-        <form
-          className="flex gap-2 max-w-3xl mx-auto"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-        >
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={language === "en" ? "Ask me anything about HIE, therapies, documents..." : "დამისვით კითხვა HIE-ზე, თერაპიებზე, დოკუმენტებზე..."}
-            disabled={sendMessage.isPending}
-            className="flex-1 bg-background"
-            data-testid="input-ai-message"
-          />
-          <Button type="submit" disabled={!input.trim() || sendMessage.isPending} data-testid="button-send-ai-message">
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
-    </div>
+    </SidebarProvider>
   );
 }
