@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -13,6 +14,12 @@ const gemini = new GoogleGenAI({
     apiVersion: "",
     baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
   },
+});
+
+// Using Replit's AI Integrations service for Anthropic
+const anthropic = new Anthropic({
+  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
 });
 
 interface AIResponse {
@@ -95,6 +102,40 @@ Please respond to the user's message:`;
   }
 }
 
+async function queryAnthropic(
+  systemPrompt: string,
+  userMessage: string,
+  chatHistory: { role: "user" | "assistant"; content: string }[]
+): Promise<AIResponse> {
+  try {
+    const messages: { role: "user" | "assistant"; content: string }[] = [
+      ...chatHistory,
+      { role: "user", content: userMessage },
+    ];
+
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    });
+
+    const content = response.content[0]?.type === "text" ? response.content[0].text : "";
+    return { provider: "Claude", content, success: true };
+  } catch (error) {
+    console.error("Anthropic error:", error);
+    return {
+      provider: "Claude",
+      content: "",
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 async function synthesizeResponses(
   responses: AIResponse[],
   originalQuestion: string
@@ -165,11 +206,14 @@ export async function getConsensusResponse(
   const responses = await Promise.all([
     queryOpenAI(systemPrompt, userMessage, chatHistory),
     queryGemini(systemPrompt, userMessage, chatHistory),
+    queryAnthropic(systemPrompt, userMessage, chatHistory),
   ]);
 
   const successfulProviders = responses
     .filter((r) => r.success)
     .map((r) => r.provider);
+
+  console.log(`Multi-AI consensus: ${successfulProviders.length}/3 providers responded (${successfulProviders.join(", ")})`);
 
   const synthesizedContent = await synthesizeResponses(responses, userMessage);
 
