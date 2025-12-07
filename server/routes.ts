@@ -631,6 +631,7 @@ export async function registerRoutes(
   });
 
   // AI Chat endpoint - sends message to OpenAI and stores conversation
+  // Supports function calling for sending emails
   app.post("/api/chat", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -658,7 +659,12 @@ export async function registerRoutes(
       });
 
       // Build messages array for OpenAI
-      const systemPrompt = "You are a helpful medical assistant for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). Provide empathetic, accurate information about HIE, therapies, and medical care. Always recommend consulting healthcare providers for specific medical decisions.";
+      const systemPrompt = `You are a helpful medical assistant for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). 
+Provide empathetic, accurate information about HIE, therapies, and medical care. Always recommend consulting healthcare providers for specific medical decisions.
+
+You have the ability to send emails on behalf of the user. When a user asks you to send an email, draft an appropriate email and use the sendEmail function to send it.
+If the user doesn't specify a recipient email address, ask them for it before sending.
+After sending an email, confirm to the user that it was sent successfully.`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
@@ -674,13 +680,125 @@ export async function registerRoutes(
       // Add the new user message
       messages.push({ role: "user", content });
 
-      // Call OpenAI
+      // Define tools for function calling
+      const tools: any[] = [
+        {
+          type: "function",
+          function: {
+            name: "sendEmail",
+            description: "Send an email to a specified recipient. Use this when the user asks you to send, draft and send, or compose and send an email.",
+            parameters: {
+              type: "object",
+              properties: {
+                to: {
+                  type: "string",
+                  description: "The recipient's email address"
+                },
+                subject: {
+                  type: "string",
+                  description: "The email subject line"
+                },
+                body: {
+                  type: "string",
+                  description: "The email body content"
+                }
+              },
+              required: ["to", "subject", "body"]
+            }
+          }
+        }
+      ];
+
+      // Call OpenAI with function calling
       const completion = await openai.chat.completions.create({
         model: AI_MODEL,
         messages,
+        tools,
+        tool_choice: "auto",
       });
 
-      const aiResponseContent = completion.choices[0]?.message?.content || "I apologize, but I was unable to generate a response. Please try again.";
+      const responseMessage = completion.choices[0]?.message;
+      
+      // Check if AI wants to call a function
+      if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+        const toolCall = responseMessage.tool_calls[0];
+        
+        if (toolCall.function.name === "sendEmail") {
+          const args = JSON.parse(toolCall.function.arguments);
+          
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const isValidEmail = emailRegex.test(args.to?.trim() || "");
+          const hasSubject = args.subject?.trim()?.length > 0;
+          const hasBody = args.body?.trim()?.length > 0;
+
+          let responseContent: string;
+          
+          if (!isValidEmail) {
+            responseContent = `The email address "${args.to}" doesn't appear to be valid. Please provide a valid email address (like example@email.com) and I'll try again.`;
+            
+            const assistantMessage = await storage.createChatMessage({
+              userId,
+              role: "assistant",
+              content: responseContent,
+            });
+            return res.json(assistantMessage);
+          }
+
+          if (!hasSubject || !hasBody) {
+            responseContent = `I need both a subject and message body to send an email. Please provide the missing information and I'll try again.`;
+            
+            const assistantMessage = await storage.createChatMessage({
+              userId,
+              role: "assistant",
+              content: responseContent,
+            });
+            return res.json(assistantMessage);
+          }
+          
+          // Actually send the email
+          const emailResult = await sendEmail({
+            to: args.to.trim(),
+            subject: args.subject.trim(),
+            body: args.body.trim(),
+          });
+
+          // Log full error details server-side for debugging
+          if (!emailResult.success) {
+            console.error("Email send failed for user", userId, ":", emailResult.error);
+          }
+
+          // Save the email to the database with appropriate status
+          await storage.createEmail({
+            userId,
+            recipient: args.to.trim(),
+            subject: args.subject.trim(),
+            body: args.body.trim(),
+            status: emailResult.success ? "sent" : "failed",
+            category: "general",
+            sentAt: emailResult.success ? new Date() : null,
+          });
+
+          // Build response message based on result (sanitized - no raw SMTP errors)
+          if (emailResult.success) {
+            responseContent = `I've successfully sent the email to ${args.to}.\n\n**Subject:** ${args.subject}\n\n**Message:**\n${args.body}`;
+          } else {
+            responseContent = `I wasn't able to send the email right now due to a delivery issue. I've saved it in your Email Hub so you can try sending it again later.`;
+          }
+
+          // Save the AI response
+          const assistantMessage = await storage.createChatMessage({
+            userId,
+            role: "assistant",
+            content: responseContent,
+          });
+
+          return res.json(assistantMessage);
+        }
+      }
+
+      // Regular response (no function call)
+      const aiResponseContent = responseMessage?.content || "I apologize, but I was unable to generate a response. Please try again.";
 
       // Save the AI response
       const assistantMessage = await storage.createChatMessage({
