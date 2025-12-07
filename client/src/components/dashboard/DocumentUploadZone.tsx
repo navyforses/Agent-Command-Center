@@ -124,17 +124,26 @@ export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUpload
         prev.map((f) => f.id === id ? { ...f, progress: 90, status: "processing" } : f)
       );
 
+      let analysisSucceeded = false;
       try {
-        await apiRequest("POST", `/api/documents/${createdDoc.id}/analyze`);
-        toast({
-          title: "Document Analyzed",
-          description: "AI analysis completed successfully",
-        });
+        const analyzeResponse = await apiRequest("POST", `/api/documents/${createdDoc.id}/analyze`);
+        if (analyzeResponse.ok) {
+          analysisSucceeded = true;
+          toast({
+            title: "Document Analyzed",
+            description: "AI analysis completed successfully",
+          });
+        } else {
+          toast({
+            title: "Document Saved",
+            description: "Document uploaded but AI analysis is pending. You can retry later.",
+          });
+        }
       } catch (analysisError) {
         console.warn("AI analysis failed, document still saved:", analysisError);
         toast({
           title: "Document Saved",
-          description: "Document uploaded but AI analysis is pending",
+          description: "Document uploaded but AI analysis is pending. You can retry later.",
         });
       }
 
@@ -143,7 +152,7 @@ export function DocumentUploadZone({ onUploadComplete, childId }: DocumentUpload
       );
 
       queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      if (childId) {
+      if (childId !== undefined && !isNaN(childId)) {
         queryClient.invalidateQueries({ queryKey: ['/api/children', String(childId), 'documents'] });
       }
 
