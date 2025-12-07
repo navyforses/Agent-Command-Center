@@ -23,9 +23,16 @@ export interface SearchResponse {
   results: SearchResult[];
   query: string;
   summary?: string;
+  source?: string;
 }
 
-export async function searchWeb(query: string, maxResults: number = 5): Promise<SearchResponse> {
+export interface MultiSearchResponse {
+  results: SearchResult[];
+  query: string;
+  sources: string[];
+}
+
+export async function searchWithTavily(query: string, maxResults: number = 5): Promise<SearchResponse> {
   const apiKey = process.env.TAVILY_API_KEY;
   
   if (!apiKey) {
