@@ -140,6 +140,88 @@ async function queryAnthropic(
   }
 }
 
+interface PerplexityResponse {
+  choices: {
+    message: {
+      content: string;
+      role: string;
+    };
+    finish_reason: string;
+  }[];
+  citations?: string[];
+}
+
+async function queryPerplexity(
+  systemPrompt: string,
+  userMessage: string,
+  chatHistory: { role: "user" | "assistant"; content: string }[]
+): Promise<AIResponse> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  
+  if (!apiKey) {
+    console.error("PERPLEXITY_API_KEY not configured");
+    return {
+      provider: "Perplexity",
+      content: "",
+      success: false,
+      error: "PERPLEXITY_API_KEY not configured",
+    };
+  }
+
+  try {
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    for (const msg of chatHistory) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+    messages.push({ role: "user", content: userMessage });
+
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-sonar-small-128k-online",
+        messages,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Perplexity API error: ${response.status} - ${errorText}`);
+      return {
+        provider: "Perplexity",
+        content: "",
+        success: false,
+        error: `API error: ${response.status}`,
+      };
+    }
+
+    const data: PerplexityResponse = await response.json();
+    const content = data.choices[0]?.message?.content || "";
+    
+    let finalContent = content;
+    if (data.citations && data.citations.length > 0) {
+      finalContent += "\n\nSources from Perplexity:\n" + data.citations.map((c, i) => `[${i + 1}] ${c}`).join("\n");
+    }
+
+    return { provider: "Perplexity", content: finalContent, success: true };
+  } catch (error) {
+    console.error("Perplexity error:", error);
+    return {
+      provider: "Perplexity",
+      content: "",
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 async function synthesizeResponses(
   responses: AIResponse[],
   originalQuestion: string
@@ -174,6 +256,9 @@ ${successfulResponses[1].content}` : ""}
 
 ${successfulResponses[2] ? `Response 3:
 ${successfulResponses[2].content}` : ""}
+
+${successfulResponses[3] ? `Response 4:
+${successfulResponses[3].content}` : ""}
 
 Now provide a single, unified response:`;
 
@@ -211,13 +296,14 @@ export async function getConsensusResponse(
     queryOpenAI(systemPrompt, userMessage, chatHistory),
     queryGemini(systemPrompt, userMessage, chatHistory),
     queryAnthropic(systemPrompt, userMessage, chatHistory),
+    queryPerplexity(systemPrompt, userMessage, chatHistory),
   ]);
 
   const successfulProviders = responses
     .filter((r) => r.success)
     .map((r) => r.provider);
 
-  console.log(`Multi-AI consensus: ${successfulProviders.length}/3 providers responded (${successfulProviders.join(", ")})`);
+  console.log(`Multi-AI consensus: ${successfulProviders.length}/4 providers responded (${successfulProviders.join(", ")})`);
 
   const synthesizedContent = await synthesizeResponses(responses, userMessage);
 
@@ -272,6 +358,9 @@ ${successfulResponses[1].content}` : ""}
 
 ${successfulResponses[2] ? `Response 3:
 ${successfulResponses[2].content}` : ""}
+
+${successfulResponses[3] ? `Response 4:
+${successfulResponses[3].content}` : ""}
 
 Now provide a single, unified response with proper source citations:`;
 
@@ -330,13 +419,14 @@ Respond based on these search results. Always cite your sources using [Source X]
     queryOpenAI(searchSystemPrompt, userMessage, chatHistory),
     queryGemini(searchSystemPrompt, userMessage, chatHistory),
     queryAnthropic(searchSystemPrompt, userMessage, chatHistory),
+    queryPerplexity(searchSystemPrompt, userMessage, chatHistory),
   ]);
 
   const successfulProviders = responses
     .filter((r) => r.success)
     .map((r) => r.provider);
 
-  console.log(`Multi-AI search consensus: ${successfulProviders.length}/3 providers responded (${successfulProviders.join(", ")})`);
+  console.log(`Multi-AI search consensus: ${successfulProviders.length}/4 providers responded (${successfulProviders.join(", ")})`);
 
   const synthesizedContent = await synthesizeSearchResponses(
     responses,
