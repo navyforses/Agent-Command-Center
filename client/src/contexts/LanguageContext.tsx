@@ -164,6 +164,7 @@ const translations: Record<string, Record<Language, string>> = {
   evolutionSubtitle: { en: "Autonomous 24-hour research cycles monitoring your child's condition", ka: "ავტონომიური 24-საათიანი კვლევითი ციკლები თქვენი შვილის მდგომარეობის მონიტორინგისთვის" },
   evolutionCycle: { en: "Evolution Cycle", ka: "ევოლუციის ციკლი" },
   evolutionCycles: { en: "Evolution", ka: "ევოლუცია" },
+  evolutionActive: { en: "Evolution Active", ka: "ევოლუცია აქტიურია" },
   noActiveCycle: { en: "No Active Evolution Cycle", ka: "არ არის აქტიური ევოლუციის ციკლი" },
   noActiveCycleDescription: { en: "Upload a medical document to start an autonomous research cycle that monitors the latest findings for your child's condition.", ka: "ატვირთეთ სამედიცინო დოკუმენტი ავტონომიური კვლევითი ციკლის დასაწყებად, რომელიც აკვირდება უახლეს აღმოჩენებს თქვენი შვილის მდგომარეობისთვის." },
   uploadDocumentToStart: { en: "Upload Document to Start", ka: "ატვირთეთ დოკუმენტი დასაწყებად" },
