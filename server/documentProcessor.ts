@@ -1,10 +1,7 @@
-import { createRequire } from "module";
+import { PDFParse } from "pdf-parse";
 import { openai, AI_MODEL } from "./openai";
 import { objectStorageClient, ObjectStorageService } from "./objectStorage";
 import type { File } from "@google-cloud/storage";
-
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
 
 export interface ExtractedContent {
   text: string;
@@ -45,17 +42,20 @@ Respond with JSON:
 }`;
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProcessingResult> {
+  let parser: InstanceType<typeof PDFParse> | null = null;
   try {
-    const pdfData = await pdfParse(buffer);
+    parser = new PDFParse({ data: buffer });
+    const textResult = await parser.text();
+    const infoResult = await parser.info();
     
-    const text = pdfData.text?.trim() || "";
+    const text = textResult.text?.trim() || "";
     const language = detectLanguage(text);
     
     return {
       success: true,
       text,
-      pageCount: pdfData.numpages,
-      metadata: pdfData.info,
+      pageCount: infoResult.numPages,
+      metadata: infoResult.info,
       extractionMethod: "pdf",
       language,
     };
@@ -67,6 +67,14 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProces
       extractionMethod: "none",
       error: error instanceof Error ? error.message : "Failed to extract PDF text",
     };
+  } finally {
+    if (parser) {
+      try {
+        await parser.destroy();
+      } catch (destroyError) {
+        console.error("PDF parser cleanup error:", destroyError);
+      }
+    }
   }
 }
 
