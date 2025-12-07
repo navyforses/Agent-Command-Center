@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,6 +36,10 @@ interface TransformedDocument {
   sourceClinic?: string;
   status: "processed" | "pending" | "analyzed";
   aiSummary?: string;
+  aiSummaryKa?: string;
+  aiKeyFindings?: string[];
+  purpose?: string;
+  conversationId?: number;
   filePath?: string | null;
 }
 
@@ -53,11 +58,15 @@ function transformDocument(doc: Document): TransformedDocument {
     id: String(doc.id),
     fileName: doc.title,
     fileType: doc.fileType || "application/octet-stream",
-    documentType: doc.category || "other",
+    documentType: doc.documentType || doc.category || "other",
     documentDate,
     sourceClinic: undefined,
     status,
     aiSummary: doc.aiSummary || undefined,
+    aiSummaryKa: doc.aiSummaryKa || undefined,
+    aiKeyFindings: doc.aiKeyFindings || undefined,
+    purpose: doc.purpose || undefined,
+    conversationId: doc.conversationId || undefined,
     filePath: doc.filePath,
   };
 }
@@ -85,8 +94,9 @@ function DocumentSkeleton() {
 }
 
 export default function Documents() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -140,6 +150,10 @@ export default function Documents() {
   const handleUploadComplete = () => {
     setShowUploadDialog(false);
     queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+  };
+
+  const handleViewConversation = (conversationId: number) => {
+    setLocation(`/ai-assistant?conversation=${conversationId}`);
   };
 
   const transformedDocuments = documents?.map(transformDocument) || [];
@@ -249,7 +263,11 @@ export default function Documents() {
               documentDate={doc.documentDate}
               sourceClinic={doc.sourceClinic}
               status={doc.status}
-              aiSummary={doc.aiSummary}
+              aiSummary={language === "ka" && doc.aiSummaryKa ? doc.aiSummaryKa : doc.aiSummary}
+              aiKeyFindings={doc.aiKeyFindings}
+              purpose={doc.purpose}
+              conversationId={doc.conversationId}
+              language={language}
               onClick={() => {
                 if (doc.filePath) {
                   handleDownload(doc);
@@ -257,6 +275,7 @@ export default function Documents() {
               }}
               onDownload={() => handleDownload(doc)}
               onAnalyze={() => handleAnalyze(doc.id)}
+              onViewConversation={doc.conversationId ? () => handleViewConversation(doc.conversationId!) : undefined}
             />
           ))}
         </div>
