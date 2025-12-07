@@ -263,7 +263,7 @@ export default function NexusOmega() {
         }
         
         if (hasContent || hasKeyPoints || hasConcerns || hasInsights) {
-          aiAnalyses[frontendId] = {
+          (aiAnalyses as Record<string, typeof aiAnalyses[keyof typeof aiAnalyses]>)[frontendId] = {
             perspective,
             confidence: analysis.confidence,
             keyPoints: analysis.keyPoints || [],
@@ -283,7 +283,7 @@ export default function NexusOmega() {
       id: `finding-${result.finding.id}`,
       title: result.finding.title,
       summary: result.finding.summary,
-      consensusLevel: mapConsensusLevel(result.consensusLevel),
+      consensusLevel: mapConsensusLevel(result.consensusLevel) as Finding["consensusLevel"],
       confidenceScore: result.finding.confidenceScore,
       relevanceScore: result.finding.relevanceScore,
       aiAnalyses,
