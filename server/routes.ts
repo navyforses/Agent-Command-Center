@@ -33,6 +33,7 @@ import {
   type CommandCenterChatResult,
   type FullDocumentProcessingResult,
 } from "./aiOrchestrator";
+import { runNexusResearch } from "./nexusOrchestrator";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1640,6 +1641,43 @@ Format your response as JSON with the following structure:
     } catch (error) {
       console.error("Error creating NEXUS research query:", error);
       res.status(500).json({ message: "Failed to create research query" });
+    }
+  });
+
+  // Run multi-AI research - orchestrates all AI agents and stores results
+  app.post("/api/nexus/research", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { queryText, disciplines = [] } = req.body;
+      
+      if (!queryText || typeof queryText !== "string" || queryText.trim().length === 0) {
+        return res.status(400).json({ message: "queryText is required" });
+      }
+
+      const parseResult = insertNexusResearchQuerySchema.safeParse({ 
+        queryText: queryText.trim(),
+        disciplines,
+        userId,
+        status: "pending",
+      });
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid query data", errors: parseResult.error.errors });
+      }
+
+      const query = await storage.createNexusResearchQuery(parseResult.data);
+
+      const result = await runNexusResearch(
+        query.id,
+        queryText.trim(),
+        disciplines,
+        userId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error running NEXUS research:", error);
+      res.status(500).json({ message: "Failed to run research query" });
     }
   });
 

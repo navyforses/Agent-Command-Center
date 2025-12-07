@@ -134,7 +134,7 @@ export interface IStorage {
   getNexusResearchQueries(userId: string): Promise<NexusResearchQuery[]>;
   getNexusResearchQuery(id: number, userId: string): Promise<NexusResearchQuery | undefined>;
   createNexusResearchQuery(query: InsertNexusResearchQuery): Promise<NexusResearchQuery>;
-  updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery>): Promise<NexusResearchQuery | undefined>;
+  updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery> & { completedAt?: Date }): Promise<NexusResearchQuery | undefined>;
   
   getNexusFindings(userId: string, queryId?: number): Promise<NexusFinding[]>;
   getNexusFinding(id: number, userId: string): Promise<NexusFinding | undefined>;
@@ -569,7 +569,7 @@ export class DatabaseStorage implements IStorage {
     return newQuery;
   }
 
-  async updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery>): Promise<NexusResearchQuery | undefined> {
+  async updateNexusResearchQuery(id: number, userId: string, query: Partial<InsertNexusResearchQuery> & { completedAt?: Date }): Promise<NexusResearchQuery | undefined> {
     const [updatedQuery] = await db
       .update(nexusResearchQueries)
       .set(query)
