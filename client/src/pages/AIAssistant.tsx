@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ChatMessage, Document, Conversation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,7 @@ import {
   Trash2,
   Paperclip,
   Video,
+  ArrowLeft,
 } from "lucide-react";
 import type { Attachment } from "@shared/schema";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -1305,6 +1307,23 @@ export default function AIAssistant() {
           <div className="p-6 pb-0">
             <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
               <div className="flex items-center gap-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      asChild
+                      data-testid="button-back-to-dashboard"
+                    >
+                      <Link href="/">
+                        <ArrowLeft className="h-5 w-5" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {language === "en" ? "Back to Dashboard" : "მთავარ გვერდზე დაბრუნება"}
+                  </TooltipContent>
+                </Tooltip>
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <div className="p-2 bg-primary rounded-md">
                   <Bot className="h-5 w-5 text-primary-foreground" />
