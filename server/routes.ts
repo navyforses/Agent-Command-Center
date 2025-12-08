@@ -16,6 +16,7 @@ import {
   insertNexusResearchQuerySchema,
   insertNexusHypothesisSchema,
   insertNexusActionItemSchema,
+  insertAccumulatedKnowledgeSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
 import { getConsensusResponse, getConsensusSearchResponse } from "./multiAI";
@@ -2552,6 +2553,109 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     } catch (error) {
       console.error("Error getting recommendations:", error);
       res.status(500).json({ message: "Failed to get paper recommendations" });
+    }
+  });
+
+  // ============================================================================
+  // ACCUMULATED KNOWLEDGE - Persistent insights that grow across evolution cycles
+  // ============================================================================
+
+  // Get all accumulated knowledge for user
+  app.get("/api/evolution/accumulated-knowledge", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const knowledge = await storage.getAccumulatedKnowledge(userId);
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error fetching accumulated knowledge:", error);
+      res.status(500).json({ message: "Failed to fetch accumulated knowledge" });
+    }
+  });
+
+  // Get accumulated knowledge for specific child
+  app.get("/api/evolution/accumulated-knowledge/child/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      if (isNaN(childId)) {
+        return res.status(400).json({ message: "Invalid child ID" });
+      }
+      const knowledge = await storage.getAccumulatedKnowledgeByChild(userId, childId);
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error fetching accumulated knowledge for child:", error);
+      res.status(500).json({ message: "Failed to fetch accumulated knowledge for child" });
+    }
+  });
+
+  // Get active accumulated knowledge (for use in cycle initialization)
+  app.get("/api/evolution/accumulated-knowledge/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const knowledge = await storage.getActiveAccumulatedKnowledge(userId);
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error fetching active accumulated knowledge:", error);
+      res.status(500).json({ message: "Failed to fetch active accumulated knowledge" });
+    }
+  });
+
+  // Get single accumulated knowledge item
+  app.get("/api/evolution/accumulated-knowledge/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid knowledge ID" });
+      }
+      const knowledge = await storage.getAccumulatedKnowledgeItem(id, userId);
+      if (!knowledge) {
+        return res.status(404).json({ message: "Accumulated knowledge not found" });
+      }
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error fetching accumulated knowledge item:", error);
+      res.status(500).json({ message: "Failed to fetch accumulated knowledge item" });
+    }
+  });
+
+  // Create new accumulated knowledge
+  app.post("/api/evolution/accumulated-knowledge", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertAccumulatedKnowledgeSchema.safeParse({ ...req.body, userId });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid knowledge data", errors: parseResult.error.errors });
+      }
+      const knowledge = await storage.createAccumulatedKnowledge(parseResult.data);
+      res.status(201).json(knowledge);
+    } catch (error) {
+      console.error("Error creating accumulated knowledge:", error);
+      res.status(500).json({ message: "Failed to create accumulated knowledge" });
+    }
+  });
+
+  // Update accumulated knowledge
+  app.patch("/api/evolution/accumulated-knowledge/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid knowledge ID" });
+      }
+      const { userId: _, ...bodyWithoutUserId } = req.body;
+      const parseResult = insertAccumulatedKnowledgeSchema.partial().safeParse(bodyWithoutUserId);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid knowledge data", errors: parseResult.error.errors });
+      }
+      const knowledge = await storage.updateAccumulatedKnowledge(id, userId, parseResult.data);
+      if (!knowledge) {
+        return res.status(404).json({ message: "Accumulated knowledge not found" });
+      }
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error updating accumulated knowledge:", error);
+      res.status(500).json({ message: "Failed to update accumulated knowledge" });
     }
   });
 

@@ -819,3 +819,70 @@ export const insertEvolutionReportMessageSchema = createInsertSchema(evolutionRe
 
 export type InsertEvolutionReportMessage = z.infer<typeof insertEvolutionReportMessageSchema>;
 export type EvolutionReportMessage = typeof evolutionReportMessages.$inferSelect;
+
+// ============================================================================
+// ACCUMULATED KNOWLEDGE - Persistent insights that grow across cycles
+// ============================================================================
+
+// Accumulated Knowledge - stores insights that carry forward between evolution cycles
+export const accumulatedKnowledge = pgTable("accumulated_knowledge", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  childId: integer("child_id").references(() => children.id),
+  knowledgeType: varchar("knowledge_type", { length: 50 }).notNull(), // hypothesis, discovery, treatment_insight, mechanism, pattern
+  titleEn: text("title_en").notNull(),
+  titleKa: text("title_ka"),
+  contentEn: text("content_en").notNull(),
+  contentKa: text("content_ka"),
+  confidence: integer("confidence").default(50), // 0-100 confidence score
+  validationCount: integer("validation_count").default(0), // How many cycles have validated this
+  contradictionCount: integer("contradiction_count").default(0), // How many cycles have contradicted this
+  status: varchar("status", { length: 50 }).default("active"), // active, superseded, refuted, validated
+  sources: jsonb("sources"), // Array of source references
+  contributingCycleIds: integer("contributing_cycle_ids").array(), // Which cycles contributed to this knowledge
+  originCycleId: integer("origin_cycle_id").references(() => evolutionCycles.id), // The cycle that first discovered this
+  originInsightId: integer("origin_insight_id").references(() => evolutionInsights.id), // The specific insight it came from
+  relatedKnowledgeIds: integer("related_knowledge_ids").array(), // Links to related accumulated knowledge
+  metadata: jsonb("metadata"), // Additional data like tags, categories, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const accumulatedKnowledgeTypeEnum = z.enum([
+  "hypothesis",        // A proposed theory about treatment or mechanism
+  "discovery",         // A confirmed finding from research
+  "treatment_insight", // Insight about specific treatment approaches
+  "mechanism",         // Understanding of biological/medical mechanisms
+  "pattern",           // Identified patterns across research
+  "connection",        // Cross-disciplinary connections
+  "prediction"         // Validated predictions about outcomes
+]);
+export type AccumulatedKnowledgeType = z.infer<typeof accumulatedKnowledgeTypeEnum>;
+
+export const accumulatedKnowledgeStatusEnum = z.enum([
+  "active",      // Currently considered valid
+  "superseded",  // Replaced by newer knowledge
+  "refuted",     // Contradicted by evidence
+  "validated",   // Confirmed by multiple sources/cycles
+  "emerging"     // New, not yet validated
+]);
+export type AccumulatedKnowledgeStatus = z.infer<typeof accumulatedKnowledgeStatusEnum>;
+
+export const insertAccumulatedKnowledgeSchema = createInsertSchema(accumulatedKnowledge, {
+  sources: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    doi: z.string().optional(),
+    snippet: z.string().optional(),
+    source: z.string().optional(),
+    cycleId: z.number().optional(),
+  })).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAccumulatedKnowledge = z.infer<typeof insertAccumulatedKnowledgeSchema>;
+export type AccumulatedKnowledge = typeof accumulatedKnowledge.$inferSelect;

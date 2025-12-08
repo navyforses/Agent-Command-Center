@@ -13,6 +13,8 @@ import type {
   InsertEvolutionDailyRun,
   InsertEvolutionCycle,
   InsertEvolutionReport,
+  InsertAccumulatedKnowledge,
+  AccumulatedKnowledgeType,
 } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -1280,6 +1282,10 @@ export async function executeEvolutionPhase(
       ...(currentPhasesCompleted.length === 7 ? { completedAt: new Date() } : {}),
     });
 
+    if (currentPhasesCompleted.length === 7) {
+      await storeAccumulatedKnowledgeFromCycle(cycle, dailyRunId, previousInsights);
+    }
+
     console.log(
       `[Evolution Engine] Phase ${phase} completed with ${phaseResult.insights.length} insights`
     );
@@ -1679,6 +1685,141 @@ export async function processReportChat(
       contentKa: "ბოდიში, თქვენი კითხვის დამუშავებისას შეცდომა მოხდა. გთხოვთ, სცადოთ ხელახლა." 
     };
   }
+}
+
+async function storeAccumulatedKnowledgeFromCycle(
+  cycle: EvolutionCycle,
+  dailyRunId: number,
+  allInsights: EvolutionInsight[]
+): Promise<void> {
+  console.log(`[Evolution Engine] Storing accumulated knowledge from cycle ${cycle.id}`);
+  
+  try {
+    const synthesizeInsights = allInsights.filter(
+      (i) => i.phase === "synthesize" && (i.confidence || 0) >= 70
+    );
+    
+    const validateInsights = allInsights.filter(
+      (i) => i.phase === "validate" && (i.confidence || 0) >= 75
+    );
+    
+    const highValueInsights = [...synthesizeInsights, ...validateInsights];
+    
+    if (highValueInsights.length === 0) {
+      console.log("[Evolution Engine] No high-confidence insights to store as accumulated knowledge");
+      return;
+    }
+    
+    const existingKnowledge = await storage.getActiveAccumulatedKnowledge(cycle.userId || "");
+    const processedKnowledgeIds = new Set<number>();
+    
+    for (const insight of highValueInsights) {
+      const knowledgeType = determineKnowledgeType(insight);
+      const title = extractTitleFromContent(insight.contentEn || "");
+      
+      const similarKnowledge = existingKnowledge.find(k => 
+        !processedKnowledgeIds.has(k.id) && (
+          k.titleEn?.toLowerCase().includes(title.toLowerCase().substring(0, 30)) ||
+          title.toLowerCase().includes(k.titleEn?.toLowerCase().substring(0, 30) || "")
+        )
+      );
+      
+      if (similarKnowledge) {
+        processedKnowledgeIds.add(similarKnowledge.id);
+        
+        const alreadyContributed = (similarKnowledge.contributingCycleIds || []).includes(cycle.id);
+        if (alreadyContributed) {
+          console.log(`[Evolution Engine] Cycle ${cycle.id} already contributed to knowledge #${similarKnowledge.id}, skipping`);
+          continue;
+        }
+        
+        const updatedCycleIds = [...(similarKnowledge.contributingCycleIds || []), cycle.id];
+        const newValidationCount = (similarKnowledge.validationCount || 0) + 1;
+        
+        let newStatus = similarKnowledge.status;
+        if (newValidationCount >= 3) {
+          newStatus = "validated";
+        } else if (newValidationCount >= 1 && similarKnowledge.status === "emerging") {
+          newStatus = "active";
+        }
+        
+        await storage.updateAccumulatedKnowledge(similarKnowledge.id, cycle.userId || "", {
+          validationCount: newValidationCount,
+          confidence: Math.min(100, (similarKnowledge.confidence || 50) + 5),
+          contributingCycleIds: updatedCycleIds,
+          status: newStatus,
+        });
+        
+        console.log(`[Evolution Engine] Updated existing knowledge #${similarKnowledge.id} (validations: ${newValidationCount}, status: ${newStatus})`);
+      } else {
+        const newKnowledge: InsertAccumulatedKnowledge = {
+          userId: cycle.userId,
+          childId: cycle.childId,
+          knowledgeType,
+          titleEn: title,
+          titleKa: insight.contentKa ? extractTitleFromContent(insight.contentKa) : undefined,
+          contentEn: insight.contentEn || "",
+          contentKa: insight.contentKa,
+          confidence: insight.confidence || 70,
+          validationCount: 0,
+          contradictionCount: 0,
+          status: "emerging",
+          sources: insight.sources as InsertAccumulatedKnowledge["sources"],
+          contributingCycleIds: [cycle.id],
+          originCycleId: cycle.id,
+          originInsightId: insight.id,
+          metadata: {
+            phase: insight.phase,
+            insightType: insight.insightType,
+            aiProvider: (insight.metadata as Record<string, unknown>)?.aiProvider,
+          },
+        };
+        
+        await storage.createAccumulatedKnowledge(newKnowledge);
+        console.log(`[Evolution Engine] Created new accumulated knowledge from insight #${insight.id}`);
+      }
+    }
+    
+    console.log(`[Evolution Engine] Processed ${highValueInsights.length} insights for accumulated knowledge`);
+  } catch (error) {
+    console.error("[Evolution Engine] Error storing accumulated knowledge:", error);
+  }
+}
+
+function determineKnowledgeType(insight: EvolutionInsight): string {
+  const content = (insight.contentEn || "").toLowerCase();
+  const insightType = insight.insightType?.toLowerCase() || "";
+  
+  if (insightType.includes("hypothesis") || content.includes("hypothesis") || content.includes("theory")) {
+    return "hypothesis";
+  }
+  if (insightType.includes("mechanism") || content.includes("mechanism") || content.includes("pathway")) {
+    return "mechanism";
+  }
+  if (content.includes("treatment") || content.includes("therapy") || content.includes("intervention")) {
+    return "treatment_insight";
+  }
+  if (content.includes("pattern") || content.includes("trend") || content.includes("correlation")) {
+    return "pattern";
+  }
+  if (content.includes("connection") || content.includes("cross-disciplinary") || content.includes("interdisciplinary")) {
+    return "connection";
+  }
+  if (insight.phase === "validate" || content.includes("confirmed") || content.includes("validated")) {
+    return "discovery";
+  }
+  
+  return "discovery";
+}
+
+function extractTitleFromContent(content: string): string {
+  const firstSentence = content.split(/[.!?\n]/)[0]?.trim() || "";
+  
+  if (firstSentence.length <= 100) {
+    return firstSentence;
+  }
+  
+  return firstSentence.substring(0, 97) + "...";
 }
 
 export async function startEvolutionCycle(
