@@ -251,6 +251,12 @@ const translations: Record<string, Record<Language, string>> = {
 
   // File Upload
   uploadDiagnosis: { en: "Upload Diagnosis", ka: "დიაგნოზის ატვირთვა" },
+  uploadDiagnosisDocument: { en: "Upload Diagnosis Document", ka: "ატვირთეთ დიაგნოზის დოკუმენტი" },
+  clickToUpload: { en: "Click to upload", ka: "დააჭირეთ ასატვირთად" },
+  supportedFormats: { en: "PDF, JPEG, PNG, WebP (max 10MB)", ka: "PDF, JPEG, PNG, WebP (მაქს. 10MB)" },
+  fileExtractionHelp: { en: "Child information and diagnosis details will be automatically extracted from this document.", ka: "ბავშვის ინფორმაცია და დიაგნოზის დეტალები ავტომატურად ამოიღება ამ დოკუმენტიდან." },
+  evolutionCycleDescriptionFile: { en: "Upload your child's diagnosis document. The AI will extract the relevant information and start researching.", ka: "ატვირთეთ თქვენი შვილის დიაგნოზის დოკუმენტი. AI ამოიღებს რელევანტურ ინფორმაციას და დაიწყებს კვლევას." },
+  uploadDiagnosisRequired: { en: "Please upload a diagnosis file and select an end date.", ka: "გთხოვთ ატვირთოთ დიაგნოზის ფაილი და აირჩიოთ დასრულების თარიღი." },
   analyzeDiagnosis: { en: "Analyze this diagnosis and recommend treatment", ka: "გააანალიზეთ ეს დიაგნოზი და რეკომენდაცია გაუწიეთ მკურნალობას" },
   fileTooLarge: { en: "File too large", ka: "ფაილი ზედმეტად დიდია" },
   maxFileSize: { en: "Maximum file size is 10MB", ka: "მაქსიმალური ფაილის ზომა 10MB-ია" },

@@ -627,39 +627,47 @@ function ReportsList() {
 function StartCycleDialog({
   isOpen,
   onClose,
-  children,
   onSuccess,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  children: Child[];
   onSuccess: () => void;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [endDate, setEndDate] = useState<Date | undefined>(addDays(new Date(), 7));
-  const [diagnosisContext, setDiagnosisContext] = useState("");
+  const [diagnosisFile, setDiagnosisFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startCycleMutation = useMutation({
-    mutationFn: async (data: { childId: number; endDate: Date; diagnosisContext: string }) => {
-      return apiRequest("POST", "/api/evolution/cycles", {
-        childId: data.childId,
-        endDate: data.endDate.toISOString(),
-        diagnosisContext: data.diagnosisContext,
+    mutationFn: async (data: { endDate: Date; diagnosisFile: File }) => {
+      const formData = new FormData();
+      formData.append("endDate", data.endDate.toISOString());
+      formData.append("diagnosisFile", data.diagnosisFile);
+      
+      const response = await fetch("/api/evolution/cycles", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to start cycle");
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/evolution/cycles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
       toast({
         title: t("cycleStarted") || "Evolution Cycle Started",
         description: t("cycleStartedDesc") || "Your research cycle has begun and will run autonomously.",
       });
       onSuccess();
       onClose();
-      setSelectedChildId("");
       setEndDate(addDays(new Date(), 7));
-      setDiagnosisContext("");
+      setDiagnosisFile(null);
     },
     onError: (error: Error) => {
       toast({
@@ -670,19 +678,50 @@ function StartCycleDialog({
     },
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: t("fileTooLarge") || "File too large",
+          description: t("maxFileSize") || "Maximum file size is 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: t("invalidFileType") || "Invalid file type",
+          description: t("allowedFileTypes") || "Please upload PDF or image files (JPEG, PNG, WebP)",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDiagnosisFile(file);
+    }
+  };
+
+  const removeFile = () => {
+    setDiagnosisFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleStart = () => {
-    if (!selectedChildId || !endDate || !diagnosisContext.trim()) {
+    if (!endDate || !diagnosisFile) {
       toast({
         title: t("missingFields") || "Missing Fields",
-        description: t("fillAllFields") || "Please fill in all required fields.",
+        description: t("uploadDiagnosisRequired") || "Please upload a diagnosis file and select an end date.",
         variant: "destructive",
       });
       return;
     }
     startCycleMutation.mutate({
-      childId: parseInt(selectedChildId, 10),
       endDate,
-      diagnosisContext: diagnosisContext.trim(),
+      diagnosisFile,
     });
   };
 
@@ -695,25 +734,56 @@ function StartCycleDialog({
             {t("startEvolutionCycle")}
           </DialogTitle>
           <DialogDescription>
-            {t("evolutionCycleDescription")}
+            {t("evolutionCycleDescriptionFile") || "Upload your child's diagnosis document. The AI will extract the relevant information and start researching."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="child-select">{t("selectChild") || "Select Child"}</Label>
-            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-              <SelectTrigger id="child-select" data-testid="select-child">
-                <SelectValue placeholder={t("selectChildPlaceholder") || "Choose a child..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {children.map((child) => (
-                  <SelectItem key={child.id} value={child.id.toString()}>
-                    {child.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>{t("uploadDiagnosisDocument") || "Upload Diagnosis Document"}</Label>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              data-testid="input-cycle-diagnosis-file"
+            />
+            
+            {!diagnosisFile ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-muted-foreground/30 rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                data-testid="dropzone-diagnosis"
+              >
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm font-medium">{t("clickToUpload") || "Click to upload"}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("supportedFormats") || "PDF, JPEG, PNG, WebP (max 10MB)"}
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                <FileText className="h-5 w-5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{diagnosisFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(diagnosisFile.size / 1024).toFixed(0)} KB
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={removeFile}
+                  data-testid="button-remove-cycle-file"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {t("fileExtractionHelp") || "Child information and diagnosis details will be automatically extracted from this document."}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -732,7 +802,7 @@ function StartCycleDialog({
                   {endDate ? format(endDate, "PPP") : t("selectDate") || "Select date"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[9999]" align="start">
                 <CalendarComponent
                   mode="single"
                   selected={endDate}
@@ -743,21 +813,6 @@ function StartCycleDialog({
               </PopoverContent>
             </Popover>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="diagnosis-context">{t("diagnosisContext") || "Diagnosis Context"}</Label>
-            <Textarea
-              id="diagnosis-context"
-              value={diagnosisContext}
-              onChange={(e) => setDiagnosisContext(e.target.value)}
-              placeholder={t("diagnosisContextPlaceholder") || "Describe your child's condition and what you want the AI to research..."}
-              className="min-h-[100px]"
-              data-testid="textarea-diagnosis-context"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("diagnosisContextHelp") || "The more details you provide, the more relevant the research findings will be."}
-            </p>
-          </div>
         </div>
 
         <DialogFooter>
@@ -766,7 +821,7 @@ function StartCycleDialog({
           </Button>
           <Button
             onClick={handleStart}
-            disabled={startCycleMutation.isPending || !selectedChildId || !endDate || !diagnosisContext.trim()}
+            disabled={startCycleMutation.isPending || !endDate || !diagnosisFile}
             data-testid="button-confirm-start-cycle"
           >
             {startCycleMutation.isPending ? (

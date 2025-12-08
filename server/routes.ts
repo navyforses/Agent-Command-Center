@@ -2043,23 +2043,118 @@ Format your response as JSON with the following structure:
     }
   });
 
-  // Start new evolution cycle
-  app.post("/api/evolution/cycles", isAuthenticated, async (req: any, res) => {
+  // Start new evolution cycle with file upload for child info extraction
+  app.post("/api/evolution/cycles", isAuthenticated, diagnosisUpload.single("diagnosisFile"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { childId, endDate, triggerDocumentId, diagnosisContext } = req.body;
+      const { endDate, childId } = req.body;
+      const file = req.file;
       
-      if (!childId || !endDate || !diagnosisContext) {
-        return res.status(400).json({ message: "Missing required fields: childId, endDate, diagnosisContext" });
+      if (!endDate) {
+        return res.status(400).json({ message: "Missing required field: endDate" });
+      }
+
+      if (!file && !childId) {
+        return res.status(400).json({ message: "Please upload a diagnosis file or provide a child ID" });
+      }
+
+      let diagnosisContext = "";
+      let extractedChildId: number | undefined = childId ? parseInt(childId, 10) : undefined;
+
+      // If a file is uploaded, extract text and child information
+      if (file) {
+        let extractedText = "";
+        
+        // Extract text from file
+        if (file.mimetype === "application/pdf") {
+          extractedText = await extractTextFromPDF(file.buffer);
+        } else if (file.mimetype.startsWith("image/")) {
+          extractedText = await extractTextFromImage(file.buffer, file.mimetype);
+        }
+        
+        if (!extractedText || extractedText.trim().length === 0) {
+          return res.status(400).json({ message: "Could not extract text from the uploaded file" });
+        }
+
+        // Use AI to extract child information and diagnosis context
+        const extractionPrompt = `Analyze this medical document and extract the following information in JSON format:
+{
+  "childName": "Name of the child/patient (if found, otherwise null)",
+  "dateOfBirth": "Date of birth if mentioned (YYYY-MM-DD format, otherwise null)",
+  "diagnosis": "Main diagnosis or condition",
+  "diagnosisSummary": "A comprehensive summary of the diagnosis, condition details, symptoms, and any relevant medical history. This should be detailed enough for AI research purposes."
+}
+
+Document text:
+${extractedText.substring(0, 8000)}`;
+
+        try {
+          const completion = await openai.chat.completions.create({
+            model: AI_MODEL,
+            messages: [
+              { role: "system", content: "You are a medical document analyzer. Extract patient information accurately from medical documents. Return only valid JSON." },
+              { role: "user", content: extractionPrompt }
+            ],
+            response_format: { type: "json_object" },
+          });
+
+          const extracted = JSON.parse(completion.choices[0].message.content || "{}");
+          
+          diagnosisContext = extracted.diagnosisSummary || extracted.diagnosis || extractedText.substring(0, 2000);
+          
+          // Create or find child if name was extracted
+          if (extracted.childName && !extractedChildId) {
+            // Check if child already exists
+            const existingChildren = await storage.getChildren(userId);
+            const nameParts = extracted.childName.split(' ');
+            const extractedFirstName = nameParts[0] || "Child";
+            const extractedLastName = nameParts.slice(1).join(' ') || "(from document)";
+            const existingChild = existingChildren.find(
+              c => `${c.firstName} ${c.lastName}`.toLowerCase() === extracted.childName.toLowerCase()
+            );
+            
+            if (existingChild) {
+              extractedChildId = existingChild.id;
+            } else {
+              // Create new child
+              const newChild = await storage.createChild({
+                userId,
+                firstName: extractedFirstName,
+                lastName: extractedLastName,
+                dateOfBirth: extracted.dateOfBirth || null,
+                diagnosis: extracted.diagnosis || null,
+                notes: `Created from uploaded document. ${extracted.diagnosisSummary || ""}`,
+              });
+              extractedChildId = newChild.id;
+            }
+          }
+        } catch (aiError) {
+          console.error("AI extraction error:", aiError);
+          // Use raw text as fallback
+          diagnosisContext = extractedText.substring(0, 2000);
+        }
+      }
+
+      // If still no child, create a placeholder
+      if (!extractedChildId) {
+        const newChild = await storage.createChild({
+          userId,
+          firstName: "Child",
+          lastName: "(from document)",
+          dateOfBirth: null,
+          diagnosis: diagnosisContext.substring(0, 500),
+          notes: "Created automatically from uploaded document",
+        });
+        extractedChildId = newChild.id;
       }
 
       const { startEvolutionCycle } = await import("./evolutionCycleEngine");
       const cycle = await startEvolutionCycle(
         userId,
-        parseInt(childId, 10),
+        extractedChildId,
         new Date(endDate),
-        triggerDocumentId ? parseInt(triggerDocumentId, 10) : undefined,
-        diagnosisContext
+        undefined,
+        diagnosisContext || "Analyze the uploaded medical document and research relevant treatments."
       );
       
       res.status(201).json(cycle);
