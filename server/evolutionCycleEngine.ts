@@ -1479,7 +1479,7 @@ export async function startEvolutionCycle(
   userId: string,
   childId: number,
   endDate: Date,
-  triggerDocumentId: number,
+  triggerDocumentId: number | null,
   diagnosisContext: string
 ): Promise<EvolutionCycle> {
   console.log(`[Evolution Engine] Starting new cycle for user ${userId}, child ${childId}`);
