@@ -102,7 +102,7 @@ export function FindingCard({ finding, variant = "default" }: FindingCardProps) 
               className="font-semibold text-base leading-snug"
               data-testid={`finding-title-${finding.id}`}
             >
-              {finding.title}
+              {displayTitle}
             </h3>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
@@ -144,7 +144,7 @@ export function FindingCard({ finding, variant = "default" }: FindingCardProps) 
           className="text-sm text-muted-foreground"
           data-testid={`finding-summary-${finding.id}`}
         >
-          {finding.summary}
+          {displaySummary}
         </p>
 
         <Collapsible open={aiPerspectivesOpen} onOpenChange={setAiPerspectivesOpen}>

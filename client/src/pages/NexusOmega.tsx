@@ -98,7 +98,9 @@ interface ResearchOrchestrationResult {
   finding: {
     id: number;
     title: string;
+    titleKa?: string | null;
     summary: string;
+    summaryKa?: string | null;
     consensusLevel: "low" | "moderate" | "high" | "unanimous";
     confidenceScore: number;
     relevanceScore: number;
@@ -956,7 +958,9 @@ export default function NexusOmega() {
     return {
       id: `finding-${result.finding.id}`,
       title: result.finding.title,
+      titleKa: result.finding.titleKa,
       summary: result.finding.summary,
+      summaryKa: result.finding.summaryKa,
       consensusLevel: mapConsensusLevel(result.consensusLevel) as Finding["consensusLevel"],
       confidenceScore: result.finding.confidenceScore,
       relevanceScore: result.finding.relevanceScore,
