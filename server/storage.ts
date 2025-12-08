@@ -201,6 +201,7 @@ export interface IStorage {
   getEvolutionInsights(dailyRunId: number): Promise<EvolutionInsight[]>;
   getEvolutionInsightsByPhase(dailyRunId: number, phase: string): Promise<EvolutionInsight[]>;
   createEvolutionInsight(insight: InsertEvolutionInsight): Promise<EvolutionInsight>;
+  getPreviousCycleSynthesizedInsights(userId: string, currentCycleId: number): Promise<EvolutionInsight[]>;
 
   getEvolutionReports(userId: string): Promise<EvolutionReport[]>;
   getEvolutionReport(id: number, userId: string): Promise<EvolutionReport | undefined>;
@@ -869,6 +870,32 @@ export class DatabaseStorage implements IStorage {
   async createEvolutionInsight(insight: InsertEvolutionInsight): Promise<EvolutionInsight> {
     const [newInsight] = await db.insert(evolutionInsights).values(insight).returning();
     return newInsight;
+  }
+
+  async getPreviousCycleSynthesizedInsights(userId: string, currentCycleId: number): Promise<EvolutionInsight[]> {
+    const userCycles = await this.getEvolutionCycles(userId);
+    const previousCompletedCycles = userCycles
+      .filter(c => c.id !== currentCycleId && c.status === "completed")
+      .sort((a, b) => {
+        const dateA = a.endDate ? new Date(a.endDate).getTime() : 0;
+        const dateB = b.endDate ? new Date(b.endDate).getTime() : 0;
+        return dateB - dateA;
+      });
+    
+    if (previousCompletedCycles.length === 0) {
+      return [];
+    }
+
+    const mostRecentCycle = previousCompletedCycles[0];
+    const dailyRuns = await this.getEvolutionDailyRuns(mostRecentCycle.id);
+    
+    const allSynthesizedInsights: EvolutionInsight[] = [];
+    for (const run of dailyRuns) {
+      const synthesizeInsights = await this.getEvolutionInsightsByPhase(run.id, "synthesize");
+      allSynthesizedInsights.push(...synthesizeInsights);
+    }
+
+    return allSynthesizedInsights;
   }
 
   async getEvolutionReports(userId: string): Promise<EvolutionReport[]> {

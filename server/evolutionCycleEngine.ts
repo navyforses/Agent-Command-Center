@@ -374,8 +374,15 @@ async function queryGrok(query: string, systemPrompt: string): Promise<AIRespons
   }
 }
 
-async function executeObservePhase(diagnosisContext: string): Promise<PhaseResult> {
+async function executeObservePhase(
+  diagnosisContext: string,
+  previousCycleInsights: EvolutionInsight[] = []
+): Promise<PhaseResult> {
   const insights: InsertEvolutionInsight[] = [];
+
+  const previousCycleContext = previousCycleInsights.length > 0
+    ? `\n\n=== ACCUMULATED KNOWLEDGE FROM PREVIOUS CYCLES ===\nThe following insights were synthesized from previous research cycles. Build upon this knowledge and look for NEW developments, confirmations, or contradictions:\n\n${previousCycleInsights.map((i, idx) => `[Previous Insight ${idx + 1}]\n${i.contentEn}`).join("\n\n")}\n\n=== END ACCUMULATED KNOWLEDGE ===\n`
+    : "";
 
   const academicSearchResult = await searchAcademicSources(diagnosisContext, {
     maxResults: 25,
@@ -418,7 +425,7 @@ async function executeObservePhase(diagnosisContext: string): Promise<PhaseResul
   const systemPrompt = `You are a medical research observer specializing in neurological conditions, particularly Hypoxic-Ischemic Encephalopathy (HIE) and related pediatric neurological disorders.
 
 Your task is to search for and compile the latest research, clinical trials, and medical news related to the diagnosis provided.
-
+${previousCycleContext}
 You have access to the following academic research from OpenAlex and Semantic Scholar:
 ${academicContext}
 
@@ -429,6 +436,7 @@ Focus on:
 - Emerging therapies and treatments
 - New diagnostic techniques
 - Cross-disciplinary insights from physics, engineering, and other fields
+${previousCycleInsights.length > 0 ? "- Building upon and extending knowledge from previous research cycles\n- Identifying confirmations, contradictions, or new developments related to previous findings" : ""}
 
 Respond with a JSON object:
 {
@@ -437,7 +445,7 @@ Respond with a JSON object:
   "sources": [{"title": "Source title", "url": "URL if available", "snippet": "Relevant excerpt", "source": "PubMed/ClinicalTrials/News/Academic"}],
   "clinicalTrials": ["Trial 1 description", "Trial 2 description", ...],
   "emergingTherapies": ["Therapy 1", "Therapy 2", ...],
-  "crossDisciplinaryFindings": ["Finding from physics/engineering/etc", ...],
+  "crossDisciplinaryFindings": ["Finding from physics/engineering/etc", ...],${previousCycleInsights.length > 0 ? '\n  "continuityWithPreviousCycles": "How these findings relate to or extend previous cycle insights",' : ""}
   "confidence": 85
 }`;
 
@@ -1207,7 +1215,15 @@ export async function executeEvolutionPhase(
 
     switch (phase) {
       case "observe":
-        phaseResult = await executeObservePhase(diagnosisContext);
+        const userId = cycle.userId;
+        let previousCycleInsights: EvolutionInsight[] = [];
+        if (userId) {
+          previousCycleInsights = await storage.getPreviousCycleSynthesizedInsights(userId, cycle.id);
+          console.log(`[Evolution Engine] Found ${previousCycleInsights.length} insights from previous cycles for continuous learning (userId: ${userId})`);
+        } else {
+          console.log(`[Evolution Engine] No userId found on cycle ${cycle.id}, skipping continuous learning`);
+        }
+        phaseResult = await executeObservePhase(diagnosisContext, previousCycleInsights);
         break;
 
       case "learn":
