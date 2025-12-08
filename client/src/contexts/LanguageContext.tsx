@@ -269,6 +269,30 @@ const translations: Record<string, Record<Language, string>> = {
   noResearchYet: { en: "No Research Yet", ka: "კვლევა ჯერ არ ჩატარებულა" },
   enterQueryToBegin: { en: "Enter a research query above and click OMEGA to begin multi-AI research synthesis.", ka: "შეიყვანეთ კვლევის მოთხოვნა ზემოთ და დააჭირეთ OMEGA-ს მულტი-AI კვლევის სინთეზის დასაწყებად." },
   noIndividualPerspectives: { en: "Run a research query to see individual AI perspectives.", ka: "გაუშვით კვლევის მოთხოვნა ინდივიდუალური AI პერსპექტივების სანახავად." },
+
+  // Accumulated Knowledge Section
+  accumulatedKnowledge: { en: "Accumulated Knowledge", ka: "დაგროვებული ცოდნა" },
+  accumulatedKnowledgeSubtitle: { en: "Insights discovered and validated across research cycles", ka: "ინსაითები აღმოჩენილი და დადასტურებული კვლევის ციკლებში" },
+  noAccumulatedKnowledge: { en: "No Accumulated Knowledge Yet", ka: "ჯერ არ არის დაგროვებული ცოდნა" },
+  noAccumulatedKnowledgeDesc: { en: "As research cycles complete, validated insights and discoveries will appear here.", ka: "კვლევის ციკლების დასრულებისას, დადასტურებული ინსაითები და აღმოჩენები აქ გამოჩნდება." },
+  knowledgeConfidence: { en: "Confidence", ka: "სანდოობა" },
+  knowledgeValidations: { en: "Validations", ka: "ვალიდაციები" },
+  knowledgeCycles: { en: "Contributing Cycles", ka: "მონაწილე ციკლები" },
+  knowledgeType_hypothesis: { en: "Hypothesis", ka: "ჰიპოთეზა" },
+  knowledgeType_discovery: { en: "Discovery", ka: "აღმოჩენა" },
+  knowledgeType_treatment_insight: { en: "Treatment Insight", ka: "მკურნალობის ინსაითი" },
+  knowledgeType_mechanism: { en: "Mechanism", ka: "მექანიზმი" },
+  knowledgeType_pattern: { en: "Pattern", ka: "ნიმუში" },
+  knowledgeType_connection: { en: "Connection", ka: "კავშირი" },
+  knowledgeType_prediction: { en: "Prediction", ka: "პროგნოზი" },
+  knowledgeStatus_emerging: { en: "Emerging", ka: "წარმოშობადი" },
+  knowledgeStatus_active: { en: "Active", ka: "აქტიური" },
+  knowledgeStatus_validated: { en: "Validated", ka: "დადასტურებული" },
+  knowledgeStatus_superseded: { en: "Superseded", ka: "ჩანაცვლებული" },
+  knowledgeStatus_refuted: { en: "Refuted", ka: "უარყოფილი" },
+  knowledgeGrowth: { en: "Knowledge Growth", ka: "ცოდნის ზრდა" },
+  totalKnowledge: { en: "Total Knowledge Items", ka: "ცოდნის ერთეულები" },
+  viewDetails: { en: "View Details", ka: "დეტალების ნახვა" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
