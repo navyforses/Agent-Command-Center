@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+import { Languages, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,8 @@ interface EditChildDialogProps {
 
 export function EditChildDialog({ child, open, onOpenChange }: EditChildDialogProps) {
   const { toast } = useToast();
+  const [translatingDiagnosis, setTranslatingDiagnosis] = useState(false);
+  const [translatingNotes, setTranslatingNotes] = useState(false);
 
   const form = useForm<EditChildFormData>({
     resolver: zodResolver(editChildSchema),
@@ -97,6 +100,50 @@ export function EditChildDialog({ child, open, onOpenChange }: EditChildDialogPr
       });
     },
   });
+
+  const translateText = async (text: string, targetField: 'diagnosisKa' | 'notesKa') => {
+    if (!text || text.trim().length === 0) {
+      toast({
+        title: "Nothing to translate",
+        description: "Please enter text in the English field first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const setLoading = targetField === 'diagnosisKa' ? setTranslatingDiagnosis : setTranslatingNotes;
+    setLoading(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/translate", {
+        text,
+        targetLanguage: "ka",
+      });
+      const data = await response.json();
+      
+      if (data.translatedText && data.translatedText.trim().length > 0) {
+        form.setValue(targetField, data.translatedText);
+        toast({
+          title: "Translation complete",
+          description: "Text has been translated to Georgian.",
+        });
+      } else {
+        toast({
+          title: "Translation failed",
+          description: "Translation returned empty. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Translation failed",
+        description: "Could not translate the text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onSubmit = (data: EditChildFormData) => {
     const normalizedData = {
@@ -196,7 +243,24 @@ export function EditChildDialog({ child, open, onOpenChange }: EditChildDialogPr
               name="diagnosisKa"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Diagnosis (Georgian / ქართულად)</FormLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FormLabel>Diagnosis (Georgian / ქართულად)</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => translateText(form.getValues('diagnosis') || '', 'diagnosisKa')}
+                      disabled={translatingDiagnosis}
+                      data-testid="button-translate-diagnosis"
+                    >
+                      {translatingDiagnosis ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Languages className="h-3 w-3" />
+                      )}
+                      <span className="ml-1">Translate</span>
+                    </Button>
+                  </div>
                   <FormControl>
                     <Input {...field} data-testid="input-diagnosis-ka" placeholder="დიაგნოზი ქართულად" />
                   </FormControl>
@@ -230,7 +294,24 @@ export function EditChildDialog({ child, open, onOpenChange }: EditChildDialogPr
               name="notesKa"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Georgian / ქართულად)</FormLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FormLabel>Notes (Georgian / ქართულად)</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => translateText(form.getValues('notes') || '', 'notesKa')}
+                      disabled={translatingNotes}
+                      data-testid="button-translate-notes"
+                    >
+                      {translatingNotes ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Languages className="h-3 w-3" />
+                      )}
+                      <span className="ml-1">Translate</span>
+                    </Button>
+                  </div>
                   <FormControl>
                     <Textarea 
                       {...field} 

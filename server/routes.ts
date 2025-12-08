@@ -164,6 +164,65 @@ export async function registerRoutes(
     }
   });
 
+  // Translation endpoint using Gemini AI (Replit AI Integrations)
+  app.post("/api/translate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { text, targetLanguage } = req.body;
+      
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ message: "Text is required" });
+      }
+      
+      if (text.trim().length === 0) {
+        return res.status(400).json({ message: "Text cannot be empty" });
+      }
+
+      if (!targetLanguage || typeof targetLanguage !== 'string') {
+        return res.status(400).json({ message: "Target language is required" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      
+      const gemini = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+        },
+      });
+
+      const langName = targetLanguage === 'ka' ? 'Georgian' : targetLanguage;
+      
+      const prompt = `You are a professional medical translator. Translate the following medical text from English to ${langName}. 
+      
+Important guidelines:
+- Preserve all medical terminology accurately
+- Maintain the same structure and formatting as the original
+- Keep proper nouns (names, hospital names, etc.) in their original form
+- Use appropriate medical terminology in ${langName}
+- Only output the translation, nothing else
+
+Text to translate:
+${text}`;
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      const translatedText = response.text || "";
+      
+      if (!translatedText || translatedText.trim().length === 0) {
+        return res.status(500).json({ message: "Translation returned empty result" });
+      }
+      
+      res.json({ translatedText });
+    } catch (error) {
+      console.error("Translation error:", error);
+      res.status(500).json({ message: "Failed to translate text" });
+    }
+  });
+
   // Documents routes
   app.get("/api/documents", isAuthenticated, async (req: any, res) => {
     try {
