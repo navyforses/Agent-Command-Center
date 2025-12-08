@@ -4,6 +4,16 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +23,7 @@ import { insertChildSchema, type Child } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Plus, User, Calendar, FileText, ChevronRight, Loader2 } from "lucide-react";
+import { Plus, User, Calendar, FileText, ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { z } from "zod";
 
 const formSchema = insertChildSchema.extend({
@@ -25,8 +35,11 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function ChildrenList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteChildId, setDeleteChildId] = useState<number | null>(null);
+  const [deleteChildName, setDeleteChildName] = useState<string>("");
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const { data: children = [], isLoading } = useQuery<Child[]>({
     queryKey: ["/api/children"],
@@ -71,6 +84,34 @@ export default function ChildrenList() {
     },
   });
 
+  const deleteChildMutation = useMutation({
+    mutationFn: async (childId: number) => {
+      const response = await apiRequest("DELETE", `/api/children/${childId}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete child profile");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      setShowDeleteDialog(false);
+      setDeleteChildId(null);
+      setDeleteChildName("");
+      toast({
+        title: language === "ka" ? "წარმატება" : "Success",
+        description: language === "ka" ? "ბავშვის პროფილი წაიშალა" : "Child profile deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: language === "ka" ? "შეცდომა" : "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: FormData) => {
     const normalizedData = {
       ...data,
@@ -80,6 +121,20 @@ export default function ChildrenList() {
       notes: data.notes || null,
     };
     createChildMutation.mutate(normalizedData);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, childId: number, childName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteChildId(childId);
+    setDeleteChildName(childName);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteChildId) {
+      deleteChildMutation.mutate(deleteChildId);
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -320,6 +375,15 @@ export default function ChildrenList() {
                         )}
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                      onClick={(e) => handleDeleteClick(e, child.id, `${child.firstName} ${child.lastName}`)}
+                      data-testid={`button-delete-child-${child.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                     <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   </CardContent>
                 </Card>
@@ -328,6 +392,39 @@ export default function ChildrenList() {
           })}
         </div>
       )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === "ka" ? "ბავშვის პროფილის წაშლა" : "Delete Child Profile"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === "ka" 
+                ? `დარწმუნებული ხართ, რომ გსურთ "${deleteChildName}"-ის პროფილის წაშლა? ეს მოქმედება შეუქცევადია და წაშლის ყველა დაკავშირებულ მონაცემს.`
+                : `Are you sure you want to delete "${deleteChildName}"'s profile? This action cannot be undone and will delete all associated data.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-child">
+              {language === "ka" ? "გაუქმება" : "Cancel"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteChildMutation.isPending}
+              data-testid="button-confirm-delete-child"
+            >
+              {deleteChildMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              {language === "ka" ? "წაშლა" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
