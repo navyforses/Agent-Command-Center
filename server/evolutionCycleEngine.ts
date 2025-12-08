@@ -1014,9 +1014,10 @@ export async function executeEvolutionPhase(
     return { success: false, insightsCreated: 0, error: "Daily run not found" };
   }
 
-  const cycles = await storage.getEvolutionCycles("");
+  const cycles = await storage.getAllActiveEvolutionCycles();
   const cycle = cycles.find((c) => c.id === dailyRun.cycleId);
   if (!cycle) {
+    console.error(`[Evolution Engine] Cycle not found for daily run ${dailyRunId}, cycleId: ${dailyRun.cycleId}`);
     return { success: false, insightsCreated: 0, error: "Cycle not found" };
   }
 
