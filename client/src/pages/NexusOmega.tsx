@@ -1626,7 +1626,6 @@ export default function NexusOmega() {
             <StartCycleDialog
               isOpen={startCycleDialogOpen}
               onClose={() => setStartCycleDialogOpen(false)}
-              children={childrenData || []}
               onSuccess={() => setMainTab("evolution")}
             />
           </TabsContent>
