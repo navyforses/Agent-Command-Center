@@ -243,6 +243,25 @@ const translations: Record<string, Record<Language, string>> = {
   fillAllFields: { en: "Please fill in all required fields.", ka: "გთხოვთ შეავსოთ ყველა სავალდებულო ველი." },
   addChildFirst: { en: "Add a child profile first to start an Evolution Cycle", ka: "ჯერ დაამატეთ ბავშვის პროფილი ევოლუციის ციკლის დასაწყებად" },
   cancel: { en: "Cancel", ka: "გაუქმება" },
+
+  // NEXUS OMEGA Tab Labels
+  research: { en: "Research", ka: "კვლევა" },
+  evolution: { en: "Evolution", ka: "ევოლუცია" },
+  reports: { en: "Reports", ka: "ანგარიშები" },
+
+  // File Upload
+  uploadDiagnosis: { en: "Upload Diagnosis", ka: "დიაგნოზის ატვირთვა" },
+  analyzeDiagnosis: { en: "Analyze this diagnosis and recommend treatment", ka: "გააანალიზეთ ეს დიაგნოზი და რეკომენდაცია გაუწიეთ მკურნალობას" },
+  fileTooLarge: { en: "File too large", ka: "ფაილი ზედმეტად დიდია" },
+  maxFileSize: { en: "Maximum file size is 10MB", ka: "მაქსიმალური ფაილის ზომა 10MB-ია" },
+  invalidFileType: { en: "Invalid file type", ka: "არასწორი ფაილის ტიპი" },
+  allowedFileTypes: { en: "Please upload PDF or image files (JPEG, PNG, WebP)", ka: "გთხოვთ ატვირთოთ PDF ან სურათის ფაილები (JPEG, PNG, WebP)" },
+
+  // Research States
+  researchingWithAI: { en: "Researching with 5 AI agents...", ka: "კვლევა 5 AI აგენტით..." },
+  noResearchYet: { en: "No Research Yet", ka: "კვლევა ჯერ არ ჩატარებულა" },
+  enterQueryToBegin: { en: "Enter a research query above and click OMEGA to begin multi-AI research synthesis.", ka: "შეიყვანეთ კვლევის მოთხოვნა ზემოთ და დააჭირეთ OMEGA-ს მულტი-AI კვლევის სინთეზის დასაწყებად." },
+  noIndividualPerspectives: { en: "Run a research query to see individual AI perspectives.", ka: "გაუშვით კვლევის მოთხოვნა ინდივიდუალური AI პერსპექტივების სანახავად." },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
