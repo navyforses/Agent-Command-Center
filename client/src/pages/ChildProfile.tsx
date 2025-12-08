@@ -55,16 +55,16 @@ export default function ChildProfile() {
   });
 
   const calculateAge = (dob: string | null) => {
-    if (!dob) return "Unknown";
+    if (!dob) return t("unknown");
     const birthDate = new Date(dob);
     const today = new Date();
     const years = today.getFullYear() - birthDate.getFullYear();
     const months = today.getMonth() - birthDate.getMonth();
     const totalMonths = years * 12 + months;
     if (years === 0) {
-      return `${months} months`;
+      return `${months} ${t("months")}`;
     }
-    return `${years} years, ${months >= 0 ? months : 12 + months} months (${totalMonths} months)`;
+    return `${years} ${t("years")}, ${months >= 0 ? months : 12 + months} ${t("months")} (${totalMonths} ${t("months")})`;
   };
 
   const activeTherapiesCount = therapies?.filter((t) => t.isActive).length ?? 0;
@@ -118,15 +118,15 @@ export default function ChildProfile() {
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <AlertCircle className="h-12 w-12 text-muted-foreground" />
               <div>
-                <h2 className="text-xl font-semibold">Child Not Found</h2>
+                <h2 className="text-xl font-semibold">{t("childNotFound")}</h2>
                 <p className="text-muted-foreground mt-1">
-                  The child profile you're looking for doesn't exist or you don't have access to it.
+                  {t("childNotFoundDescription")}
                 </p>
               </div>
               <Link href="/">
                 <Button variant="outline" className="gap-2" data-testid="button-back-dashboard">
                   <ArrowLeft className="h-4 w-4" />
-                  Back to Dashboard
+                  {t("backToDashboard")}
                 </Button>
               </Link>
             </div>
@@ -168,7 +168,7 @@ export default function ChildProfile() {
           onClick={() => setEditDialogOpen(true)}
         >
           <Edit className="h-4 w-4" />
-          Edit Profile
+          {t("editProfile")}
         </Button>
 
         <EditChildDialog 
@@ -180,10 +180,10 @@ export default function ChildProfile() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="medical" data-testid="tab-medical">Medical Info</TabsTrigger>
-          <TabsTrigger value="therapies" data-testid="tab-therapies">Therapies</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview">{t("overview")}</TabsTrigger>
+          <TabsTrigger value="medical" data-testid="tab-medical">{t("medicalInfo")}</TabsTrigger>
+          <TabsTrigger value="therapies" data-testid="tab-therapies">{t("therapies")}</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">{t("documents")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
@@ -195,11 +195,11 @@ export default function ChildProfile() {
                     <Calendar className="h-5 w-5 text-chart-1" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Birth Date</p>
+                    <p className="text-sm text-muted-foreground">{t("birthDate")}</p>
                     <p className="font-medium" data-testid="text-birth-date">
                       {child.dateOfBirth
                         ? new Date(child.dateOfBirth).toLocaleDateString()
-                        : "Not set"}
+                        : t("notSet")}
                     </p>
                   </div>
                 </div>
@@ -212,7 +212,7 @@ export default function ChildProfile() {
                     <Activity className="h-5 w-5 text-chart-2" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Active Therapies</p>
+                    <p className="text-sm text-muted-foreground">{t("activeTherapies")}</p>
                     <p className="font-medium" data-testid="text-active-therapies-count">
                       {therapiesLoading ? (
                         <Skeleton className="h-5 w-8 inline-block" />
@@ -231,7 +231,7 @@ export default function ChildProfile() {
                     <FileText className="h-5 w-5 text-chart-3" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Documents</p>
+                    <p className="text-sm text-muted-foreground">{t("documents")}</p>
                     <p className="font-medium" data-testid="text-documents-count">
                       {documentsLoading ? (
                         <Skeleton className="h-5 w-8 inline-block" />
@@ -250,11 +250,11 @@ export default function ChildProfile() {
                     <Brain className="h-5 w-5 text-chart-4" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Diagnosis Date</p>
+                    <p className="text-sm text-muted-foreground">{t("diagnosisDate")}</p>
                     <p className="font-medium" data-testid="text-diagnosis-date">
                       {child.diagnosisDate
                         ? new Date(child.diagnosisDate).toLocaleDateString()
-                        : "Not set"}
+                        : t("notSet")}
                     </p>
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export default function ChildProfile() {
           {(child.notes || child.notesKa) && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Notes</CardTitle>
+                <CardTitle className="text-lg">{t("notes")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground" data-testid="text-child-notes">
@@ -278,12 +278,12 @@ export default function ChildProfile() {
           {activeTherapiesCount > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Therapy Progress</CardTitle>
+                <CardTitle className="text-lg">{t("therapyProgress")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Active therapies</span>
+                    <span className="text-muted-foreground">{t("activeTherapies")}</span>
                     <span className="font-medium">{activeTherapiesCount}</span>
                   </div>
                   <Progress value={(activeTherapiesCount / (therapies?.length || 1)) * 100} className="h-2" />
@@ -297,29 +297,29 @@ export default function ChildProfile() {
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Diagnosis Information</CardTitle>
+                <CardTitle className="text-lg">{t("diagnosisInformation")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Primary Diagnosis</span>
+                  <span className="text-muted-foreground">{t("primaryDiagnosis")}</span>
                   <span className="font-medium" data-testid="text-diagnosis">
-                    {language === "ka" && child.diagnosisKa ? child.diagnosisKa : (child.diagnosis || "Not specified")}
+                    {language === "ka" && child.diagnosisKa ? child.diagnosisKa : (child.diagnosis || t("notSpecified"))}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Diagnosis Date</span>
+                  <span className="text-muted-foreground">{t("diagnosisDate")}</span>
                   <span className="font-medium" data-testid="text-diagnosis-date-medical">
                     {child.diagnosisDate
                       ? new Date(child.diagnosisDate).toLocaleDateString()
-                      : "Not specified"}
+                      : t("notSpecified")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Date of Birth</span>
+                  <span className="text-muted-foreground">{t("dateOfBirth")}</span>
                   <span className="font-medium">
                     {child.dateOfBirth
                       ? new Date(child.dateOfBirth).toLocaleDateString()
-                      : "Not specified"}
+                      : t("notSpecified")}
                   </span>
                 </div>
               </CardContent>
@@ -327,13 +327,13 @@ export default function ChildProfile() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Notes</CardTitle>
+                <CardTitle className="text-lg">{t("notes")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {(child.notes || child.notesKa) ? (
                   <p className="text-muted-foreground">{language === "ka" && child.notesKa ? child.notesKa : child.notes}</p>
                 ) : (
-                  <p className="text-muted-foreground italic">No additional notes</p>
+                  <p className="text-muted-foreground italic">{t("noAdditionalNotes")}</p>
                 )}
               </CardContent>
             </Card>
@@ -342,10 +342,10 @@ export default function ChildProfile() {
 
         <TabsContent value="therapies" className="mt-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Current Therapies</h3>
+            <h3 className="text-lg font-semibold">{t("currentTherapies")}</h3>
             <Button className="gap-2" data-testid="button-add-therapy">
               <Plus className="h-4 w-4" />
-              Add Therapy
+              {t("addTherapy")}
             </Button>
           </div>
 
@@ -380,17 +380,17 @@ export default function ChildProfile() {
                           <Activity className="h-5 w-5 text-accent-foreground" />
                         </div>
                         <div>
-                          <h4 className="font-medium">{therapy.type || "Therapy"}</h4>
+                          <h4 className="font-medium">{therapy.type || t("therapy")}</h4>
                           <p className="text-sm text-muted-foreground">
-                            {therapy.therapistName || "No therapist assigned"}
+                            {therapy.therapistName || t("noTherapistAssigned")}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {therapy.frequency || "No frequency set"}
+                            {therapy.frequency || t("noFrequencySet")}
                           </p>
                         </div>
                       </div>
                       <Badge variant={therapy.isActive ? "default" : "secondary"}>
-                        {therapy.isActive ? "Active" : "Paused"}
+                        {therapy.isActive ? t("active") : t("paused")}
                       </Badge>
                     </div>
                   </CardContent>
@@ -403,9 +403,9 @@ export default function ChildProfile() {
                 <div className="flex flex-col items-center justify-center text-center space-y-3">
                   <Activity className="h-10 w-10 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">No therapies yet</p>
+                    <p className="font-medium">{t("noTherapiesYet")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Add a therapy to start tracking progress
+                      {t("addTherapyToTrack")}
                     </p>
                   </div>
                 </div>
@@ -416,21 +416,21 @@ export default function ChildProfile() {
 
         <TabsContent value="documents" className="mt-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Documents</h3>
+            <h3 className="text-lg font-semibold">{t("documents")}</h3>
             <Button 
               className="gap-2" 
               data-testid="button-add-document"
               onClick={() => setUploadDialogOpen(true)}
             >
               <Plus className="h-4 w-4" />
-              Upload Document
+              {t("uploadDocument")}
             </Button>
           </div>
 
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Upload Medical Document</DialogTitle>
+                <DialogTitle>{t("uploadMedicalDocument")}</DialogTitle>
               </DialogHeader>
               <DocumentUploadZone 
                 childId={id ? parseInt(id, 10) : undefined}
@@ -476,19 +476,19 @@ export default function ChildProfile() {
                           {doc.aiSummary ? (
                             <Badge variant="outline" className="gap-1">
                               <Sparkles className="h-3 w-3" />
-                              AI Analyzed
+                              {t("aiAnalyzed")}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="gap-1" data-testid={`badge-processing-${doc.id}`}>
                               <Clock className="h-3 w-3" />
-                              Analysis Pending
+                              {t("analysisPending")}
                             </Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {doc.uploadedAt
                             ? new Date(doc.uploadedAt).toLocaleDateString()
-                            : "Unknown date"}
+                            : t("unknownDate")}
                         </p>
                         {doc.aiSummary ? (
                           <p className="text-sm text-muted-foreground mt-2 line-clamp-2" data-testid={`text-ai-summary-${doc.id}`}>
@@ -496,7 +496,7 @@ export default function ChildProfile() {
                           </p>
                         ) : (
                           <p className="text-sm text-muted-foreground/70 mt-2 italic" data-testid={`text-pending-analysis-${doc.id}`}>
-                            AI analysis in progress...
+                            {t("aiAnalysisInProgress")}
                           </p>
                         )}
                         {doc.aiKeyFindings && doc.aiKeyFindings.length > 0 && (
@@ -520,9 +520,9 @@ export default function ChildProfile() {
                 <div className="flex flex-col items-center justify-center text-center space-y-3">
                   <FileText className="h-10 w-10 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">No documents yet</p>
+                    <p className="font-medium">{t("noDocumentsYet")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Upload medical documents to keep track of records
+                      {t("uploadDocumentsToTrack")}
                     </p>
                   </div>
                 </div>
