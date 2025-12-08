@@ -12,7 +12,6 @@ import {
   LogOut,
   Heart,
   Zap,
-  Dna,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,7 +53,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const aiMenuItems = [
     { title: t("aiAssistant"), icon: Bot, url: "/assistant" },
     { title: t("nexusOmega"), icon: Zap, url: "/nexus" },
-    { title: t("evolutionCycles"), icon: Dna, url: "/evolution" },
   ];
 
   const bottomMenuItems = [
