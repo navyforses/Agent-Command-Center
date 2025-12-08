@@ -65,6 +65,13 @@ interface AIResponse {
 }
 
 export async function translateToGeorgian(text: string): Promise<string> {
+  if (!text || text.trim().length === 0) {
+    console.log("[Translation] Skipping empty text");
+    return text;
+  }
+  
+  console.log(`[Translation] Translating to Georgian: "${text.substring(0, 50)}..."`);
+  
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -77,9 +84,11 @@ export async function translateToGeorgian(text: string): Promise<string> {
       ],
     });
 
-    return completion.choices[0]?.message?.content || text;
+    const result = completion.choices[0]?.message?.content || text;
+    console.log(`[Translation] Success: "${result.substring(0, 50)}..."`);
+    return result;
   } catch (error) {
-    console.error("Translation error:", error);
+    console.error("[Translation] Error:", error);
     return text;
   }
 }
