@@ -84,6 +84,7 @@ export interface IStorage {
 
   getChildren(userId: string): Promise<Child[]>;
   getChild(id: number, userId: string): Promise<Child | undefined>;
+  findChildByName(userId: string, firstName: string, lastName: string): Promise<Child | undefined>;
   createChild(child: InsertChild): Promise<Child>;
   updateChild(id: number, userId: string, child: Partial<InsertChild>): Promise<Child | undefined>;
   deleteChild(id: number, userId: string): Promise<boolean>;
@@ -240,6 +241,16 @@ export class DatabaseStorage implements IStorage {
     const [child] = await db.select().from(children)
       .where(and(eq(children.id, id), eq(children.userId, userId)));
     return child;
+  }
+
+  async findChildByName(userId: string, firstName: string, lastName: string): Promise<Child | undefined> {
+    const normalizedFirst = firstName.toLowerCase().trim();
+    const normalizedLast = lastName.toLowerCase().trim();
+    const allChildren = await db.select().from(children).where(eq(children.userId, userId));
+    return allChildren.find(child => 
+      child.firstName.toLowerCase().trim() === normalizedFirst &&
+      child.lastName.toLowerCase().trim() === normalizedLast
+    );
   }
 
   async createChild(child: InsertChild): Promise<Child> {

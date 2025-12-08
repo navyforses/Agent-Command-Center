@@ -1480,21 +1480,84 @@ Format your response as JSON with the following structure:
         actionStatus: "executed",
       });
 
-      // Store suggested actions as pending action messages with parentMessageId
-      // Note: DocumentAnalysisResult uses { type, data } for actions
-      const pendingActionMessages = [];
+      // Auto-execute create_child actions for Form 100 documents, store others as pending
+      const pendingActionMessages: Awaited<ReturnType<typeof storage.createChatMessage>>[] = [];
+      const executedActions: ActionResult[] = [];
+      
+      // Helper to create pending action message
+      const createPendingAction = async (action: typeof analysis.suggestedActions[0]) => {
+        const actionMessage = await storage.createChatMessage({
+          userId,
+          role: "assistant",
+          content: `${action.description}${action.descriptionKa ? `\n${action.descriptionKa}` : ''}`,
+          actionType: action.type,
+          actionData: { ...(action.data || {}), parentMessageId: uploadMessage.id },
+          actionStatus: "pending",
+          documentIds: [document.id],
+        });
+        pendingActionMessages.push(actionMessage);
+      };
+      
       if (analysis.suggestedActions && analysis.suggestedActions.length > 0) {
         for (const suggestedAction of analysis.suggestedActions) {
-          const actionMessage = await storage.createChatMessage({
-            userId,
-            role: "assistant",
-            content: `${suggestedAction.description}${suggestedAction.descriptionKa ? `\n${suggestedAction.descriptionKa}` : ''}`,
-            actionType: suggestedAction.type,
-            actionData: { ...suggestedAction.data, parentMessageId: uploadMessage.id },
-            actionStatus: "pending",
-            documentIds: [document.id],
-          });
-          pendingActionMessages.push(actionMessage);
+          // Auto-execute child creation from Form 100 documents
+          if (suggestedAction.type === "create_child" && analysis.documentType === "form_100") {
+            const childData = suggestedAction.data;
+            
+            // If missing required fields, fall back to pending action
+            if (!childData || !childData.firstName || !childData.lastName) {
+              await createPendingAction(suggestedAction);
+              continue;
+            }
+            
+            // Check for duplicate child with same name
+            const existingChild = await storage.findChildByName(
+              userId, 
+              childData.firstName, 
+              childData.lastName
+            );
+            
+            if (existingChild) {
+              // Child already exists - create info message
+              await storage.createChatMessage({
+                userId,
+                role: "assistant",
+                content: `Child profile for ${childData.firstName} ${childData.lastName} already exists.\n\nბავშვის პროფილი ${childData.firstName} ${childData.lastName}-სთვის უკვე არსებობს.`,
+                actionType: "create_child",
+                actionStatus: "skipped",
+                documentIds: [document.id],
+              });
+              continue;
+            }
+            
+            // Try to execute the create_child action
+            try {
+              const result = await executeAction("create_child", childData, userId);
+              if (result.success) {
+                executedActions.push(result);
+                // Create executed action message
+                await storage.createChatMessage({
+                  userId,
+                  role: "assistant",
+                  content: `${result.message}${result.messageKa ? `\n\n${result.messageKa}` : ''}`,
+                  actionType: "create_child",
+                  actionData: result.data,
+                  actionStatus: "executed",
+                  documentIds: [document.id],
+                });
+              } else {
+                // Action failed - fall back to pending action
+                await createPendingAction(suggestedAction);
+              }
+            } catch (executeError) {
+              console.error("Error auto-executing create_child:", executeError);
+              // On error, fall back to pending action so user can retry manually
+              await createPendingAction(suggestedAction);
+            }
+          } else {
+            // Store other actions as pending
+            await createPendingAction(suggestedAction);
+          }
         }
       }
 
@@ -1504,6 +1567,7 @@ Format your response as JSON with the following structure:
         message: uploadMessage,
         suggestedActions: analysis.suggestedActions || [],
         pendingActionMessages,
+        executedActions,
       });
     } catch (error) {
       console.error("Error uploading document to AI:", error);
