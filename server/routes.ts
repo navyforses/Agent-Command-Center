@@ -2161,7 +2161,7 @@ ${extractedText.substring(0, 8000)}`;
         userId,
         extractedChildId!,
         new Date(endDate),
-        0,
+        null,
         diagnosisContext || "Analyze the uploaded medical document and research relevant treatments."
       );
       
