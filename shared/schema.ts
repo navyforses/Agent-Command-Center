@@ -48,8 +48,10 @@ export const children = pgTable("children", {
   lastName: varchar("last_name").notNull(),
   dateOfBirth: date("date_of_birth"),
   diagnosis: text("diagnosis"),
+  diagnosisKa: text("diagnosis_ka"),
   diagnosisDate: date("diagnosis_date"),
   notes: text("notes"),
+  notesKa: text("notes_ka"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
