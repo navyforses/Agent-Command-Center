@@ -32,7 +32,7 @@ import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import type { Child, Therapy, Document } from "@shared/schema";
 
 export default function ChildProfile() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -153,7 +153,7 @@ export default function ChildProfile() {
             <div className="flex flex-wrap gap-2 mt-2">
               {child.diagnosis && (
                 <Badge variant="default" data-testid="badge-diagnosis">
-                  {child.diagnosis}
+                  {language === "ka" && child.diagnosisKa ? child.diagnosisKa : child.diagnosis}
                 </Badge>
               )}
             </div>
@@ -249,14 +249,14 @@ export default function ChildProfile() {
             </Card>
           </div>
 
-          {child.notes && (
+          {(child.notes || child.notesKa) && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Notes</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground" data-testid="text-child-notes">
-                  {child.notes}
+                  {language === "ka" && child.notesKa ? child.notesKa : child.notes}
                 </p>
               </CardContent>
             </Card>
@@ -290,7 +290,7 @@ export default function ChildProfile() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Primary Diagnosis</span>
                   <span className="font-medium" data-testid="text-diagnosis">
-                    {child.diagnosis || "Not specified"}
+                    {language === "ka" && child.diagnosisKa ? child.diagnosisKa : (child.diagnosis || "Not specified")}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -317,8 +317,8 @@ export default function ChildProfile() {
                 <CardTitle className="text-lg">Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                {child.notes ? (
-                  <p className="text-muted-foreground">{child.notes}</p>
+                {(child.notes || child.notesKa) ? (
+                  <p className="text-muted-foreground">{language === "ka" && child.notesKa ? child.notesKa : child.notes}</p>
                 ) : (
                   <p className="text-muted-foreground italic">No additional notes</p>
                 )}
