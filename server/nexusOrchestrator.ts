@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
+import { translateToGeorgian } from "./evolutionCycleEngine";
 import type { 
   InsertNexusFinding, 
   InsertNexusAiAnalysis, 
@@ -1030,15 +1031,27 @@ export async function runNexusResearch(
     }
   }
 
+  const [titleKa, summaryKa] = await Promise.all([
+    translateToGeorgian(title),
+    summary ? translateToGeorgian(summary) : Promise.resolve(null),
+  ]);
+
+  const activeCycle = await storage.getActiveEvolutionCycle(userId);
+
   const findingData: InsertNexusFinding = {
     queryId,
+    userId,
+    evolutionCycleId: activeCycle?.id || null,
     title,
+    titleKa,
     summary,
+    summaryKa,
     consensusLevel,
     confidenceScore: avgConfidence,
     relevanceScore: Math.min(100, avgConfidence + 10),
     sources: allSources.length > 0 ? allSources : null,
     hypothesesGenerated: null,
+    hypothesesGeneratedKa: null,
   };
 
   const finding = await storage.createNexusFinding(findingData);

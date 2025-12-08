@@ -64,7 +64,7 @@ interface AIResponse {
   error?: string;
 }
 
-async function translateToGeorgian(text: string): Promise<string> {
+export async function translateToGeorgian(text: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
