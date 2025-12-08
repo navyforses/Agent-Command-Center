@@ -24,6 +24,7 @@ import {
   evolutionInsights,
   evolutionReports,
   evolutionReportMessages,
+  accumulatedKnowledge,
   type User,
   type UpsertUser,
   type Child,
@@ -74,6 +75,8 @@ import {
   type InsertEvolutionReport,
   type EvolutionReportMessage,
   type InsertEvolutionReportMessage,
+  type AccumulatedKnowledge,
+  type InsertAccumulatedKnowledge,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or } from "drizzle-orm";
@@ -211,6 +214,14 @@ export interface IStorage {
 
   getEvolutionReportMessages(reportId: number): Promise<EvolutionReportMessage[]>;
   createEvolutionReportMessage(message: InsertEvolutionReportMessage): Promise<EvolutionReportMessage>;
+
+  // Accumulated Knowledge - Persistent insights across cycles
+  getAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
+  getAccumulatedKnowledgeByChild(userId: string, childId: number): Promise<AccumulatedKnowledge[]>;
+  getAccumulatedKnowledgeItem(id: number, userId: string): Promise<AccumulatedKnowledge | undefined>;
+  createAccumulatedKnowledge(knowledge: InsertAccumulatedKnowledge): Promise<AccumulatedKnowledge>;
+  updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined>;
+  getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -947,6 +958,54 @@ export class DatabaseStorage implements IStorage {
   async createEvolutionReportMessage(message: InsertEvolutionReportMessage): Promise<EvolutionReportMessage> {
     const [newMsg] = await db.insert(evolutionReportMessages).values(message).returning();
     return newMsg;
+  }
+
+  // Accumulated Knowledge - Persistent insights across cycles
+  async getAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]> {
+    return db.select().from(accumulatedKnowledge)
+      .where(eq(accumulatedKnowledge.userId, userId))
+      .orderBy(desc(accumulatedKnowledge.updatedAt));
+  }
+
+  async getAccumulatedKnowledgeByChild(userId: string, childId: number): Promise<AccumulatedKnowledge[]> {
+    return db.select().from(accumulatedKnowledge)
+      .where(and(
+        eq(accumulatedKnowledge.userId, userId),
+        eq(accumulatedKnowledge.childId, childId)
+      ))
+      .orderBy(desc(accumulatedKnowledge.updatedAt));
+  }
+
+  async getAccumulatedKnowledgeItem(id: number, userId: string): Promise<AccumulatedKnowledge | undefined> {
+    const [item] = await db.select().from(accumulatedKnowledge)
+      .where(and(eq(accumulatedKnowledge.id, id), eq(accumulatedKnowledge.userId, userId)));
+    return item;
+  }
+
+  async createAccumulatedKnowledge(knowledge: InsertAccumulatedKnowledge): Promise<AccumulatedKnowledge> {
+    const [newKnowledge] = await db.insert(accumulatedKnowledge).values(knowledge).returning();
+    return newKnowledge;
+  }
+
+  async updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined> {
+    const [updated] = await db.update(accumulatedKnowledge)
+      .set({ ...knowledge, updatedAt: new Date() })
+      .where(and(eq(accumulatedKnowledge.id, id), eq(accumulatedKnowledge.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]> {
+    return db.select().from(accumulatedKnowledge)
+      .where(and(
+        eq(accumulatedKnowledge.userId, userId),
+        or(
+          eq(accumulatedKnowledge.status, "active"),
+          eq(accumulatedKnowledge.status, "validated"),
+          eq(accumulatedKnowledge.status, "emerging")
+        )
+      ))
+      .orderBy(desc(accumulatedKnowledge.confidence));
   }
 }
 
