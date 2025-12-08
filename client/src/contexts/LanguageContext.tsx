@@ -184,6 +184,7 @@ const translations: Record<string, Record<Language, string>> = {
   phaseLearn: { en: "Learn", ka: "სწავლა" },
   phaseConnect: { en: "Connect", ka: "დაკავშირება" },
   phaseTheorize: { en: "Theorize", ka: "თეორიზება" },
+  phaseSynthesize: { en: "Synthesize", ka: "სინთეზი" },
   phaseValidate: { en: "Validate", ka: "ვალიდაცია" },
   phaseAdapt: { en: "Adapt", ka: "ადაპტაცია" },
   dailyReports: { en: "Daily Reports", ka: "ყოველდღიური ანგარიშები" },

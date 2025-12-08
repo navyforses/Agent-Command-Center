@@ -43,11 +43,12 @@ const PHASE_DURATIONS: Record<EvolutionPhase, number> = {
   learn: 4,
   connect: 4,
   theorize: 4,
+  synthesize: 2,
   validate: 2,
   adapt: 2,
 };
 
-const PHASE_ORDER: EvolutionPhase[] = ["observe", "learn", "connect", "theorize", "validate", "adapt"];
+const PHASE_ORDER: EvolutionPhase[] = ["observe", "learn", "connect", "theorize", "synthesize", "validate", "adapt"];
 
 interface PhaseResult {
   insights: InsertEvolutionInsight[];
@@ -774,6 +775,172 @@ Respond with JSON containing synthesized conclusions.`;
   };
 }
 
+async function executeSynthesizePhase(
+  diagnosisContext: string,
+  theorizeInsights: EvolutionInsight[]
+): Promise<PhaseResult> {
+  const hypothesesByAI: Record<string, string> = {};
+  
+  for (const insight of theorizeInsights) {
+    const provider = (insight.metadata as Record<string, unknown>)?.aiProvider as string;
+    if (provider && insight.contentEn) {
+      hypothesesByAI[provider] = insight.contentEn;
+    }
+  }
+
+  const allHypothesesContext = Object.entries(hypothesesByAI)
+    .map(([ai, content]) => `=== ${ai.toUpperCase()} HYPOTHESIS ===\n${content}`)
+    .join("\n\n");
+
+  const debatePrompt = `You are part of a Multi-AI Synthesis Debate for medical research on Hypoxic-Ischemic Encephalopathy (HIE).
+
+You have received hypotheses from 5 different AI systems (Claude, GPT, Gemini, Grok, Perplexity). Your task is to:
+
+1. ANALYZE each AI's hypothesis for strengths and weaknesses
+2. IDENTIFY areas of agreement (consensus points)
+3. IDENTIFY areas of disagreement (debate points)
+4. SYNTHESIZE the strongest elements into unified recommendations
+5. PROPOSE a merged hypothesis that combines the best insights
+
+Consider:
+- Which hypotheses have the strongest evidence base?
+- What unique perspectives does each AI bring?
+- Where do the AIs agree most strongly?
+- What contradictions exist and how can they be resolved?
+- What novel treatment approaches emerge from combining perspectives?
+
+Respond with a JSON object:
+{
+  "summary": "Synthesis debate summary (2-3 paragraphs)",
+  "keyPoints": ["Key synthesis point 1", ...],
+  "consensusPoints": [
+    {
+      "point": "What all/most AIs agree on",
+      "supportingAIs": ["claude", "gpt", ...],
+      "strength": "strong/moderate/weak"
+    }
+  ],
+  "debatePoints": [
+    {
+      "topic": "Area of disagreement",
+      "positions": [
+        {"ai": "claude", "position": "Claude's view"},
+        {"ai": "gpt", "position": "GPT's view"}
+      ],
+      "resolution": "How to reconcile or which is stronger"
+    }
+  ],
+  "mergedHypothesis": {
+    "statement": "The unified hypothesis combining best insights",
+    "rationale": "Why this synthesis is stronger than individual hypotheses",
+    "contributingAIs": ["claude", "gpt", ...],
+    "novelElements": ["New insight from synthesis 1", ...]
+  },
+  "actionableRecommendations": [
+    {
+      "recommendation": "Specific actionable recommendation",
+      "priority": "high/medium/low",
+      "evidence": "Supporting evidence"
+    }
+  ],
+  "sources": [{"title": "Source", "snippet": "Key excerpt"}],
+  "confidence": 85
+}`;
+
+  const query = `Synthesize and debate the following hypotheses from 5 AI systems for: ${diagnosisContext}
+
+${allHypothesesContext}
+
+Your task:
+1. Identify where the AIs agree (consensus)
+2. Identify where they disagree (debate points)
+3. Synthesize the strongest elements into a unified recommendation
+4. Propose actionable next steps based on the synthesis`;
+
+  const insights: InsertEvolutionInsight[] = [];
+
+  const [claudeResult, gptResult, geminiResult, grokResult, perplexityResult] = await Promise.all([
+    queryClaude(query, debatePrompt),
+    queryOpenAI(query, debatePrompt),
+    queryGemini(query, debatePrompt),
+    queryGrok(query, debatePrompt),
+    queryPerplexity(query, debatePrompt),
+  ]);
+
+  const allDebateResults = [
+    { result: claudeResult, provider: "claude-synthesis" },
+    { result: gptResult, provider: "gpt-synthesis" },
+    { result: geminiResult, provider: "gemini-synthesis" },
+    { result: grokResult, provider: "grok-synthesis" },
+    { result: perplexityResult, provider: "perplexity-synthesis" },
+  ];
+
+  for (const { result, provider } of allDebateResults) {
+    if (result.success) {
+      const contentKa = await translateToGeorgian(result.content);
+      insights.push({
+        phase: "synthesize",
+        insightType: "synthesis",
+        contentEn: result.content,
+        contentKa,
+        sources: result.sources,
+        metadata: {
+          keyPoints: result.keyPoints,
+          aiProvider: provider,
+          synthesisType: "debate-contribution",
+          inputHypothesesCount: Object.keys(hypothesesByAI).length,
+        },
+        confidence: result.confidence,
+        relevanceScore: 90,
+      });
+    }
+  }
+
+  const successfulDebates = allDebateResults.filter((r) => r.result.success);
+  if (successfulDebates.length >= 3) {
+    const metaSynthesisPrompt = `You are the final synthesizer in a Multi-AI debate. Analyze the synthesis contributions from ${successfulDebates.length} AI systems and produce the FINAL unified synthesis.
+
+Extract:
+- The strongest consensus points across all syntheses
+- The most actionable recommendations
+- The unified hypothesis that represents the collective intelligence
+- Priority actions for the child's treatment journey
+
+Respond with JSON containing the final synthesized conclusions.`;
+
+    const metaSynthesisContext = successfulDebates
+      .map((r) => `[${r.provider.toUpperCase()}]: ${r.result.content}`)
+      .join("\n\n");
+
+    const finalSynthesis = await queryClaude(metaSynthesisContext, metaSynthesisPrompt);
+
+    if (finalSynthesis.success) {
+      const contentKa = await translateToGeorgian(finalSynthesis.content);
+      insights.push({
+        phase: "synthesize",
+        insightType: "synthesis",
+        contentEn: finalSynthesis.content,
+        contentKa,
+        sources: finalSynthesis.sources,
+        metadata: {
+          keyPoints: finalSynthesis.keyPoints,
+          aiProvider: "meta-synthesis",
+          synthesisType: "final-unified",
+          participatingAIs: successfulDebates.map((r) => r.provider),
+        },
+        confidence: finalSynthesis.confidence,
+        relevanceScore: 98,
+      });
+    }
+  }
+
+  return {
+    insights,
+    success: insights.length > 0,
+    error: insights.length === 0 ? "No synthesis generated" : undefined,
+  };
+}
+
 async function executeValidatePhase(
   diagnosisContext: string,
   hypotheses: EvolutionInsight[]
@@ -891,12 +1058,13 @@ async function executeAdaptPhase(
     learn: allInsights.filter((i) => i.phase === "learn"),
     connect: allInsights.filter((i) => i.phase === "connect"),
     theorize: allInsights.filter((i) => i.phase === "theorize"),
+    synthesize: allInsights.filter((i) => i.phase === "synthesize"),
     validate: allInsights.filter((i) => i.phase === "validate"),
   };
 
   const adaptationPrompt = `You are a medical AI adaptation specialist. Your task is to analyze the complete cycle of research and generate adaptation recommendations.
 
-Based on all phases (observe, learn, connect, theorize, validate), determine:
+Based on all phases (observe, learn, connect, theorize, synthesize, validate), determine:
 - What new knowledge should be integrated into the research model
 - How to improve future observation strategies
 - Which hypothesis directions proved most promising
@@ -937,6 +1105,8 @@ CONNECT (${insightsByPhase.connect.length} insights): ${insightsByPhase.connect.
 
 THEORIZE (${insightsByPhase.theorize.length} insights): ${insightsByPhase.theorize.map((i) => i.contentEn?.substring(0, 200)).join("... ")}
 
+SYNTHESIZE (${insightsByPhase.synthesize.length} insights): ${insightsByPhase.synthesize.map((i) => i.contentEn?.substring(0, 200)).join("... ")}
+
 VALIDATE (${insightsByPhase.validate.length} insights): ${insightsByPhase.validate.map((i) => i.contentEn?.substring(0, 200)).join("... ")}
 
 Generate:
@@ -970,6 +1140,7 @@ Generate:
           learnCount: insightsByPhase.learn.length,
           connectCount: insightsByPhase.connect.length,
           theorizeCount: insightsByPhase.theorize.length,
+          synthesizeCount: insightsByPhase.synthesize.length,
           validateCount: insightsByPhase.validate.length,
         },
       },
@@ -1053,11 +1224,18 @@ export async function executeEvolutionPhase(
         phaseResult = await executeTheorizePhase(diagnosisContext, previousInsights);
         break;
 
-      case "validate":
-        const hypotheses = previousInsights.filter(
+      case "synthesize":
+        const theorizeInsights = previousInsights.filter(
           (i) => i.phase === "theorize"
         );
-        phaseResult = await executeValidatePhase(diagnosisContext, hypotheses);
+        phaseResult = await executeSynthesizePhase(diagnosisContext, theorizeInsights);
+        break;
+
+      case "validate":
+        const synthesizeInsights = previousInsights.filter(
+          (i) => i.phase === "synthesize"
+        );
+        phaseResult = await executeValidatePhase(diagnosisContext, synthesizeInsights);
         break;
 
       case "adapt":
@@ -1082,8 +1260,8 @@ export async function executeEvolutionPhase(
 
     await storage.updateEvolutionDailyRun(dailyRunId, {
       phasesCompleted: currentPhasesCompleted,
-      status: currentPhasesCompleted.length === 6 ? "completed" : "running",
-      ...(currentPhasesCompleted.length === 6 ? { completedAt: new Date() } : {}),
+      status: currentPhasesCompleted.length === 7 ? "completed" : "running",
+      ...(currentPhasesCompleted.length === 7 ? { completedAt: new Date() } : {}),
     });
 
     console.log(
@@ -1115,7 +1293,8 @@ function getPhaseForHour(hourOfDay: number): EvolutionPhase {
   if (hourOfDay < 12) return "learn";
   if (hourOfDay < 16) return "connect";
   if (hourOfDay < 20) return "theorize";
-  if (hourOfDay < 22) return "validate";
+  if (hourOfDay < 22) return "synthesize";
+  if (hourOfDay < 24) return "validate";
   return "adapt";
 }
 
@@ -1266,6 +1445,7 @@ export async function generateDailyReport(dailyRunId: number): Promise<Evolution
       learn: [],
       connect: [],
       theorize: [],
+      synthesize: [],
       validate: [],
       adapt: [],
     };

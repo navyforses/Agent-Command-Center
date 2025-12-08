@@ -688,12 +688,13 @@ export const evolutionDailyRuns = pgTable("evolution_daily_runs", {
 });
 
 export const evolutionPhaseEnum = z.enum([
-  "observe",   // 8 hours - Monitor PubMed, ClinicalTrials.gov, medical news
-  "learn",     // 4 hours - Extract and structure information
-  "connect",   // 4 hours - Link to child's diagnosis
-  "theorize",  // 4 hours - Generate hypotheses with Swarm Intelligence
-  "validate",  // 2 hours - Compare predictions with evidence
-  "adapt"      // 2 hours - Adjust model
+  "observe",    // 8 hours - Monitor PubMed, ClinicalTrials.gov, medical news
+  "learn",      // 4 hours - Extract and structure information
+  "connect",    // 4 hours - Link to child's diagnosis
+  "theorize",   // 4 hours - Generate hypotheses with Swarm Intelligence
+  "synthesize", // 2 hours - 5 AIs debate and synthesize hypotheses together
+  "validate",   // 2 hours - Compare predictions with evidence
+  "adapt"       // 2 hours - Adjust model
 ]);
 export type EvolutionPhase = z.infer<typeof evolutionPhaseEnum>;
 
@@ -735,6 +736,7 @@ export const evolutionInsightTypeEnum = z.enum([
   "connection",     // From CONNECT phase
   "hypothesis",     // From THEORIZE phase
   "prediction",     // From THEORIZE phase
+  "synthesis",      // From SYNTHESIZE phase - AI debate results
   "validation",     // From VALIDATE phase
   "adaptation"      // From ADAPT phase
 ]);
