@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Image, File, Download, Eye, Brain, Calendar, Building, MessageSquare, ChevronDown, Target, Lightbulb } from "lucide-react";
+import { FileText, Image, File, Download, Eye, Brain, Calendar, Building, MessageSquare, ChevronDown, Target, Lightbulb, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface DocumentCardProps {
@@ -22,6 +22,7 @@ interface DocumentCardProps {
   onDownload?: () => void;
   onAnalyze?: () => void;
   onViewConversation?: () => void;
+  onDelete?: () => void;
 }
 
 export function DocumentCard({
@@ -41,6 +42,7 @@ export function DocumentCard({
   onDownload,
   onAnalyze,
   onViewConversation,
+  onDelete,
 }: DocumentCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const getFileIcon = () => {
@@ -205,6 +207,21 @@ export function DocumentCard({
                 >
                   <MessageSquare className="h-3 w-3" />
                   {language === "en" ? "View AI Chat" : "AI ჩატის ნახვა"}
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  data-testid={`button-delete-${id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {language === "en" ? "Delete" : "წაშლა"}
                 </Button>
               )}
             </div>

@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, Filter, Grid, List, Zap, Calendar, Loader2 } from "lucide-react";
+import { Upload, Search, Filter, Grid, List, Zap, Calendar, Loader2, Trash2 } from "lucide-react";
 import { DocumentCard } from "@/components/dashboard/DocumentCard";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import {
@@ -22,6 +22,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -110,6 +120,8 @@ export default function Documents() {
   const [showEvolutionDialog, setShowEvolutionDialog] = useState(false);
   const [uploadedDocumentId, setUploadedDocumentId] = useState<number | null>(null);
   const [endDate, setEndDate] = useState<Date | undefined>(addDays(new Date(), 30));
+  const [deleteDocumentId, setDeleteDocumentId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: documents, isLoading } = useQuery<Document[]>({
     queryKey: ['/api/documents'],
@@ -131,6 +143,33 @@ export default function Documents() {
       toast({
         title: "Analysis Failed",
         description: error.message || "Failed to analyze document",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const response = await apiRequest("DELETE", `/api/documents/${documentId}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete document");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      setShowDeleteDialog(false);
+      setDeleteDocumentId(null);
+      toast({
+        title: language === "ka" ? "წარმატება" : "Success",
+        description: language === "ka" ? "დოკუმენტი წაიშალა" : "Document deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: language === "ka" ? "შეცდომა" : "Error",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -206,6 +245,17 @@ export default function Documents() {
 
   const handleViewConversation = (conversationId: number) => {
     setLocation(`/ai-assistant?conversation=${conversationId}`);
+  };
+
+  const handleDeleteClick = (documentId: string) => {
+    setDeleteDocumentId(documentId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteDocumentId) {
+      deleteMutation.mutate(deleteDocumentId);
+    }
   };
 
   const transformedDocuments = documents?.map(transformDocument) || [];
@@ -328,6 +378,7 @@ export default function Documents() {
               onDownload={() => handleDownload(doc)}
               onAnalyze={() => handleAnalyze(doc.id)}
               onViewConversation={doc.conversationId ? () => handleViewConversation(doc.conversationId!) : undefined}
+              onDelete={() => handleDeleteClick(doc.id)}
             />
           ))}
         </div>
@@ -404,6 +455,39 @@ export default function Documents() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === "ka" ? "დოკუმენტის წაშლა" : "Delete Document"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === "ka" 
+                ? "დარწმუნებული ხართ, რომ გსურთ ამ დოკუმენტის წაშლა? ეს მოქმედება შეუქცევადია."
+                : "Are you sure you want to delete this document? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              {language === "ka" ? "გაუქმება" : "Cancel"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              {language === "ka" ? "წაშლა" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
