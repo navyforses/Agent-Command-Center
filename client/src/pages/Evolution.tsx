@@ -27,10 +27,17 @@ import {
   Brain,
   Target,
   RefreshCw,
+  Sparkles,
+  TrendingUp,
+  Layers,
+  Link2,
+  FlaskConical,
+  Activity,
+  Telescope,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format, parseISO, differenceInDays } from "date-fns";
-import type { EvolutionCycle, EvolutionDailyRun, EvolutionReport, EvolutionReportMessage } from "@shared/schema";
+import type { EvolutionCycle, EvolutionDailyRun, EvolutionReport, EvolutionReportMessage, AccumulatedKnowledge } from "@shared/schema";
 
 const phases = [
   { id: "observe", icon: Search, duration: "8h", labelKey: "phaseObserve" },
@@ -397,6 +404,246 @@ function ReportsList({ cycleId }: { cycleId: number }) {
   );
 }
 
+const knowledgeTypeIcons: Record<string, typeof Lightbulb> = {
+  hypothesis: Lightbulb,
+  discovery: Sparkles,
+  treatment_insight: FlaskConical,
+  mechanism: Activity,
+  pattern: Layers,
+  connection: Link2,
+  prediction: Telescope,
+};
+
+const knowledgeStatusColors: Record<string, string> = {
+  emerging: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  active: "bg-green-500/10 text-green-600 dark:text-green-400",
+  validated: "bg-primary/10 text-primary",
+  superseded: "bg-muted text-muted-foreground",
+  refuted: "bg-destructive/10 text-destructive",
+};
+
+function KnowledgeCard({ knowledge }: { knowledge: AccumulatedKnowledge }) {
+  const { t, language } = useLanguage();
+  const title = language === "ka" && knowledge.titleKa ? knowledge.titleKa : knowledge.titleEn;
+  const content = language === "ka" && knowledge.contentKa ? knowledge.contentKa : knowledge.contentEn;
+  const knowledgeType = knowledge.knowledgeType || "hypothesis";
+  const knowledgeStatus = knowledge.status || "active";
+  const TypeIcon = knowledgeTypeIcons[knowledgeType] || Lightbulb;
+  const statusColorClass = knowledgeStatusColors[knowledgeStatus] || knowledgeStatusColors.active;
+  const cycleCount = knowledge.contributingCycleIds?.length ?? 0;
+  const confidence = typeof knowledge.confidence === "number" ? knowledge.confidence : 50;
+  const validations = typeof knowledge.validationCount === "number" ? knowledge.validationCount : 0;
+
+  const typeLabel = t(`knowledgeType_${knowledgeType}`);
+  const statusLabel = t(`knowledgeStatus_${knowledgeStatus}`);
+
+  return (
+    <Card className="hover-elevate" data-testid={`card-knowledge-${knowledge.id}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-md bg-muted">
+              <TypeIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">{title}</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                {typeLabel !== `knowledgeType_${knowledgeType}` ? typeLabel : knowledgeType}
+              </CardDescription>
+            </div>
+          </div>
+          <Badge className={`${statusColorClass} text-xs`} data-testid={`badge-knowledge-status-${knowledge.id}`}>
+            {statusLabel !== `knowledgeStatus_${knowledgeStatus}` ? statusLabel : knowledgeStatus}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground line-clamp-2">{content}</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{t("knowledgeConfidence")}</span>
+            <span className="font-medium">{confidence}%</span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${confidence}%` }}
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5" data-testid={`text-knowledge-validations-${knowledge.id}`}>
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>{validations} {t("knowledgeValidations")}</span>
+          </div>
+          <div className="flex items-center gap-1.5" data-testid={`text-knowledge-cycles-${knowledge.id}`}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>{cycleCount} {t("knowledgeCycles")}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function KnowledgeGrowthCard({ knowledge }: { knowledge: AccumulatedKnowledge[] }) {
+  const { t } = useLanguage();
+
+  const statusCounts = {
+    validated: knowledge.filter(k => k.status === "validated").length,
+    active: knowledge.filter(k => k.status === "active").length,
+    emerging: knowledge.filter(k => k.status === "emerging").length,
+  };
+
+  const typeCounts: Record<string, number> = {};
+  knowledge.forEach(k => {
+    const type = k.knowledgeType || "hypothesis";
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+
+  const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const maxTypeCount = Math.max(...Object.values(typeCounts), 1);
+
+  const avgConfidence = knowledge.length > 0
+    ? Math.round(knowledge.reduce((sum, k) => sum + (k.confidence ?? 50), 0) / knowledge.length)
+    : 0;
+
+  return (
+    <Card data-testid="card-knowledge-growth">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          {t("knowledgeGrowth")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-primary">{statusCounts.validated}</p>
+            <p className="text-xs text-muted-foreground">{t("validated")}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{statusCounts.active}</p>
+            <p className="text-xs text-muted-foreground">{t("knowledgeStatus_active")}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{statusCounts.emerging}</p>
+            <p className="text-xs text-muted-foreground">{t("knowledgeStatus_emerging")}</p>
+          </div>
+        </div>
+        <div className="pt-2 border-t">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+            <span>{t("knowledgeConfidence")}</span>
+            <span className="font-medium">{avgConfidence}%</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary transition-all" style={{ width: `${avgConfidence}%` }} />
+          </div>
+        </div>
+        {sortedTypes.length > 0 && (
+          <div className="pt-2 border-t space-y-2">
+            <p className="text-xs text-muted-foreground font-medium mb-1">{t("knowledgeGrowth")}</p>
+            {sortedTypes.map(([type, count]) => {
+              const TypeIcon = knowledgeTypeIcons[type] || Lightbulb;
+              const typeLabel = t(`knowledgeType_${type}`);
+              return (
+                <div key={type} className="flex items-center gap-2">
+                  <TypeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground w-20 truncate">
+                    {typeLabel !== `knowledgeType_${type}` ? typeLabel : type}
+                  </span>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary/70 transition-all" 
+                      style={{ width: `${(count / maxTypeCount) * 100}%` }} 
+                    />
+                  </div>
+                  <span className="text-xs font-medium w-4 text-right">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AccumulatedKnowledgeSection() {
+  const { t } = useLanguage();
+
+  const { data: knowledge, isLoading, isError } = useQuery<AccumulatedKnowledge[]>({
+    queryKey: ["/api/evolution/accumulated-knowledge"],
+  });
+
+  const activeKnowledge = knowledge?.filter(k => k.status === "active" || k.status === "validated" || k.status === "emerging") || [];
+  const validatedCount = knowledge?.filter(k => k.status === "validated").length || 0;
+  const totalCount = knowledge?.length || 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-24" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-40" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4" data-testid="section-accumulated-knowledge">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            {t("accumulatedKnowledge")}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("accumulatedKnowledgeSubtitle")}</p>
+        </div>
+        {totalCount > 0 && (
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Layers className="h-4 w-4" />
+              <span>{totalCount} {t("totalKnowledge")}</span>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {validatedCount} {t("validated")}
+            </Badge>
+          </div>
+        )}
+      </div>
+
+      {!knowledge || knowledge.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Brain className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="font-medium mb-2">{t("noAccumulatedKnowledge")}</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              {t("noAccumulatedKnowledgeDesc")}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <KnowledgeGrowthCard knowledge={knowledge} />
+          <div className="grid gap-4 md:grid-cols-2">
+            {activeKnowledge.slice(0, 6).map((item) => (
+              <KnowledgeCard key={item.id} knowledge={item} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Evolution() {
   const { t } = useLanguage();
 
@@ -457,6 +704,8 @@ export default function Evolution() {
             </h2>
             <ReportsList cycleId={activeCycle.id} />
           </div>
+
+          <AccumulatedKnowledgeSection />
         </>
       )}
     </div>
