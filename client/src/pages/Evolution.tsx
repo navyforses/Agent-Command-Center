@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -644,6 +646,250 @@ function AccumulatedKnowledgeSection() {
   );
 }
 
+const knowledgeTypeColors: Record<string, { fill: string; stroke: string }> = {
+  hypothesis: { fill: "#fbbf24", stroke: "#f59e0b" },
+  discovery: { fill: "#a855f7", stroke: "#9333ea" },
+  treatment_insight: { fill: "#22c55e", stroke: "#16a34a" },
+  mechanism: { fill: "#3b82f6", stroke: "#2563eb" },
+  pattern: { fill: "#6366f1", stroke: "#4f46e5" },
+  connection: { fill: "#06b6d4", stroke: "#0891b2" },
+  prediction: { fill: "#f97316", stroke: "#ea580c" },
+};
+
+interface GraphNode {
+  id: number;
+  x: number;
+  y: number;
+  label: string;
+  fullTitle: string;
+  type: string;
+  confidence: number;
+}
+
+interface GraphEdge {
+  source: number;
+  target: number;
+}
+
+function KnowledgeGraphSection() {
+  const { t, language } = useLanguage();
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+
+  const { data: knowledge, isLoading, isError } = useQuery<AccumulatedKnowledge[]>({
+    queryKey: ["/api/evolution/accumulated-knowledge"],
+  });
+
+  const { nodes, edges } = useMemo(() => {
+    if (!knowledge || knowledge.length === 0) {
+      return { nodes: [], edges: [] };
+    }
+
+    const centerX = 50;
+    const centerY = 50;
+    const radius = 40;
+    const angleStep = (2 * Math.PI) / knowledge.length;
+
+    const graphNodes: GraphNode[] = knowledge.map((item, index) => {
+      const angle = angleStep * index - Math.PI / 2;
+      const title = language === "ka" && item.titleKa ? item.titleKa : item.titleEn;
+      const maxChars = language === "ka" ? 10 : 12;
+      return {
+        id: item.id,
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
+        label: title.length > maxChars ? title.substring(0, maxChars) + "..." : title,
+        fullTitle: title,
+        type: item.knowledgeType || "hypothesis",
+        confidence: item.confidence ?? 50,
+      };
+    });
+
+    const knowledgeIdSet = new Set(knowledge.map(k => k.id));
+    const edgeSet = new Set<string>();
+    const graphEdges: GraphEdge[] = [];
+
+    knowledge.forEach((item) => {
+      if (item.relatedKnowledgeIds && Array.isArray(item.relatedKnowledgeIds)) {
+        item.relatedKnowledgeIds.forEach((relatedId) => {
+          if (knowledgeIdSet.has(relatedId)) {
+            const edgeKey = [Math.min(item.id, relatedId), Math.max(item.id, relatedId)].join("-");
+            if (!edgeSet.has(edgeKey)) {
+              edgeSet.add(edgeKey);
+              graphEdges.push({ source: Math.min(item.id, relatedId), target: Math.max(item.id, relatedId) });
+            }
+          }
+        });
+      }
+    });
+
+    return { nodes: graphNodes, edges: graphEdges };
+  }, [knowledge, language]);
+
+  const nodeMap = useMemo(() => {
+    const map = new Map<number, GraphNode>();
+    nodes.forEach((node) => map.set(node.id, node));
+    return map;
+  }, [nodes]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4" data-testid="section-knowledge-graph">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4" data-testid="section-knowledge-graph">
+      <div>
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <GitBranch className="h-5 w-5" />
+          {t("knowledgeGraph")}
+        </h2>
+        <p className="text-sm text-muted-foreground">{t("knowledgeGraphVisualization")}</p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <GitBranch className="h-4 w-4" />
+            {t("knowledgeGraph")}
+          </CardTitle>
+          <CardDescription>{t("interactiveConceptMapping")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!knowledge || knowledge.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <GitBranch className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="font-medium mb-2">{t("noAccumulatedKnowledge")}</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                {t("noAccumulatedKnowledgeDesc")}
+              </p>
+            </div>
+          ) : (
+            <div className="relative" data-testid="graph-container">
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full aspect-square max-w-md mx-auto"
+                role="img"
+                aria-label={t("knowledgeGraphVisualization")}
+              >
+                {edges.map((edge, index) => {
+                  const sourceNode = nodeMap.get(edge.source);
+                  const targetNode = nodeMap.get(edge.target);
+                  if (!sourceNode || !targetNode) return null;
+                  return (
+                    <motion.line
+                      key={`edge-${index}`}
+                      x1={sourceNode.x}
+                      y1={sourceNode.y}
+                      x2={targetNode.x}
+                      y2={targetNode.y}
+                      stroke="currentColor"
+                      strokeOpacity={0.2}
+                      strokeWidth={0.4}
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 1 }}
+                      transition={{ duration: 0.5, delay: index * 0.05 }}
+                    />
+                  );
+                })}
+
+                {nodes.map((node, index) => {
+                  const colors = knowledgeTypeColors[node.type] || knowledgeTypeColors.hypothesis;
+                  const nodeRadius = 2 + (node.confidence / 100) * 1;
+                  const isSelected = selectedNode?.id === node.id;
+
+                  return (
+                    <Tooltip key={node.id}>
+                      <TooltipTrigger asChild>
+                        <motion.g
+                          className="cursor-pointer focus:outline-none"
+                          tabIndex={0}
+                          role="button"
+                          aria-label={node.fullTitle}
+                          onClick={() => setSelectedNode(isSelected ? null : node)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelectedNode(isSelected ? null : node);
+                            }
+                          }}
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                          whileHover={{ scale: 1.15 }}
+                          whileFocus={{ scale: 1.15 }}
+                          data-testid={`graph-node-${node.id}`}
+                        >
+                          <circle
+                            cx={node.x}
+                            cy={node.y}
+                            r={nodeRadius}
+                            fill={colors.fill}
+                            stroke={isSelected ? "hsl(var(--primary))" : colors.stroke}
+                            strokeWidth={isSelected ? 0.6 : 0.4}
+                          />
+                          <text
+                            x={node.x}
+                            y={node.y + nodeRadius + 3}
+                            textAnchor="middle"
+                            className="text-[2.5px] fill-muted-foreground pointer-events-none"
+                          >
+                            {node.label}
+                          </text>
+                        </motion.g>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="font-medium">{node.fullTitle}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {t(`knowledgeType_${node.type}`) !== `knowledgeType_${node.type}` 
+                            ? t(`knowledgeType_${node.type}`) 
+                            : node.type}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("knowledgeConfidence")}: {node.confidence}%
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </svg>
+
+              {nodes.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs">
+                  {Object.entries(knowledgeTypeColors).map(([type, colors]) => {
+                    const count = nodes.filter((n) => n.type === type).length;
+                    if (count === 0) return null;
+                    const typeLabel = t(`knowledgeType_${type}`);
+                    return (
+                      <div key={type} className="flex items-center gap-1.5">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: colors.fill }}
+                        />
+                        <span className="text-muted-foreground">
+                          {typeLabel !== `knowledgeType_${type}` ? typeLabel : type} ({count})
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Evolution() {
   const { t } = useLanguage();
 
@@ -706,6 +952,8 @@ export default function Evolution() {
           </div>
 
           <AccumulatedKnowledgeSection />
+
+          <KnowledgeGraphSection />
         </>
       )}
     </div>
