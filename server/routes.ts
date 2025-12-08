@@ -2067,9 +2067,17 @@ Format your response as JSON with the following structure:
         
         // Extract text from file
         if (file.mimetype === "application/pdf") {
-          extractedText = await extractTextFromPDF(file.buffer);
+          const result = await extractTextFromPDF(file.buffer);
+          if (!result.success) {
+            return res.status(400).json({ message: result.error || "Failed to extract text from PDF" });
+          }
+          extractedText = result.text;
         } else if (file.mimetype.startsWith("image/")) {
-          extractedText = await extractTextFromImage(file.buffer, file.mimetype);
+          const result = await extractTextFromImage(file.buffer, file.mimetype);
+          if (!result.success) {
+            return res.status(400).json({ message: result.error || "Failed to extract text from image" });
+          }
+          extractedText = result.text;
         }
         
         if (!extractedText || extractedText.trim().length === 0) {
@@ -2151,9 +2159,9 @@ ${extractedText.substring(0, 8000)}`;
       const { startEvolutionCycle } = await import("./evolutionCycleEngine");
       const cycle = await startEvolutionCycle(
         userId,
-        extractedChildId,
+        extractedChildId!,
         new Date(endDate),
-        undefined,
+        0,
         diagnosisContext || "Analyze the uploaded medical document and research relevant treatments."
       );
       
