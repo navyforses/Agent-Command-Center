@@ -129,7 +129,10 @@ export function DocumentCard({
                     variant="ghost"
                     size="sm"
                     className="gap-1 mt-2"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDetails(!showDetails);
+                    }}
                     data-testid={`button-toggle-findings-${id}`}
                   >
                     <ChevronDown className={`h-3 w-3 transition-transform ${showDetails ? "rotate-180" : ""}`} />
