@@ -2149,13 +2149,15 @@ Format your response as JSON with the following structure:
           return res.status(400).json({ message: "Could not extract text from the uploaded file" });
         }
 
-        // Use AI to extract child information and diagnosis context
-        const extractionPrompt = `Analyze this medical document and extract the following information in JSON format:
+        // Use AI to extract child information and diagnosis context (bilingual)
+        const extractionPrompt = `Analyze this medical document and extract the following information in JSON format. Provide both English and Georgian (ქართული) translations:
 {
   "childName": "Name of the child/patient (if found, otherwise null)",
   "dateOfBirth": "Date of birth if mentioned (YYYY-MM-DD format, otherwise null)",
-  "diagnosis": "Main diagnosis or condition",
-  "diagnosisSummary": "A comprehensive summary of the diagnosis, condition details, symptoms, and any relevant medical history. This should be detailed enough for AI research purposes."
+  "diagnosis": "Main diagnosis or condition (in English)",
+  "diagnosisKa": "Main diagnosis or condition (in Georgian/ქართული)",
+  "diagnosisSummary": "A comprehensive summary of the diagnosis, condition details, symptoms, and any relevant medical history in English. This should be detailed enough for AI research purposes.",
+  "diagnosisSummaryKa": "იგივე შეჯამება ქართულად - დიაგნოზის, მდგომარეობის დეტალების, სიმპტომების და შესაბამისი სამედიცინო ისტორიის ყოვლისმომცველი შეჯამება."
 }
 
 Document text:
@@ -2189,14 +2191,16 @@ ${extractedText.substring(0, 8000)}`;
             if (existingChild) {
               extractedChildId = existingChild.id;
             } else {
-              // Create new child
+              // Create new child with bilingual notes/diagnosis
               const newChild = await storage.createChild({
                 userId,
                 firstName: extractedFirstName,
                 lastName: extractedLastName,
                 dateOfBirth: extracted.dateOfBirth || null,
                 diagnosis: extracted.diagnosis || null,
+                diagnosisKa: extracted.diagnosisKa || null,
                 notes: `Created from uploaded document. ${extracted.diagnosisSummary || ""}`,
+                notesKa: `შეიქმნა ატვირთული დოკუმენტიდან. ${extracted.diagnosisSummaryKa || ""}`,
               });
               extractedChildId = newChild.id;
             }
@@ -2216,7 +2220,9 @@ ${extractedText.substring(0, 8000)}`;
           lastName: "(from document)",
           dateOfBirth: null,
           diagnosis: diagnosisContext.substring(0, 500),
+          diagnosisKa: null,
           notes: "Created automatically from uploaded document",
+          notesKa: "ავტომატურად შეიქმნა ატვირთული დოკუმენტიდან",
         });
         extractedChildId = newChild.id;
       }

@@ -317,8 +317,10 @@ export async function executeAction(
           lastName: actionData.lastName,
           dateOfBirth: actionData.dateOfBirth || null,
           diagnosis: actionData.diagnosis || null,
+          diagnosisKa: actionData.diagnosisKa || null,
           diagnosisDate: actionData.diagnosisDate || null,
           notes: actionData.notes || null,
+          notesKa: actionData.notesKa || null,
         };
         const child = await storage.createChild(childData);
         return {
