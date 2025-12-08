@@ -370,14 +370,19 @@ export type NexusQueryStatus = z.infer<typeof nexusQueryStatusEnum>;
 // Findings table - stores research findings from multi-AI analysis
 export const nexusFindings = pgTable("nexus_findings", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   queryId: integer("query_id").references(() => nexusResearchQueries.id),
+  evolutionCycleId: integer("evolution_cycle_id").references(() => evolutionCycles.id),
   title: text("title").notNull(),
+  titleKa: text("title_ka"),
   summary: text("summary"),
+  summaryKa: text("summary_ka"),
   consensusLevel: varchar("consensus_level", { length: 10 }),
   confidenceScore: integer("confidence_score"),
   relevanceScore: integer("relevance_score"),
   sources: jsonb("sources"),
   hypothesesGenerated: text("hypotheses_generated").array(),
+  hypothesesGeneratedKa: text("hypotheses_generated_ka").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

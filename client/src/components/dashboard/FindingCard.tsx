@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Star,
   ChevronDown,
@@ -24,7 +25,9 @@ interface AIAnalysis {
 export interface Finding {
   id: string;
   title: string;
+  titleKa?: string | null;
   summary: string;
+  summaryKa?: string | null;
   consensusLevel: "5/5" | "4/5" | "3/5" | "2/5" | "1/5";
   confidenceScore: number;
   relevanceScore: number;
@@ -76,9 +79,13 @@ function StarRating({ count }: { count: number }) {
 }
 
 export function FindingCard({ finding, variant = "default" }: FindingCardProps) {
+  const { language } = useLanguage();
   const [aiPerspectivesOpen, setAiPerspectivesOpen] = useState(false);
   const [disciplinaryOpen, setDisciplinaryOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+
+  const displayTitle = language === "ka" && finding.titleKa ? finding.titleKa : finding.title;
+  const displaySummary = language === "ka" && finding.summaryKa ? finding.summaryKa : finding.summary;
 
   const starCount = getStarCount(finding.consensusLevel);
   const disciplines = Object.keys(finding.disciplinaryAnalyses);
