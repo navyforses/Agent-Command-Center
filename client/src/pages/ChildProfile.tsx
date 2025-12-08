@@ -29,6 +29,7 @@ import {
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "wouter";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
+import { EditChildDialog } from "@/components/dashboard/EditChildDialog";
 import type { Child, Therapy, Document } from "@shared/schema";
 
 export default function ChildProfile() {
@@ -36,6 +37,7 @@ export default function ChildProfile() {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: child, isLoading: childLoading, error: childError } = useQuery<Child>({
     queryKey: ['/api/children', id],
@@ -159,10 +161,21 @@ export default function ChildProfile() {
             </div>
           </div>
         </div>
-        <Button variant="outline" className="gap-2" data-testid="button-edit-profile">
+        <Button 
+          variant="outline" 
+          className="gap-2" 
+          data-testid="button-edit-profile"
+          onClick={() => setEditDialogOpen(true)}
+        >
           <Edit className="h-4 w-4" />
           Edit Profile
         </Button>
+
+        <EditChildDialog 
+          child={child} 
+          open={editDialogOpen} 
+          onOpenChange={setEditDialogOpen} 
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
