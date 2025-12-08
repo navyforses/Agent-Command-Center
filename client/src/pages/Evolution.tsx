@@ -16,6 +16,7 @@ import {
   Clock,
   FileText,
   MessageSquare,
+  MessagesSquare,
   Search,
   BookOpen,
   Lightbulb,
@@ -46,6 +47,7 @@ const phases = [
   { id: "learn", icon: BookOpen, duration: "4h", labelKey: "phaseLearn" },
   { id: "connect", icon: GitBranch, duration: "4h", labelKey: "phaseConnect" },
   { id: "theorize", icon: Lightbulb, duration: "4h", labelKey: "phaseTheorize" },
+  { id: "synthesize", icon: MessagesSquare, duration: "3h", labelKey: "phaseSynthesize" },
   { id: "validate", icon: CheckCircle2, duration: "2h", labelKey: "phaseValidate" },
   { id: "adapt", icon: RefreshCw, duration: "2h", labelKey: "phaseAdapt" },
 ];
