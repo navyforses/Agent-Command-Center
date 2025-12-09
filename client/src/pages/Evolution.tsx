@@ -64,24 +64,23 @@ function PhaseTimeline({ currentPhase, phasesCompleted }: { currentPhase: string
         const Icon = phase.icon;
 
         return (
-          <div key={phase.id} className="flex items-center">
+          <div key={phase.id} className="flex items-center" data-testid={`phase-${phase.id}`}>
             <div
               className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                isCompleted
+                isCurrent
+                  ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
+                  : isCompleted
                   ? "bg-primary/10 text-primary"
-                  : isCurrent
-                  ? "bg-accent text-accent-foreground"
                   : "bg-muted/50 text-muted-foreground"
               }`}
             >
               <div className="relative">
                 <Icon className="h-4 w-4" />
-                {isCompleted && (
+                {isCurrent ? (
+                  <CircleDot className="h-3 w-3 absolute -bottom-1 -right-1 text-primary-foreground animate-pulse" />
+                ) : isCompleted ? (
                   <CheckCircle2 className="h-3 w-3 absolute -bottom-1 -right-1 text-primary" />
-                )}
-                {isCurrent && (
-                  <CircleDot className="h-3 w-3 absolute -bottom-1 -right-1 text-accent-foreground animate-pulse" />
-                )}
+                ) : null}
               </div>
               <div className="hidden sm:block">
                 <p className="text-xs font-medium">{t(phase.labelKey)}</p>
@@ -91,7 +90,7 @@ function PhaseTimeline({ currentPhase, phasesCompleted }: { currentPhase: string
             {index < phases.length - 1 && (
               <div
                 className={`h-0.5 w-4 ${
-                  isCompleted ? "bg-primary" : "bg-muted"
+                  isCompleted || isCurrent ? "bg-primary" : "bg-muted"
                 }`}
               />
             )}
