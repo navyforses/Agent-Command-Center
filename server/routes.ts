@@ -2490,8 +2490,33 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   app.post("/api/evolution/runs/:runId/generate-report", isAuthenticated, async (req: any, res) => {
     try {
       const runId = parseInt(req.params.runId);
+      const userId = req.user.claims.sub;
+      
       if (isNaN(runId)) {
         return res.status(400).json({ message: "Invalid run ID" });
+      }
+      
+      // Get the run and verify it exists
+      const run = await storage.getEvolutionDailyRun(runId);
+      if (!run) {
+        return res.status(404).json({ message: "Run not found" });
+      }
+      
+      // Verify ownership via the cycle
+      const cycle = await storage.getEvolutionCycle(run.cycleId, userId);
+      if (!cycle) {
+        return res.status(403).json({ message: "Not authorized to access this run" });
+      }
+      
+      // Check run is completed
+      if (run.status !== "completed") {
+        return res.status(400).json({ message: "Cannot generate report - run is not completed" });
+      }
+      
+      // Check if report already exists
+      const existingReport = await storage.getEvolutionReportByDailyRun(runId);
+      if (existingReport) {
+        return res.status(409).json({ message: "Report already exists for this run", report: existingReport });
       }
       
       const { generateDailyReport } = await import("./evolutionCycleEngine");
