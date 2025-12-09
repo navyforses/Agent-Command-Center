@@ -1380,6 +1380,22 @@ export async function runEvolutionTick(): Promise<{
         continue;
       }
 
+      // First, check for any incomplete runs from previous days and complete them
+      const allRuns = await storage.getEvolutionDailyRuns(cycle.id);
+      for (const oldRun of allRuns) {
+        if (oldRun.status === "running") {
+          const expectedPhase = getCurrentPhaseForRun(oldRun);
+          if (!expectedPhase) {
+            // Time elapsed - mark as completed and generate report
+            console.log(`[Evolution Engine] Completing old run ${oldRun.id} from ${oldRun.runDate}`);
+            await storage.updateEvolutionDailyRun(oldRun.id, {
+              status: "completed",
+              completedAt: new Date(),
+            });
+          }
+        }
+      }
+
       let dailyRun = await storage.getTodaysDailyRun(cycle.id);
 
       if (!dailyRun) {
