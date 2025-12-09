@@ -39,6 +39,7 @@ import {
   Telescope,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, differenceInDays } from "date-fns";
 import type { EvolutionCycle, EvolutionDailyRun, EvolutionReport, EvolutionReportMessage, AccumulatedKnowledge } from "@shared/schema";
 
@@ -324,11 +325,15 @@ function ReportDetailDialog({
   isOpen,
   onClose,
   onChatOpen,
+  onRegenerate,
+  isRegenerating,
 }: {
   report: EvolutionReport;
   isOpen: boolean;
   onClose: () => void;
   onChatOpen: () => void;
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
 }) {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"en" | "ka">("en");
@@ -424,21 +429,36 @@ function ReportDetailDialog({
           }
         </ScrollArea>
 
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={() => {
-              onClose();
-              onChatOpen();
-            }}
-            data-testid="button-open-chat-from-detail"
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            {t("chat")}
-          </Button>
-          <Button variant="secondary" onClick={onClose} data-testid="button-close-detail">
-            {t("close")}
-          </Button>
+        <div className="flex items-center justify-between gap-2 pt-4 border-t">
+          <div>
+            {onRegenerate && (
+              <Button
+                variant="outline"
+                onClick={onRegenerate}
+                disabled={isRegenerating}
+                data-testid="button-regenerate-report"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+                {isRegenerating ? t("regenerating") : t("regenerate")}
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                onClose();
+                onChatOpen();
+              }}
+              data-testid="button-open-chat-from-detail"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              {t("chat")}
+            </Button>
+            <Button variant="secondary" onClick={onClose} data-testid="button-close-detail">
+              {t("close")}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -527,11 +547,26 @@ function ReportCard({ report, onDetailOpen, onChatOpen }: { report: EvolutionRep
 
 function ReportsList({ cycleId }: { cycleId: number }) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [chatReport, setChatReport] = useState<EvolutionReport | null>(null);
   const [detailReport, setDetailReport] = useState<EvolutionReport | null>(null);
 
   const { data: reports, isLoading } = useQuery<EvolutionReport[]>({
     queryKey: ["/api/evolution/reports"],
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async (report: EvolutionReport) => {
+      return apiRequest("POST", `/api/evolution/runs/${report.dailyRunId}/generate-report`, { regenerate: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/reports"] });
+      toast({ title: t("regenerateSuccess") });
+      setDetailReport(null);
+    },
+    onError: () => {
+      toast({ title: t("regenerateError"), variant: "destructive" });
+    },
   });
 
   if (isLoading) {
@@ -577,6 +612,8 @@ function ReportsList({ cycleId }: { cycleId: number }) {
           isOpen={!!detailReport}
           onClose={() => setDetailReport(null)}
           onChatOpen={() => setChatReport(detailReport)}
+          onRegenerate={() => detailReport && regenerateMutation.mutate(detailReport)}
+          isRegenerating={regenerateMutation.isPending}
         />
       )}
 
