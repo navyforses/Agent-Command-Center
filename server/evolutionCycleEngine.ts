@@ -1327,7 +1327,8 @@ function getCycleStartHour(dailyRun: EvolutionDailyRun): number {
 
 function getCurrentPhaseForRun(dailyRun: EvolutionDailyRun): EvolutionPhase | null {
   const now = new Date();
-  const startTime = dailyRun.phaseStartedAt || dailyRun.createdAt;
+  // Use createdAt (run start time), not phaseStartedAt (current phase start time)
+  const startTime = dailyRun.createdAt;
   
   if (!startTime) return "observe";
 
@@ -1342,6 +1343,7 @@ function getCurrentPhaseForRun(dailyRun: EvolutionDailyRun): EvolutionPhase | nu
     }
   }
 
+  // All phases complete - return null to mark run as completed
   return null;
 }
 
