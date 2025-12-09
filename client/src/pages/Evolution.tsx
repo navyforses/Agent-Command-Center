@@ -285,14 +285,104 @@ function ReportChatDialog({
   );
 }
 
-function ReportCard({ report, onChatOpen }: { report: EvolutionReport; onChatOpen: () => void }) {
+function ReportDetailDialog({
+  report,
+  isOpen,
+  onClose,
+  onChatOpen,
+}: {
+  report: EvolutionReport;
+  isOpen: boolean;
+  onClose: () => void;
+  onChatOpen: () => void;
+}) {
+  const { t, language } = useLanguage();
+  const title = language === "ka" ? report.titleKa : report.titleEn;
+  const content = language === "ka" ? report.contentKa : report.contentEn;
+  const summary = language === "ka" ? report.summaryKa : report.summaryEn;
+  const keyFindings = language === "ka" ? report.keyFindingsKa : report.keyFindingsEn;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col" data-testid="dialog-report-detail">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {title || t("dailyReport")}
+          </DialogTitle>
+          <DialogDescription className="flex items-center gap-2">
+            <Calendar className="h-3 w-3" />
+            {format(parseISO(report.reportDate), "MMMM d, yyyy")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-6">
+            {summary && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">{t("summary")}</h3>
+                <p className="text-sm text-muted-foreground">{summary}</p>
+              </div>
+            )}
+
+            {keyFindings && keyFindings.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">{t("keyFindings")}</h3>
+                <ul className="space-y-2">
+                  {keyFindings.map((finding, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                      <span>{finding}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {content && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">{t("fullReport")}</h3>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <div className="text-sm text-muted-foreground whitespace-pre-wrap">{content}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onClose();
+              onChatOpen();
+            }}
+            data-testid="button-open-chat-from-detail"
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            {t("chat")}
+          </Button>
+          <Button variant="secondary" onClick={onClose} data-testid="button-close-detail">
+            {t("close")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReportCard({ report, onDetailOpen, onChatOpen }: { report: EvolutionReport; onDetailOpen: () => void; onChatOpen: () => void }) {
   const { t, language } = useLanguage();
   const title = language === "ka" ? report.titleKa : report.titleEn;
   const summary = language === "ka" ? report.summaryKa : report.summaryEn;
   const keyFindings = language === "ka" ? report.keyFindingsKa : report.keyFindingsEn;
 
   return (
-    <Card className="hover-elevate" data-testid={`card-report-${report.id}`}>
+    <Card 
+      className="hover-elevate cursor-pointer" 
+      onClick={onDetailOpen}
+      data-testid={`card-report-${report.id}`}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -308,7 +398,10 @@ function ReportCard({ report, onChatOpen }: { report: EvolutionReport; onChatOpe
           <Button
             variant="outline"
             size="sm"
-            onClick={onChatOpen}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChatOpen();
+            }}
             className="shrink-0"
             data-testid={`button-chat-report-${report.id}`}
           >
@@ -342,7 +435,13 @@ function ReportCard({ report, onChatOpen }: { report: EvolutionReport; onChatOpe
       </CardContent>
       {report.filePath && (
         <CardFooter className="pt-0">
-          <Button variant="ghost" size="sm" className="text-xs" data-testid={`button-download-report-${report.id}`}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs" 
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`button-download-report-${report.id}`}
+          >
             <FileText className="h-3 w-3 mr-1" />
             {t("downloadPdf")}
           </Button>
@@ -354,7 +453,8 @@ function ReportCard({ report, onChatOpen }: { report: EvolutionReport; onChatOpe
 
 function ReportsList({ cycleId }: { cycleId: number }) {
   const { t } = useLanguage();
-  const [selectedReport, setSelectedReport] = useState<EvolutionReport | null>(null);
+  const [chatReport, setChatReport] = useState<EvolutionReport | null>(null);
+  const [detailReport, setDetailReport] = useState<EvolutionReport | null>(null);
 
   const { data: reports, isLoading } = useQuery<EvolutionReport[]>({
     queryKey: ["/api/evolution/reports"],
@@ -391,16 +491,26 @@ function ReportsList({ cycleId }: { cycleId: number }) {
           <ReportCard
             key={report.id}
             report={report}
-            onChatOpen={() => setSelectedReport(report)}
+            onDetailOpen={() => setDetailReport(report)}
+            onChatOpen={() => setChatReport(report)}
           />
         ))}
       </div>
 
-      {selectedReport && (
+      {detailReport && (
+        <ReportDetailDialog
+          report={detailReport}
+          isOpen={!!detailReport}
+          onClose={() => setDetailReport(null)}
+          onChatOpen={() => setChatReport(detailReport)}
+        />
+      )}
+
+      {chatReport && (
         <ReportChatDialog
-          report={selectedReport}
-          isOpen={!!selectedReport}
-          onClose={() => setSelectedReport(null)}
+          report={chatReport}
+          isOpen={!!chatReport}
+          onClose={() => setChatReport(null)}
         />
       )}
     </>

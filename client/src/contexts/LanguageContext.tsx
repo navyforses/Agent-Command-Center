@@ -199,6 +199,9 @@ const translations: Record<string, Record<Language, string>> = {
   askAboutReport: { en: "Ask questions about this research report", ka: "დაუსვით შეკითხვები ამ კვლევით ანგარიშს" },
   typeYourQuestion: { en: "Type your question...", ka: "შეიყვანეთ თქვენი შეკითხვა..." },
   downloadPdf: { en: "Download PDF", ka: "PDF ჩამოტვირთვა" },
+  summary: { en: "Summary", ka: "მოკლე შინაარსი" },
+  fullReport: { en: "Full Report", ka: "სრული ანგარიში" },
+  close: { en: "Close", ka: "დახურვა" },
 
   // Evolution Cycle Activation
   startEvolutionCycle: { en: "Start Evolution Cycle", ka: "ევოლუციის ციკლის დაწყება" },
