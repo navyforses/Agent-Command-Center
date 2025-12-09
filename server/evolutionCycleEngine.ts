@@ -1535,19 +1535,21 @@ export async function generateDailyReport(dailyRunId: number): Promise<Evolution
       return phaseInsights.map(i => i.contentEn || "").filter(Boolean).join("\n\n");
     };
 
-    const systemPrompt = `You are a senior medical research scientist specializing in synthesizing multi-source research into comprehensive academic reports. Your task is to compile research findings from an autonomous 24-hour Evolution Cycle into a structured, publication-quality academic report.
+    const systemPrompt = `You are a senior medical research scientist creating structured executive reports for parents and caregivers of children with Hypoxic-Ischemic Encephalopathy (HIE).
 
-The report should be written for medical professionals, researchers, and informed caregivers of children with neurological conditions such as Hypoxic-Ischemic Encephalopathy (HIE).
+Your task is to compile today's research findings from an autonomous Evolution Cycle into a clear, actionable executive report - NOT an academic paper.
+
+CRITICAL: Write in clear, direct language. Each section must be substantive and specific - not vague descriptions of "what the text discusses."
 
 Your output must be a valid JSON object with this exact structure:
 {
-  "title": "Evolution Cycle Daily Research Report - [Date]",
-  "executiveSummary": "A comprehensive 2-3 paragraph executive summary covering the day's most significant findings, breakthroughs, and clinical implications.",
-  "fullContent": "The complete academic report content with all sections formatted in markdown",
-  "keyFindings": ["Finding 1", "Finding 2", "Finding 3", ...],
+  "title": "HIE Research Report - [Date]",
+  "executiveSummary": "A 2-3 paragraph executive summary of today's work, key discoveries, and recommended actions.",
+  "fullContent": "The complete structured report in markdown format",
+  "keyFindings": ["Specific finding 1", "Specific finding 2", "Specific finding 3", ...],
   "synthesizedHypotheses": [
     {
-      "hypothesis": "Hypothesis statement",
+      "hypothesis": "Clear hypothesis statement",
       "confidence": 80,
       "evidence": ["Evidence 1", "Evidence 2"],
       "disciplines": ["Neurology", "Pharmacology"]
@@ -1555,38 +1557,101 @@ Your output must be a valid JSON object with this exact structure:
   ]
 }
 
-The fullContent should include these sections in markdown format:
-1. Literature Review & Observations
-2. Knowledge Extraction
-3. Clinical Connections
-4. Novel Hypotheses
-5. Validation Analysis
-6. Recommendations & Adaptations
-7. Conclusions
+The fullContent MUST follow this exact structure in markdown:
 
-Be thorough, scientifically rigorous, and clinically relevant.`;
+## 1. What Was Done Today
+- List specific research activities performed
+- Sources searched and analyzed
+- Number of papers/articles reviewed
+- Specific databases and repositories accessed
 
-    const query = `Generate a comprehensive academic research report for the Evolution Cycle run on ${formattedDate}.
+## 2. Key Discoveries
+For each discovery:
+- **Finding**: Clear statement of what was found
+- **Source**: Where this information came from
+- **Relevance to HIE**: How this applies to the child's condition
+- **Confidence Level**: High/Medium/Low with brief explanation
 
-## OBSERVE PHASE - Literature Review & Recent Findings
+## 3. Clinical Implications & Results
+- Practical implications for treatment or therapy
+- Potential medication interactions or considerations
+- Therapy recommendations based on findings
+- Safety considerations identified
+
+## 4. Next Steps & Action Plan
+- Specific recommended actions for parents/caregivers
+- Topics requiring further research
+- Questions to discuss with medical team
+- Follow-up research priorities
+
+## 5. Sources & References
+- List all sources with titles and links where available
+
+Write substantively with specific details. Avoid vague statements like "the research discusses" or "the text mentions." Instead, state concrete findings and recommendations.`;
+
+
+    const query = `Generate a structured executive research report for the Evolution Cycle run on ${formattedDate}.
+
+Below is all the raw research data collected today. Synthesize this into a clear, actionable report following the exact format specified.
+
+---
+
+## RAW DATA: OBSERVE PHASE (Literature Review)
 ${phaseContent("observe", insightsByPhase.observe)}
 
-## LEARN PHASE - Knowledge Extraction & Analysis
+---
+
+## RAW DATA: LEARN PHASE (Knowledge Extraction)
 ${phaseContent("learn", insightsByPhase.learn)}
 
-## CONNECT PHASE - Clinical Connections to Diagnosis
+---
+
+## RAW DATA: CONNECT PHASE (Clinical Connections)
 ${phaseContent("connect", insightsByPhase.connect)}
 
-## THEORIZE PHASE - Novel Hypotheses Generation
+---
+
+## RAW DATA: THEORIZE PHASE (Hypotheses)
 ${phaseContent("theorize", insightsByPhase.theorize)}
 
-## VALIDATE PHASE - Validation & Evidence Assessment
+---
+
+## RAW DATA: VALIDATE PHASE (Evidence Assessment)
 ${phaseContent("validate", insightsByPhase.validate)}
 
-## ADAPT PHASE - Recommendations & Adaptations
+---
+
+## RAW DATA: ADAPT PHASE (Recommendations)
 ${phaseContent("adapt", insightsByPhase.adapt)}
 
-Synthesize all of this into a cohesive, publication-quality academic report. Extract the most important findings, formulate clear hypotheses with evidence, and provide actionable clinical recommendations.`;
+---
+
+MANDATORY: Your fullContent MUST use exactly these markdown headings in this order:
+
+## 1. What Was Done Today
+(List as bullet points: specific research activities, sources searched, papers reviewed)
+
+## 2. Key Discoveries
+(For each finding use this format:
+- **Finding**: [concrete statement]
+- **Source**: [name/link]
+- **Relevance to HIE**: [specific application]
+- **Confidence**: High/Medium/Low)
+
+## 3. Clinical Implications & Results
+(Bullet points: treatment implications, therapy recommendations, safety notes)
+
+## 4. Next Steps & Action Plan
+(Bullet points: specific actions parents can take, questions for doctors, research priorities)
+
+## 5. Sources & References
+(List all sources with titles)
+
+CRITICAL RULES:
+- Use ONLY the headings above - no other section headings
+- Use bullet points within each section
+- State concrete facts and recommendations, NOT "the text discusses" or "the research mentions"
+- Every finding must be specific and actionable`;
 
     console.log(`[Evolution Engine] Calling Claude to synthesize report...`);
 
