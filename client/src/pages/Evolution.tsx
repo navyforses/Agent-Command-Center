@@ -422,7 +422,7 @@ function ReportDetailDialog({
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4">
           {activeTab === "en" 
             ? renderContent(parsedEn, keyFindingsEn)
             : renderContent(parsedKa, keyFindingsKa)
