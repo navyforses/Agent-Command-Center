@@ -285,6 +285,40 @@ function ReportChatDialog({
   );
 }
 
+interface ParsedReportContent {
+  title?: string;
+  executiveSummary?: string;
+  fullContent?: string;
+}
+
+function parseReportContent(content: string | null): ParsedReportContent | null {
+  if (!content) return null;
+  
+  try {
+    // Remove markdown code block wrapper if present
+    let jsonStr = content.trim();
+    if (jsonStr.startsWith("```json")) {
+      jsonStr = jsonStr.slice(7);
+    } else if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.slice(3);
+    }
+    if (jsonStr.endsWith("```")) {
+      jsonStr = jsonStr.slice(0, -3);
+    }
+    jsonStr = jsonStr.trim();
+    
+    const parsed = JSON.parse(jsonStr);
+    return {
+      title: parsed.title,
+      executiveSummary: parsed.executiveSummary,
+      fullContent: parsed.fullContent,
+    };
+  } catch {
+    // If parsing fails, treat the content as plain text
+    return { fullContent: content };
+  }
+}
+
 function ReportDetailDialog({
   report,
   isOpen,
@@ -296,11 +330,59 @@ function ReportDetailDialog({
   onClose: () => void;
   onChatOpen: () => void;
 }) {
-  const { t, language } = useLanguage();
-  const title = language === "ka" ? report.titleKa : report.titleEn;
-  const content = language === "ka" ? report.contentKa : report.contentEn;
-  const summary = language === "ka" ? report.summaryKa : report.summaryEn;
-  const keyFindings = language === "ka" ? report.keyFindingsKa : report.keyFindingsEn;
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<"en" | "ka">("en");
+  
+  // Parse both English and Georgian content
+  const parsedEn = useMemo(() => parseReportContent(report.contentEn), [report.contentEn]);
+  const parsedKa = useMemo(() => parseReportContent(report.contentKa), [report.contentKa]);
+  
+  const titleEn = parsedEn?.title || report.titleEn;
+  const titleKa = parsedKa?.title || report.titleKa;
+  
+  const keyFindingsEn = report.keyFindingsEn;
+  const keyFindingsKa = report.keyFindingsKa;
+
+  const renderContent = (parsed: ParsedReportContent | null, keyFindings: string[] | null) => (
+    <div className="space-y-6">
+      {parsed?.executiveSummary && (
+        <div>
+          <h3 className="text-sm font-medium mb-2">{t("executiveSummary")}</h3>
+          <p className="text-sm text-muted-foreground">{parsed.executiveSummary}</p>
+        </div>
+      )}
+
+      {keyFindings && keyFindings.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium mb-2">{t("keyFindings")}</h3>
+          <ul className="space-y-2">
+            {keyFindings.map((finding, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm">
+                <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                <span>{finding}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {parsed?.fullContent && (
+        <div>
+          <h3 className="text-sm font-medium mb-2">{t("fullReport")}</h3>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{parsed.fullContent}</div>
+          </div>
+        </div>
+      )}
+      
+      {!parsed?.executiveSummary && !parsed?.fullContent && !keyFindings?.length && (
+        <div className="text-center py-8 text-muted-foreground">
+          <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+          <p>{activeTab === "ka" ? "ქართული ვერსია მიუწვდომელია" : "No content available"}</p>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -308,7 +390,7 @@ function ReportDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {title || t("dailyReport")}
+            {activeTab === "ka" ? (titleKa || titleEn || t("dailyReport")) : (titleEn || t("dailyReport"))}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
             <Calendar className="h-3 w-3" />
@@ -316,38 +398,30 @@ function ReportDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex items-center gap-2 border-b pb-3">
+          <Button
+            variant={activeTab === "en" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("en")}
+            data-testid="button-tab-english"
+          >
+            {t("english")}
+          </Button>
+          <Button
+            variant={activeTab === "ka" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("ka")}
+            data-testid="button-tab-georgian"
+          >
+            {t("georgian")}
+          </Button>
+        </div>
+
         <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6">
-            {summary && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">{t("summary")}</h3>
-                <p className="text-sm text-muted-foreground">{summary}</p>
-              </div>
-            )}
-
-            {keyFindings && keyFindings.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">{t("keyFindings")}</h3>
-                <ul className="space-y-2">
-                  {keyFindings.map((finding, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm">
-                      <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                      <span>{finding}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {content && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">{t("fullReport")}</h3>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <div className="text-sm text-muted-foreground whitespace-pre-wrap">{content}</div>
-                </div>
-              </div>
-            )}
-          </div>
+          {activeTab === "en" 
+            ? renderContent(parsedEn, keyFindingsEn)
+            : renderContent(parsedKa, keyFindingsKa)
+          }
         </ScrollArea>
 
         <div className="flex items-center justify-end gap-2 pt-4 border-t">
