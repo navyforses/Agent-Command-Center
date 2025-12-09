@@ -211,6 +211,7 @@ export interface IStorage {
   getEvolutionReportByDailyRun(dailyRunId: number): Promise<EvolutionReport | undefined>;
   createEvolutionReport(report: InsertEvolutionReport): Promise<EvolutionReport>;
   updateEvolutionReport(id: number, report: Partial<InsertEvolutionReport>): Promise<EvolutionReport | undefined>;
+  deleteEvolutionReport(id: number): Promise<boolean>;
 
   getEvolutionReportMessages(reportId: number): Promise<EvolutionReportMessage[]>;
   createEvolutionReportMessage(message: InsertEvolutionReportMessage): Promise<EvolutionReportMessage>;
@@ -947,6 +948,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(evolutionReports.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteEvolutionReport(id: number): Promise<boolean> {
+    // First delete any associated messages
+    await db.delete(evolutionReportMessages).where(eq(evolutionReportMessages.reportId, id));
+    // Then delete the report
+    const result = await db.delete(evolutionReports).where(eq(evolutionReports.id, id)).returning();
+    return result.length > 0;
   }
 
   async getEvolutionReportMessages(reportId: number): Promise<EvolutionReportMessage[]> {

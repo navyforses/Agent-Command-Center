@@ -2491,6 +2491,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     try {
       const runId = parseInt(req.params.runId);
       const userId = req.user.claims.sub;
+      const regenerate = req.body?.regenerate === true;
       
       if (isNaN(runId)) {
         return res.status(400).json({ message: "Invalid run ID" });
@@ -2516,14 +2517,20 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
       // Check if report already exists
       const existingReport = await storage.getEvolutionReportByDailyRun(runId);
       if (existingReport) {
-        return res.status(409).json({ message: "Report already exists for this run", report: existingReport });
+        if (regenerate) {
+          // Delete existing report to regenerate
+          await storage.deleteEvolutionReport(existingReport.id);
+          console.log(`[Routes] Deleted existing report ${existingReport.id} for regeneration`);
+        } else {
+          return res.status(409).json({ message: "Report already exists for this run", report: existingReport });
+        }
       }
       
       const { generateDailyReport } = await import("./evolutionCycleEngine");
       const report = await generateDailyReport(runId);
       
       if (report) {
-        res.json({ success: true, report });
+        res.json({ success: true, report, regenerated: regenerate && !!existingReport });
       } else {
         res.status(400).json({ message: "Failed to generate report - run may not have enough insights" });
       }
