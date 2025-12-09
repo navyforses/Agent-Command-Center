@@ -2486,6 +2486,28 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
+  // Manually generate report for a completed daily run
+  app.post("/api/evolution/runs/:runId/generate-report", isAuthenticated, async (req: any, res) => {
+    try {
+      const runId = parseInt(req.params.runId);
+      if (isNaN(runId)) {
+        return res.status(400).json({ message: "Invalid run ID" });
+      }
+      
+      const { generateDailyReport } = await import("./evolutionCycleEngine");
+      const report = await generateDailyReport(runId);
+      
+      if (report) {
+        res.json({ success: true, report });
+      } else {
+        res.status(400).json({ message: "Failed to generate report - run may not have enough insights" });
+      }
+    } catch (error) {
+      console.error("Error generating report:", error);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
   // Academic Research Routes - OpenAlex, Semantic Scholar, Cross-Disciplinary
   app.post("/api/academic/search", isAuthenticated, async (req: any, res) => {
     try {
