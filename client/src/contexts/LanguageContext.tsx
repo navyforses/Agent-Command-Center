@@ -202,6 +202,9 @@ const translations: Record<string, Record<Language, string>> = {
   summary: { en: "Summary", ka: "მოკლე შინაარსი" },
   fullReport: { en: "Full Report", ka: "სრული ანგარიში" },
   close: { en: "Close", ka: "დახურვა" },
+  english: { en: "English", ka: "ინგლისური" },
+  georgian: { en: "Georgian", ka: "ქართული" },
+  executiveSummary: { en: "Executive Summary", ka: "ძირითადი შინაარსი" },
 
   // Evolution Cycle Activation
   startEvolutionCycle: { en: "Start Evolution Cycle", ka: "ევოლუციის ციკლის დაწყება" },
