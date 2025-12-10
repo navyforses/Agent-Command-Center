@@ -1424,7 +1424,9 @@ export async function executeEvolutionPhase(
     });
 
     if (currentPhasesCompleted.length === 7) {
-      await storeAccumulatedKnowledgeFromCycle(cycle, dailyRunId, previousInsights);
+      // Re-fetch all insights including the ones just created in this phase
+      const allInsightsForKnowledge = await storage.getEvolutionInsights(dailyRunId);
+      await storeAccumulatedKnowledgeFromCycle(cycle, dailyRunId, allInsightsForKnowledge);
     }
 
     console.log(
