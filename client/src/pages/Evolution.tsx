@@ -691,7 +691,7 @@ const knowledgeStatusColors: Record<string, string> = {
   refuted: "bg-destructive/10 text-destructive",
 };
 
-function KnowledgeCard({ knowledge }: { knowledge: AccumulatedKnowledge }) {
+function KnowledgeCard({ knowledge, onClick }: { knowledge: AccumulatedKnowledge; onClick?: () => void }) {
   const { t, language } = useLanguage();
   const title = language === "ka" && knowledge.titleKa ? knowledge.titleKa : knowledge.titleEn;
   const content = language === "ka" && knowledge.contentKa ? knowledge.contentKa : knowledge.contentEn;
@@ -707,7 +707,19 @@ function KnowledgeCard({ knowledge }: { knowledge: AccumulatedKnowledge }) {
   const statusLabel = t(`knowledgeStatus_${knowledgeStatus}`);
 
   return (
-    <Card className="hover-elevate" data-testid={`card-knowledge-${knowledge.id}`}>
+    <Card 
+      className="hover-elevate cursor-pointer transition-all active:scale-[0.99]" 
+      data-testid={`card-knowledge-${knowledge.id}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -752,6 +764,142 @@ function KnowledgeCard({ knowledge }: { knowledge: AccumulatedKnowledge }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function KnowledgeDetailDialog({ 
+  knowledge, 
+  isOpen, 
+  onClose 
+}: { 
+  knowledge: AccumulatedKnowledge | null; 
+  isOpen: boolean; 
+  onClose: () => void;
+}) {
+  const { t, language } = useLanguage();
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  if (!knowledge) return null;
+
+  const title = language === "ka" && knowledge.titleKa ? knowledge.titleKa : knowledge.titleEn;
+  const content = language === "ka" && knowledge.contentKa ? knowledge.contentKa : knowledge.contentEn;
+  const knowledgeType = knowledge.knowledgeType || "hypothesis";
+  const knowledgeStatus = knowledge.status || "active";
+  const TypeIcon = knowledgeTypeIcons[knowledgeType] || Lightbulb;
+  const statusColorClass = knowledgeStatusColors[knowledgeStatus] || knowledgeStatusColors.active;
+  const cycleCount = knowledge.contributingCycleIds?.length ?? 0;
+  const confidence = typeof knowledge.confidence === "number" ? knowledge.confidence : 50;
+  const validations = typeof knowledge.validationCount === "number" ? knowledge.validationCount : 0;
+  const contradictions = typeof knowledge.contradictionCount === "number" ? knowledge.contradictionCount : 0;
+
+  const typeLabel = t(`knowledgeType_${knowledgeType}`);
+  const statusLabel = t(`knowledgeStatus_${knowledgeStatus}`);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      toast({ title: t("copied") });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: t("copyFailed"), variant: "destructive" });
+    }
+  };
+
+  const metadata = knowledge.metadata as Record<string, unknown> | null;
+  const keyPoints = metadata?.keyPoints as string[] | undefined;
+  const sources = knowledge.sources as Array<{ title: string; snippet?: string }> | null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-md bg-muted shrink-0">
+              <TypeIcon className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-lg leading-tight">{title}</DialogTitle>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm text-muted-foreground">{typeLabel !== `knowledgeType_${knowledgeType}` ? typeLabel : knowledgeType}</span>
+                <Badge className={`${statusColorClass} text-xs`}>
+                  {statusLabel !== `knowledgeStatus_${knowledgeStatus}` ? statusLabel : knowledgeStatus}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-muted/50 rounded-md">
+                <p className="text-2xl font-bold text-primary">{confidence}%</p>
+                <p className="text-xs text-muted-foreground">{t("knowledgeConfidence")}</p>
+              </div>
+              <div className="text-center p-3 bg-muted/50 rounded-md">
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{validations}</p>
+                <p className="text-xs text-muted-foreground">{t("knowledgeValidations")}</p>
+              </div>
+              <div className="text-center p-3 bg-muted/50 rounded-md">
+                <p className="text-2xl font-bold">{cycleCount}</p>
+                <p className="text-xs text-muted-foreground">{t("knowledgeCycles")}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">{t("fullContent")}</h4>
+                <Button size="sm" variant="ghost" onClick={handleCopy} data-testid="button-copy-content">
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div className="p-4 bg-muted/30 rounded-md">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+              </div>
+            </div>
+
+            {keyPoints && keyPoints.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">{t("keyPoints")}</h4>
+                <ul className="space-y-1.5">
+                  {keyPoints.map((point, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {sources && sources.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">{t("sources")}</h4>
+                <div className="space-y-2">
+                  {sources.slice(0, 5).map((source, index) => (
+                    <div key={index} className="p-3 bg-muted/30 rounded-md">
+                      <p className="text-sm font-medium">{source.title}</p>
+                      {source.snippet && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{source.snippet}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {contradictions > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-md">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <span className="text-sm text-destructive">{contradictions} {t("contradictions")}</span>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -840,6 +988,7 @@ function KnowledgeGrowthCard({ knowledge }: { knowledge: AccumulatedKnowledge[] 
 
 function AccumulatedKnowledgeSection() {
   const { t } = useLanguage();
+  const [selectedKnowledge, setSelectedKnowledge] = useState<AccumulatedKnowledge | null>(null);
 
   const { data: knowledge, isLoading, isError } = useQuery<AccumulatedKnowledge[]>({
     queryKey: ["/api/evolution/accumulated-knowledge"],
@@ -904,11 +1053,21 @@ function AccumulatedKnowledgeSection() {
           <KnowledgeGrowthCard knowledge={knowledge} />
           <div className="grid gap-4 md:grid-cols-2">
             {activeKnowledge.slice(0, 6).map((item) => (
-              <KnowledgeCard key={item.id} knowledge={item} />
+              <KnowledgeCard 
+                key={item.id} 
+                knowledge={item} 
+                onClick={() => setSelectedKnowledge(item)}
+              />
             ))}
           </div>
         </div>
       )}
+
+      <KnowledgeDetailDialog
+        knowledge={selectedKnowledge}
+        isOpen={!!selectedKnowledge}
+        onClose={() => setSelectedKnowledge(null)}
+      />
     </div>
   );
 }

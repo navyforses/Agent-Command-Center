@@ -306,6 +306,8 @@ const translations: Record<string, Record<Language, string>> = {
   knowledgeGrowth: { en: "Knowledge Growth", ka: "ცოდნის ზრდა" },
   totalKnowledge: { en: "Total Knowledge Items", ka: "ცოდნის ერთეულები" },
   viewDetails: { en: "View Details", ka: "დეტალების ნახვა" },
+  fullContent: { en: "Full Content", ka: "სრული შინაარსი" },
+  contradictions: { en: "Contradictions", ka: "წინააღმდეგობები" },
 
   // Child Profile Page
   editProfile: { en: "Edit Profile", ka: "პროფილის რედაქტირება" },
