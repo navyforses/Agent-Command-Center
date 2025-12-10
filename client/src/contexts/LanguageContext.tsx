@@ -209,6 +209,9 @@ const translations: Record<string, Record<Language, string>> = {
   english: { en: "English", ka: "ინგლისური" },
   georgian: { en: "Georgian", ka: "ქართული" },
   executiveSummary: { en: "Executive Summary", ka: "ძირითადი შინაარსი" },
+  copy: { en: "Copy", ka: "კოპირება" },
+  copied: { en: "Copied!", ka: "დაკოპირდა!" },
+  copyFailed: { en: "Failed to copy", ka: "კოპირება ვერ მოხერხდა" },
 
   // Evolution Cycle Activation
   startEvolutionCycle: { en: "Start Evolution Cycle", ka: "ევოლუციის ციკლის დაწყება" },

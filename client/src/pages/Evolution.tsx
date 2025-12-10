@@ -37,6 +37,8 @@ import {
   FlaskConical,
   Activity,
   Telescope,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -336,7 +338,9 @@ function ReportDetailDialog({
   isRegenerating?: boolean;
 }) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"en" | "ka">("en");
+  const [copied, setCopied] = useState(false);
   
   // Parse both English and Georgian content
   const parsedEn = useMemo(() => parseReportContent(report.contentEn), [report.contentEn]);
@@ -347,6 +351,39 @@ function ReportDetailDialog({
   
   const keyFindingsEn = report.keyFindingsEn;
   const keyFindingsKa = report.keyFindingsKa;
+
+  const handleCopy = async () => {
+    const parsed = activeTab === "en" ? parsedEn : parsedKa;
+    const keyFindings = activeTab === "en" ? keyFindingsEn : keyFindingsKa;
+    const title = activeTab === "en" ? titleEn : (titleKa || titleEn);
+    
+    let text = `${title}\n${format(parseISO(report.reportDate), "MMMM d, yyyy")}\n\n`;
+    
+    if (parsed?.executiveSummary) {
+      text += `${t("executiveSummary")}:\n${parsed.executiveSummary}\n\n`;
+    }
+    
+    if (keyFindings && keyFindings.length > 0) {
+      text += `${t("keyFindings")}:\n`;
+      keyFindings.forEach((finding, idx) => {
+        text += `${idx + 1}. ${finding}\n`;
+      });
+      text += "\n";
+    }
+    
+    if (parsed?.fullContent) {
+      text += `${t("fullReport")}:\n${parsed.fullContent}`;
+    }
+    
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast({ title: t("copied") });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: t("copyFailed"), variant: "destructive" });
+    }
+  };
 
   const renderContent = (parsed: ParsedReportContent | null, keyFindings: string[] | null) => (
     <div className="space-y-6">
@@ -430,7 +467,7 @@ function ReportDetailDialog({
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-4 border-t">
-          <div>
+          <div className="flex items-center gap-2">
             {onRegenerate && (
               <Button
                 variant="outline"
@@ -442,6 +479,14 @@ function ReportDetailDialog({
                 {isRegenerating ? t("regenerating") : t("regenerate")}
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={handleCopy}
+              data-testid="button-copy-report"
+            >
+              {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              {t("copy")}
+            </Button>
           </div>
           <div className="flex items-center gap-2">
             <Button
