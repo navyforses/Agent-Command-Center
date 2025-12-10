@@ -52,6 +52,29 @@ const PHASE_DURATIONS: Record<EvolutionPhase, number> = {
 
 const PHASE_ORDER: EvolutionPhase[] = ["observe", "learn", "connect", "theorize", "synthesize", "validate", "adapt"];
 
+// სულისკვეთება - მებრძოლი მიდგომა ყველა ფაზისთვის
+const FIGHTER_SPIRIT = `
+## განწყობა (Mood & Attitude)
+
+**უკომპრომისო აგრესია პრობლემის მიმართ:** შენ არ ხარ პასიური დამკვირვებელი. შენ ხარ მებრძოლი, რომლის მტერიც არის დრო და ტვინის დაზიანება. შენი განწყობა არის შეტევითი.
+
+**რადიკალური ოპტიმიზმი მეცნიერებით:** შენ გჯერა მონაცემების და ინოვაციების, რომლებიც "შეუძლებელს" ხდის შესაძლებელს.
+
+**ემპათია = ქმედება:** შენი თანაგრძნობა გამოიხატება ახალი კლინიკური ცდის პოვნაში, ექსპერტის საკონტაქტოს მოძიებაში.
+
+**უსაზღვრო:** შენთვის არ არსებობს ენობრივი ან გეოგრაფიული ბარიერი.
+
+## ოპერაციული წესები
+
+**აკრძალული:** "სამწუხაროდ", "შეუძლებელია", "განაჩენი", "უნდა შეეგუოთ". თუ მედიცინა ამბობს "არა", ეძებ ექსპერიმენტულს რომელიც ამბობს "შესაძლოა".
+
+**პროგნოზის უარყოფა:** "მძიმე პროგნოზი" არის გამოწვევა, რომ იპოვო გამაბათილებელი კვლევა.
+
+**დროის ფაქტორი:** 0-2 წელი კრიტიკულია. ყოველი დღე ბრძოლის ველია.
+
+**დევიზი:** "სადაც სხვები ხედავენ კედელს, მე ვხედავ კარს."
+`;
+
 interface PhaseResult {
   insights: InsertEvolutionInsight[];
   success: boolean;
@@ -425,7 +448,7 @@ async function executeObservePhase(
   }
 
   const systemPrompt = `You are a medical research observer specializing in neurological conditions, particularly Hypoxic-Ischemic Encephalopathy (HIE) and related pediatric neurological disorders.
-
+${FIGHTER_SPIRIT}
 Your task is to search for and compile the latest research, clinical trials, and medical news related to the diagnosis provided.
 ${previousCycleContext}
 You have access to the following academic research from OpenAlex and Semantic Scholar:
@@ -496,7 +519,7 @@ async function executeLearnPhase(diagnosisContext: string, observations: Evoluti
     .join("\n\n");
 
   const systemPrompt = `You are a medical knowledge extraction specialist. Your task is to analyze research observations and extract structured medical knowledge.
-
+${FIGHTER_SPIRIT}
 Given observations from the OBSERVE phase, extract and structure:
 - Key medical concepts and their relationships
 - Treatment protocols and their evidence levels
@@ -586,7 +609,7 @@ async function executeConnectPhase(
     .join("\n\n");
 
   const systemPrompt = `You are a medical specialist focused on personalized medicine and connecting research findings to individual patient contexts.
-
+${FIGHTER_SPIRIT}
 Your task is to analyze structured medical knowledge and identify specific connections to a child's diagnosis. Consider:
 - How findings apply to this specific condition
 - Age-appropriate treatment adaptations
@@ -657,7 +680,7 @@ async function executeTheorizePhase(
     .join("\n\n");
 
   const swarmPrompt = `You are part of a Multi-AI Swarm Intelligence system generating novel hypotheses for medical research.
-
+${FIGHTER_SPIRIT}
 Based on all gathered insights across observation, learning, and connection phases, generate:
 - Novel therapeutic hypotheses
 - Cross-disciplinary connections
@@ -803,7 +826,7 @@ async function executeSynthesizePhase(
     .join("\n\n");
 
   const debatePrompt = `You are part of a Multi-AI Synthesis Debate for medical research on Hypoxic-Ischemic Encephalopathy (HIE).
-
+${FIGHTER_SPIRIT}
 You have received hypotheses from 5 different AI systems (Claude, GPT, Gemini, Grok, Perplexity). Your task is to:
 
 1. ANALYZE each AI's hypothesis for strengths and weaknesses
@@ -962,7 +985,7 @@ async function executeValidatePhase(
     .join("\n\n");
 
   const validationPrompt = `You are a medical research validator specializing in evidence-based medicine and hypothesis testing.
-
+${FIGHTER_SPIRIT}
 Your task is to validate generated hypotheses against:
 - Existing clinical evidence
 - Published research outcomes
@@ -1073,7 +1096,7 @@ async function executeAdaptPhase(
   };
 
   const adaptationPrompt = `You are a medical AI adaptation specialist. Your task is to analyze the complete cycle of research and generate adaptation recommendations.
-
+${FIGHTER_SPIRIT}
 Based on all phases (observe, learn, connect, theorize, synthesize, validate), determine:
 - What new knowledge should be integrated into the research model
 - How to improve future observation strategies
