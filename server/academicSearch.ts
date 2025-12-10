@@ -1100,7 +1100,20 @@ function extractCrossDisciplinaryInsights(
 }
 
 function generatePotentialApplications(discipline: string, papers: AcademicPaper[]): string[] {
-  const disciplineApplications: Record<string, string[]> = {
+  // First check if discipline exists in ALL_DISCIPLINES
+  const disciplineLower = discipline.toLowerCase();
+  
+  // Try to find the discipline in the comprehensive config
+  for (const [key, config] of Object.entries(ALL_DISCIPLINES)) {
+    if (key.toLowerCase() === disciplineLower || 
+        config.name.toLowerCase() === disciplineLower ||
+        config.searchTerms.some(t => t.toLowerCase() === disciplineLower)) {
+      return config.potentialApplications;
+    }
+  }
+  
+  // Fallback legacy mappings for backwards compatibility
+  const legacyApplications: Record<string, string[]> = {
     physics: [
       "Magnetic stimulation techniques for neural repair",
       "Ultrasound-based therapeutic delivery",
@@ -1133,7 +1146,7 @@ function generatePotentialApplications(discipline: string, papers: AcademicPaper
     ],
   };
 
-  return disciplineApplications[discipline.toLowerCase()] || [
+  return legacyApplications[disciplineLower] || [
     `Potential applications from ${discipline} research`,
   ];
 }
