@@ -813,8 +813,8 @@ function KnowledgeDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-md bg-muted shrink-0">
               <TypeIcon className="h-5 w-5 text-muted-foreground" />
@@ -831,7 +831,7 @@ function KnowledgeDetailDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2">
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-muted/50 rounded-md">
@@ -897,7 +897,7 @@ function KnowledgeDetailDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
