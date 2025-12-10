@@ -2,7 +2,15 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
-import { searchAcademicSources, formatAcademicResultsForAI } from "./academicSearch";
+import { 
+  searchAcademicSources, 
+  formatAcademicResultsForAI, 
+  ALL_DISCIPLINES,
+  MEDICAL_CLINICAL_DISCIPLINES,
+  TRADITIONAL_MEDICINE_DISCIPLINES,
+  CROSS_DISCIPLINARY_SCIENCES,
+  DisciplineConfig,
+} from "./academicSearch";
 import type {
   EvolutionCycle,
   EvolutionDailyRun,
@@ -409,12 +417,48 @@ async function executeObservePhase(
     ? `\n\n=== ACCUMULATED KNOWLEDGE FROM PREVIOUS CYCLES ===\nThe following insights were synthesized from previous research cycles. Build upon this knowledge and look for NEW developments, confirmations, or contradictions:\n\n${previousCycleInsights.map((i, idx) => `[Previous Insight ${idx + 1}]\n${i.contentEn}`).join("\n\n")}\n\n=== END ACCUMULATED KNOWLEDGE ===\n`
     : "";
 
+  // მულტიდისციპლინური ძიება: სამედიცინო კლინიკური სპეციალობები + ტრადიციული მედიცინა + კროს-დისციპლინური
+  // Vetted list of OpenAlex/Semantic Scholar compatible field identifiers
+  // These are normalized slugs that work with academic database APIs
+  const targetDisciplines = [
+    // Core cross-disciplinary sciences (always present)
+    "physics",
+    "engineering", 
+    "mathematics",
+    "computer science",
+    "materials science",
+    // Medical clinical specialties
+    "neonatology",
+    "pediatric neurology",
+    "neurology",
+    "rehabilitation",
+    "regenerative medicine",
+    "stem cell",
+    "neuropharmacology",
+    "neuroimaging",
+    "neurophysiology",
+    // Traditional/complementary medicine (validated OpenAlex concepts)
+    "acupuncture",
+    "traditional medicine",
+    "herbal medicine",
+    "ayurveda",
+    "complementary medicine",
+    "osteopathy",
+    "hyperbaric oxygen",
+    "music therapy",
+    // Additional research areas
+    "neuroplasticity",
+    "neuroprotection",
+    "brain injury",
+    "cerebral palsy",
+  ];
+  
   const academicSearchResult = await searchAcademicSources(diagnosisContext, {
-    maxResults: 25,
-    yearFrom: new Date().getFullYear() - 2,
+    maxResults: 50, // გაზრდილი რაოდენობა მეტი დისციპლინისთვის
+    yearFrom: new Date().getFullYear() - 3, // 3 წლიანი პერიოდი უფრო სრულყოფილი მონაცემებისთვის
     openAccessOnly: false,
     includeCrossDisciplinary: true,
-    targetDisciplines: ["physics", "engineering", "mathematics", "computer science", "materials science"],
+    targetDisciplines: targetDisciplines,
   });
 
   const academicContext = formatAcademicResultsForAI(academicSearchResult);
@@ -460,7 +504,39 @@ Focus on:
 - Medical news and breakthrough announcements
 - Emerging therapies and treatments
 - New diagnostic techniques
-- Cross-disciplinary insights from physics, engineering, and other fields
+
+MEDICAL CLINICAL SPECIALTIES to explore:
+- Neonatology (თერაპიული ჰიპოთერმია, NICU პროტოკოლები)
+- Pediatric Neurology (ნევროლოგიური შეფასება, განვითარების პროგნოზი)
+- Neuroradiology (MRI ბიომარკერები, დიფუზური გამოსახულება)
+- Neurophysiology (EEG/aEEG მონიტორინგი, კრუნჩხვების გამოვლენა)
+- Rehabilitation Medicine (Vojta, Bobath, CME-Medek)
+- Developmental Pediatrics (განვითარების ეტაპები, ადრეული ინტერვენცია)
+- Regenerative Medicine (ღეროვანი უჯრედები, Duke EAP)
+- Neuropharmacology (ერითროპოეტინი, მელატონინი, ქსენონი)
+
+TRADITIONAL/FOLK MEDICINE to explore (ტრადიციული/ხალხური მედიცინა):
+- Acupuncture (აკუპუნქტურა, ელექტროაკუპუნქტურა, თავის აკუპუნქტურა)
+- Traditional Chinese Medicine/TCM (ტრადიციული ჩინური მედიცინა, მცენარეული ფორმულები)
+- Ayurveda (აიურვედა - მეღა რასაიანა, ბრაჰმი, აშვაგანდა, შიროდჰარა)
+- Kampo Medicine (კამპო მედიცინა - იაპონური ტრადიციული მედიცინა)
+- Tibetan Medicine/Sowa-Rigpa (ტიბეტური მედიცინა)
+- Homeopathy (ჰომეოპათია)
+- Osteopathy & Craniosacral Therapy (ოსტეოპათია, კრანიოსაკრალური თერაპია)
+- Music Therapy (მუსიკოთერაპია - ნეიროლოგიური მუსიკოთერაპია)
+- Aromatherapy (არომათერაპია - ეთერზეთები)
+- Hyperbaric Oxygen Therapy/HBOT (ჰიპერბარული ჟანგბადის თერაპია)
+- Massage Therapy (მასაჟი თერაპია - ჩვილის მასაჟი)
+- Aquatic Therapy/Hydrotherapy (აკვათერაპია, ჰიდროთერაპია)
+- Yoga Therapy (იოგა თერაპია)
+
+CROSS-DISCIPLINARY SCIENCES (კროს-დისციპლინური მეცნიერებები):
+- Physics (ფიზიკა - ფოტობიომოდულაცია, მაგნიტური სტიმულაცია, ულტრაბგერა)
+- Biomedical Engineering (ბიოსამედიცინო ინჟინერია - ასისტური ტექნოლოგიები, BCI, რობოტული რეაბილიტაცია)
+- AI & Machine Learning (ხელოვნური ინტელექტი - პროგნოზირების მოდელები, პერსონალიზირებული მკურნალობა)
+- Materials Science (მასალათმცოდნეობა - ნანონაწილაკები, წამლის მიწოდების სისტემები, ბიომასალები)
+- Systems Biology (სისტემური ბიოლოგია - ქსელის ანალიზი, მულტი-ომიკსი)
+
 ${previousCycleInsights.length > 0 ? "- Building upon and extending knowledge from previous research cycles\n- Identifying confirmations, contradictions, or new developments related to previous findings" : ""}
 
 Respond with a JSON object:
@@ -470,19 +546,34 @@ Respond with a JSON object:
   "sources": [{"title": "Source title", "url": "URL if available", "snippet": "Relevant excerpt", "source": "PubMed/ClinicalTrials/News/Academic"}],
   "clinicalTrials": ["Trial 1 description", "Trial 2 description", ...],
   "emergingTherapies": ["Therapy 1", "Therapy 2", ...],
-  "crossDisciplinaryFindings": ["Finding from physics/engineering/etc", ...],${previousCycleInsights.length > 0 ? '\n  "continuityWithPreviousCycles": "How these findings relate to or extend previous cycle insights",' : ""}
+  "medicalSpecialtiesFindings": {
+    "neonatology": "...",
+    "rehabilitationMedicine": "...",
+    "regenerativeMedicine": "..."
+  },
+  "traditionalMedicineFindings": {
+    "acupuncture": "...",
+    "ayurveda": "...",
+    "osteopathy": "...",
+    "musicTherapy": "...",
+    "hyperbaricOxygen": "..."
+  },
+  "crossDisciplinaryFindings": ["Finding from physics/engineering/AI/materials science", ...],${previousCycleInsights.length > 0 ? '\n  "continuityWithPreviousCycles": "How these findings relate to or extend previous cycle insights",' : ""}
   "confidence": 85
 }`;
 
   const query = `Search for the latest medical research, clinical trials, and news related to: ${diagnosisContext}
 
 Focus on:
-1. Recent publications about treatments and outcomes
-2. Active clinical trials accepting patients
-3. Breakthrough research or discoveries
-4. New rehabilitation approaches
-5. Emerging technologies in this field
-6. Cross-disciplinary applications from physics, engineering, materials science`;
+1. Recent publications about treatments and outcomes from medical clinical specialties
+2. Active clinical trials accepting patients (especially regenerative medicine, stem cells)
+3. Breakthrough research or discoveries in neonatology, pediatric neurology
+4. New rehabilitation approaches (Vojta, Bobath, CME-Medek, early intervention)
+5. Traditional/folk medicine approaches with evidence (acupuncture, ayurveda, TCM, HBOT, osteopathy)
+6. Cross-disciplinary applications from physics, engineering, AI/ML, materials science
+7. Nutritional neuroscience (DHA, omega-3, breast milk optimization)
+8. Neuropharmacology (erythropoietin, melatonin, xenon therapy)
+9. Music therapy, sensory integration, aquatic therapy for pediatric brain injury`;
 
   const perplexityResult = await queryPerplexity(query, systemPrompt);
 
