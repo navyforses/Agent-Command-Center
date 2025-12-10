@@ -417,40 +417,67 @@ async function executeObservePhase(
     ? `\n\n=== ACCUMULATED KNOWLEDGE FROM PREVIOUS CYCLES ===\nThe following insights were synthesized from previous research cycles. Build upon this knowledge and look for NEW developments, confirmations, or contradictions:\n\n${previousCycleInsights.map((i, idx) => `[Previous Insight ${idx + 1}]\n${i.contentEn}`).join("\n\n")}\n\n=== END ACCUMULATED KNOWLEDGE ===\n`
     : "";
 
-  // მულტიდისციპლინური ძიება: სამედიცინო კლინიკური სპეციალობები + ტრადიციული მედიცინა + კროს-დისციპლინური
-  // Vetted list of OpenAlex/Semantic Scholar compatible field identifiers
-  // These are normalized slugs that work with academic database APIs
+  // მულტიდისციპლინური ძიება: სამედიცინო კლინიკური სპეციალობები + ტრადიციული/ხალხური მედიცინა + კროს-დისციპლინური
+  // Comprehensive list for academic search (OpenAlex/Semantic Scholar free-text search)
   const targetDisciplines = [
-    // Core cross-disciplinary sciences (always present)
+    // === კროს-დისციპლინური მეცნიერებები (Cross-disciplinary Sciences) ===
     "physics",
     "engineering", 
     "mathematics",
     "computer science",
     "materials science",
-    // Medical clinical specialties
+    "biomedical engineering",
+    
+    // === სამედიცინო კლინიკური სპეციალობები (Medical Clinical Specialties) ===
     "neonatology",
     "pediatric neurology",
     "neurology",
     "rehabilitation",
     "regenerative medicine",
-    "stem cell",
+    "stem cell therapy",
     "neuropharmacology",
     "neuroimaging",
     "neurophysiology",
-    // Traditional/complementary medicine (validated OpenAlex concepts)
+    "developmental pediatrics",
+    "ophthalmology",
+    "audiology",
+    "speech therapy",
+    "occupational therapy",
+    
+    // === ტრადიციული/ხალხური მედიცინა (Traditional/Folk Medicine) ===
     "acupuncture",
-    "traditional medicine",
-    "herbal medicine",
+    "electroacupuncture",
+    "traditional Chinese medicine",
+    "TCM herbal",
     "ayurveda",
-    "complementary medicine",
+    "Medhya Rasayana",
+    "Brahmi ashwagandha",
+    "Kampo medicine",
+    "Tibetan medicine",
+    "Korean medicine",
+    "homeopathy",
+    "naturopathy",
+    "phytotherapy",
+    "herbal medicine",
     "osteopathy",
-    "hyperbaric oxygen",
+    "craniosacral therapy",
+    "chiropractic",
+    "aromatherapy",
     "music therapy",
-    // Additional research areas
+    "art therapy",
+    "hyperbaric oxygen therapy",
+    "HBOT brain injury",
+    "massage therapy infant",
+    "hydrotherapy",
+    "aquatic therapy",
+    "yoga therapy",
+    
+    // === HIE კვლევის სფეროები (HIE Research Areas) ===
     "neuroplasticity",
     "neuroprotection",
     "brain injury",
     "cerebral palsy",
+    "hypoxic ischemic encephalopathy",
   ];
   
   const academicSearchResult = await searchAcademicSources(diagnosisContext, {
