@@ -391,7 +391,7 @@ function ReportDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col" data-testid="dialog-report-detail">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden" data-testid="dialog-report-detail">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -422,12 +422,12 @@ function ReportDetailDialog({
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-4">
           {activeTab === "en" 
             ? renderContent(parsedEn, keyFindingsEn)
             : renderContent(parsedKa, keyFindingsKa)
           }
-        </ScrollArea>
+        </div>
 
         <div className="flex items-center justify-between gap-2 pt-4 border-t">
           <div>
