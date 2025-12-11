@@ -943,6 +943,15 @@ export async function searchSemanticScholar(
 
     const data: SemanticScholarResponse = await response.json();
 
+    if (!data || !data.data || !Array.isArray(data.data)) {
+      return {
+        papers: [],
+        query,
+        totalResults: 0,
+        source: "Semantic Scholar",
+      };
+    }
+
     const papers = data.data.map(mapSemanticScholarToPaper);
 
     return {
