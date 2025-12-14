@@ -2,6 +2,15 @@ import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
 import type { EvolutionReport, EvolutionInsight } from "@shared/schema";
+import { translateToGeorgian } from "./evolutionCycleEngine";
+
+interface TranslatedHypothesis {
+  hypothesis: string;
+  hypothesisKa?: string;
+  confidence: number;
+  evidence?: string[];
+  disciplines?: string[];
+}
 
 interface PDFOptions {
   language: "en" | "ka";
@@ -26,11 +35,54 @@ function setFont(doc: PDFKit.PDFDocument, isGeorgian: boolean, bold: boolean = f
   }
 }
 
+// Helper function to translate hypotheses to Georgian
+async function translateHypotheses(
+  hypotheses: TranslatedHypothesis[]
+): Promise<TranslatedHypothesis[]> {
+  console.log(`[PDF] Translating ${hypotheses.length} hypotheses to Georgian...`);
+  
+  const translated: TranslatedHypothesis[] = [];
+  
+  for (const hypo of hypotheses) {
+    if (hypo.hypothesisKa) {
+      // Already translated
+      translated.push(hypo);
+    } else {
+      try {
+        const translatedText = await translateToGeorgian(hypo.hypothesis);
+        translated.push({
+          ...hypo,
+          hypothesisKa: translatedText,
+        });
+      } catch (error) {
+        console.error(`[PDF] Translation error for hypothesis: ${error}`);
+        translated.push(hypo);
+      }
+    }
+  }
+  
+  console.log(`[PDF] Translation complete for ${translated.length} hypotheses`);
+  return translated;
+}
+
 export async function generateReportPDF(
   report: EvolutionReport,
   insights: EvolutionInsight[],
   options: PDFOptions
 ): Promise<Buffer> {
+  const isGeorgian = options.language === "ka";
+  
+  // Translate hypotheses if Georgian language is selected
+  let translatedHypotheses: TranslatedHypothesis[] = [];
+  const rawHypotheses = report.hypothesesGenerated as TranslatedHypothesis[] | null;
+  if (rawHypotheses && Array.isArray(rawHypotheses) && rawHypotheses.length > 0) {
+    if (isGeorgian) {
+      translatedHypotheses = await translateHypotheses(rawHypotheses);
+    } else {
+      translatedHypotheses = rawHypotheses;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -53,8 +105,6 @@ export async function generateReportPDF(
         resolve(Buffer.concat(buffers));
       });
       doc.on("error", reject);
-
-      const isGeorgian = options.language === "ka";
 
       doc.fontSize(20);
       setFont(doc, isGeorgian, true);
@@ -128,28 +178,27 @@ export async function generateReportPDF(
 
       doc.moveDown(1.5);
 
-      const hypotheses = report.hypothesesGenerated as Array<{
-        hypothesis: string;
-        confidence: number;
-        evidence?: string[];
-        disciplines?: string[];
-      }> | null;
-
-      if (hypotheses && Array.isArray(hypotheses) && hypotheses.length > 0) {
-        doc.fontSize(14).font("Helvetica-Bold");
+      if (translatedHypotheses.length > 0) {
+        doc.fontSize(14);
+        setFont(doc, isGeorgian, true);
         doc.text(
           isGeorgian ? "სინთეზირებული ჰიპოთეზები" : "Synthesized Hypotheses",
           { underline: true }
         );
         doc.moveDown(0.5);
         
-        doc.fontSize(11).font("Helvetica");
+        doc.fontSize(11);
+        setFont(doc, isGeorgian, false);
         
-        hypotheses.forEach((hypo, index) => {
-          doc.font("Helvetica-Bold");
+        translatedHypotheses.forEach((hypo, index) => {
+          const hypothesisText = isGeorgian && hypo.hypothesisKa 
+            ? hypo.hypothesisKa 
+            : hypo.hypothesis;
+          
+          setFont(doc, isGeorgian, true);
           doc.text(`${isGeorgian ? "ჰიპოთეზა" : "Hypothesis"} ${index + 1}:`, { continued: true });
-          doc.font("Helvetica");
-          doc.text(` ${hypo.hypothesis}`);
+          setFont(doc, isGeorgian, false);
+          doc.text(` ${hypothesisText}`);
           
           doc.text(`  ${isGeorgian ? "სანდოობა" : "Confidence"}: ${hypo.confidence}%`);
           
@@ -159,7 +208,7 @@ export async function generateReportPDF(
           
           if (hypo.evidence && hypo.evidence.length > 0) {
             doc.text(`  ${isGeorgian ? "მტკიცებულებები" : "Evidence"}:`);
-            hypo.evidence.slice(0, 3).forEach(ev => {
+            hypo.evidence.slice(0, 3).forEach((ev: string) => {
               doc.text(`    - ${ev.substring(0, 150)}${ev.length > 150 ? "..." : ""}`, { indent: 20 });
             });
           }
@@ -257,6 +306,30 @@ export async function generateCycleSummaryPDF(
   allInsights: EvolutionInsight[],
   options: PDFOptions
 ): Promise<Buffer> {
+  const isGeorgian = options.language === "ka";
+  
+  // Collect and translate all hypotheses if Georgian
+  const allHypothesesRaw: TranslatedHypothesis[] = [];
+  reports.forEach(report => {
+    const hypos = report.hypothesesGenerated as TranslatedHypothesis[] | null;
+    if (hypos && Array.isArray(hypos)) {
+      allHypothesesRaw.push(...hypos);
+    }
+  });
+  
+  let translatedHypotheses: TranslatedHypothesis[] = [];
+  if (allHypothesesRaw.length > 0) {
+    const sortedHypos = allHypothesesRaw
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+      .slice(0, 10);
+    
+    if (isGeorgian) {
+      translatedHypotheses = await translateHypotheses(sortedHypos);
+    } else {
+      translatedHypotheses = sortedHypos;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -277,8 +350,6 @@ export async function generateCycleSummaryPDF(
         resolve(Buffer.concat(buffers));
       });
       doc.on("error", reject);
-
-      const isGeorgian = options.language === "ka";
 
       doc.fontSize(22);
       setFont(doc, isGeorgian, true);
@@ -346,41 +417,27 @@ export async function generateCycleSummaryPDF(
 
       doc.moveDown(1.5);
 
-      const allHypotheses: Array<{
-        hypothesis: string;
-        confidence: number;
-        evidence?: string[];
-        disciplines?: string[];
-      }> = [];
-      
-      reports.forEach(report => {
-        const hypos = report.hypothesesGenerated as typeof allHypotheses | null;
-        if (hypos && Array.isArray(hypos)) {
-          allHypotheses.push(...hypos);
-        }
-      });
-
-      const sortedHypotheses = allHypotheses
-        .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
-        .slice(0, 10);
-
-      if (sortedHypotheses.length > 0) {
+      if (translatedHypotheses.length > 0) {
         doc.fontSize(14);
         setFont(doc, isGeorgian, true);
         doc.text(
-          isGeorgian ? "Top Hipotezebi (sandoobis mixedvit) / Top Hypotheses" : "Top Hypotheses (by confidence)",
+          isGeorgian ? "ტოპ ჰიპოთეზები (სანდოობის მიხედვით)" : "Top Hypotheses (by confidence)",
           { underline: true }
         );
         doc.moveDown(0.5);
         
         doc.fontSize(11);
         setFont(doc, isGeorgian, false);
-        sortedHypotheses.forEach((hypo, index) => {
+        translatedHypotheses.forEach((hypo, index) => {
+          const hypothesisText = isGeorgian && hypo.hypothesisKa 
+            ? hypo.hypothesisKa 
+            : hypo.hypothesis;
+          
           setFont(doc, isGeorgian, true);
           doc.text(`${index + 1}. [${hypo.confidence}%] `, { continued: true });
           setFont(doc, isGeorgian, false);
           
-          doc.text(hypo.hypothesis);
+          doc.text(hypothesisText);
           
           if (hypo.disciplines && hypo.disciplines.length > 0) {
             doc.fontSize(9);
