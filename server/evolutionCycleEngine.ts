@@ -1664,8 +1664,37 @@ export async function generateDailyReport(dailyRunId: number): Promise<Evolution
 
     const insights = await storage.getEvolutionInsights(dailyRunId);
     if (insights.length === 0) {
-      console.error(`[Evolution Engine] No insights found for daily run ${dailyRunId}`);
-      return null;
+      console.log(`[Evolution Engine] Creating placeholder report for run ${dailyRunId} - no insights available`);
+      
+      const reportDate = dailyRun.runDate || new Date().toISOString().split("T")[0];
+      const formattedDate = new Date(reportDate).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      
+      const placeholderSummaryEn = "No research data was collected for this day. The evolution cycle will continue gathering insights in subsequent days.";
+      const placeholderSummaryKa = "ამ დღეს კვლევითი მონაცემები არ შეგროვებულა. ევოლუციური ციკლი გააგრძელებს ინსაითების შეგროვებას მომდევნო დღეებში.";
+      
+      const placeholderReportData: InsertEvolutionReport = {
+        dailyRunId,
+        reportDate,
+        titleEn: `Daily Research Report - ${formattedDate}`,
+        titleKa: `ყოველდღიური კვლევითი ანგარიში - ${formattedDate}`,
+        summaryEn: placeholderSummaryEn,
+        summaryKa: placeholderSummaryKa,
+        contentEn: placeholderSummaryEn,
+        contentKa: placeholderSummaryKa,
+        keyFindingsEn: [],
+        keyFindingsKa: [],
+        hypothesesGenerated: [],
+        sourcesCompiled: [],
+      };
+      
+      const placeholderReport = await storage.createEvolutionReport(placeholderReportData);
+      console.log(`[Evolution Engine] Placeholder report ${placeholderReport.id} created for run ${dailyRunId}`);
+      return placeholderReport;
     }
 
     const insightsByPhase: Record<string, EvolutionInsight[]> = {
