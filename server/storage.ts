@@ -191,6 +191,7 @@ export interface IStorage {
   getEvolutionCycles(userId: string): Promise<EvolutionCycle[]>;
   getAllActiveEvolutionCycles(): Promise<EvolutionCycle[]>;
   getEvolutionCycle(id: number, userId: string): Promise<EvolutionCycle | undefined>;
+  getEvolutionCycleById(id: number): Promise<EvolutionCycle | undefined>;
   getActiveEvolutionCycle(userId: string): Promise<EvolutionCycle | undefined>;
   createEvolutionCycle(cycle: InsertEvolutionCycle): Promise<EvolutionCycle>;
   updateEvolutionCycle(id: number, userId: string, cycle: Partial<InsertEvolutionCycle>): Promise<EvolutionCycle | undefined>;
@@ -814,6 +815,12 @@ export class DatabaseStorage implements IStorage {
   async getEvolutionCycle(id: number, userId: string): Promise<EvolutionCycle | undefined> {
     const [cycle] = await db.select().from(evolutionCycles)
       .where(and(eq(evolutionCycles.id, id), eq(evolutionCycles.userId, userId)));
+    return cycle;
+  }
+
+  async getEvolutionCycleById(id: number): Promise<EvolutionCycle | undefined> {
+    const [cycle] = await db.select().from(evolutionCycles)
+      .where(eq(evolutionCycles.id, id));
     return cycle;
   }
 
