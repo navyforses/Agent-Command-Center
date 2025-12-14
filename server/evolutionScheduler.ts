@@ -1,4 +1,4 @@
-import { runEvolutionTick, generateDailyReport } from "./evolutionCycleEngine";
+import { runEvolutionTick, generateDailyReport, completeCycleAndStartNew } from "./evolutionCycleEngine";
 import { storage } from "./storage";
 
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -62,6 +62,7 @@ async function runSchedulerTick(): Promise<void> {
 
     for (const cycle of activeCycles) {
       await checkAndGenerateDailyReports(cycle.id);
+      await checkAndCompleteCycle(cycle.id, cycle.endDate);
     }
 
     const duration = Date.now() - startTime;
@@ -95,6 +96,30 @@ async function checkAndGenerateDailyReports(cycleId: number): Promise<void> {
     }
   } catch (error) {
     console.error(`[Evolution Scheduler] Error checking reports for cycle ${cycleId}:`, error);
+  }
+}
+
+async function checkAndCompleteCycle(cycleId: number, endDate: Date | null): Promise<void> {
+  try {
+    if (!endDate) {
+      return;
+    }
+
+    const now = new Date();
+    const cycleEndDate = new Date(endDate);
+
+    if (now >= cycleEndDate) {
+      console.log(`[Evolution Scheduler] Cycle ${cycleId} has reached end date, completing and starting new cycle...`);
+      const newCycle = await completeCycleAndStartNew(cycleId);
+      
+      if (newCycle) {
+        console.log(`[Evolution Scheduler] New cycle ${newCycle.id} started automatically from cycle ${cycleId}`);
+      } else {
+        console.log(`[Evolution Scheduler] Failed to start new cycle from ${cycleId}`);
+      }
+    }
+  } catch (error) {
+    console.error(`[Evolution Scheduler] Error checking cycle completion for ${cycleId}:`, error);
   }
 }
 

@@ -37,6 +37,7 @@ import {
 } from "./aiOrchestrator";
 import { runNexusResearch } from "./nexusOrchestrator";
 import { extractTextFromPDF, extractTextFromImage } from "./documentProcessor";
+import { generateReportPDF, generateCycleSummaryPDF } from "./pdfGenerator";
 import { 
   searchOpenAlex, 
   searchSemanticScholar, 
@@ -2373,6 +2374,95 @@ ${extractedText.substring(0, 8000)}`;
     } catch (error) {
       console.error("Error fetching evolution report:", error);
       res.status(500).json({ message: "Failed to fetch report" });
+    }
+  });
+
+  // Download report as PDF (bilingual support)
+  app.get("/api/evolution/reports/:id/pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id, 10);
+      const language = (req.query.lang as "en" | "ka") || "en";
+      const includeInsights = req.query.insights === "true";
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid report ID" });
+      }
+      
+      const report = await storage.getEvolutionReport(id, userId);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      let insights: any[] = [];
+      if (includeInsights && report.dailyRunId) {
+        insights = await storage.getEvolutionInsights(report.dailyRunId);
+      }
+
+      const pdfBuffer = await generateReportPDF(report, insights, {
+        language,
+        includeInsights,
+      });
+
+      const dateStr = report.reportDate.replace(/-/g, "");
+      const filename = language === "ka" 
+        ? `HIE_Report_${dateStr}_KA.pdf`
+        : `HIE_Report_${dateStr}_EN.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  // Download cycle summary as PDF
+  app.get("/api/evolution/cycles/:id/pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cycleId = parseInt(req.params.id, 10);
+      const language = (req.query.lang as "en" | "ka") || "en";
+      
+      if (isNaN(cycleId)) {
+        return res.status(400).json({ message: "Invalid cycle ID" });
+      }
+      
+      const cycle = await storage.getEvolutionCycle(cycleId, userId);
+      if (!cycle) {
+        return res.status(404).json({ message: "Cycle not found" });
+      }
+
+      const dailyRuns = await storage.getEvolutionDailyRuns(cycleId);
+      const reports: any[] = [];
+      const allInsights: any[] = [];
+
+      for (const run of dailyRuns) {
+        const report = await storage.getEvolutionReportByDailyRun(run.id);
+        if (report) {
+          reports.push(report);
+        }
+        const insights = await storage.getEvolutionInsights(run.id);
+        allInsights.push(...insights);
+      }
+
+      const pdfBuffer = await generateCycleSummaryPDF(cycleId, reports, allInsights, {
+        language,
+      });
+
+      const filename = language === "ka" 
+        ? `HIE_Cycle_${cycleId}_Summary_KA.pdf`
+        : `HIE_Cycle_${cycleId}_Summary_EN.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating cycle PDF:", error);
+      res.status(500).json({ message: "Failed to generate cycle PDF" });
     }
   });
 

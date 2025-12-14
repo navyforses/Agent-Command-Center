@@ -2232,3 +2232,95 @@ export async function startEvolutionCycle(
 
   return cycle;
 }
+
+export async function completeCycleAndStartNew(cycleId: number): Promise<EvolutionCycle | null> {
+  console.log(`[Evolution Engine] Completing cycle ${cycleId} and starting new one...`);
+  
+  try {
+    const oldCycle = await storage.getEvolutionCycleById(cycleId);
+    if (!oldCycle) {
+      console.error(`[Evolution Engine] Cycle ${cycleId} not found`);
+      return null;
+    }
+
+    await storage.updateEvolutionCycle(cycleId, oldCycle.userId || "", {
+      status: "completed",
+    });
+    console.log(`[Evolution Engine] Marked cycle ${cycleId} as completed`);
+
+    const dailyRuns = await storage.getEvolutionDailyRuns(cycleId);
+    let allInsightsFromCycle: EvolutionInsight[] = [];
+    
+    for (const run of dailyRuns) {
+      const insights = await storage.getEvolutionInsights(run.id);
+      allInsightsFromCycle = allInsightsFromCycle.concat(insights);
+    }
+
+    console.log(`[Evolution Engine] Collected ${allInsightsFromCycle.length} insights from completed cycle`);
+
+    const topInsights = allInsightsFromCycle
+      .filter(i => i.confidence && i.confidence >= 70)
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+      .slice(0, 20);
+
+    for (const insight of topInsights) {
+      try {
+        const knowledgeType = categorizeInsight(insight);
+        const existingKnowledge = await storage.getAccumulatedKnowledgeByChild(
+          oldCycle.userId || "",
+          oldCycle.childId || 0
+        );
+        
+        const isDuplicate = existingKnowledge.some(k => 
+          k.contentEn && insight.contentEn && 
+          k.contentEn.substring(0, 100) === insight.contentEn.substring(0, 100)
+        );
+
+        if (!isDuplicate && insight.contentEn) {
+          await storage.createAccumulatedKnowledge({
+            userId: oldCycle.userId || "",
+            childId: oldCycle.childId || 0,
+            knowledgeType,
+            titleEn: extractTitleFromContent(insight.contentEn),
+            titleKa: insight.contentKa ? extractTitleFromContent(insight.contentKa) : null,
+            contentEn: insight.contentEn,
+            contentKa: insight.contentKa || null,
+            confidence: insight.confidence || 70,
+            sourceCycleId: cycleId,
+            sourcePhase: insight.phase || "observe",
+            validatedCount: 0,
+            contradictedCount: 0,
+            isActive: true,
+            metadata: insight.metadata || {},
+          });
+        }
+      } catch (error) {
+        console.error(`[Evolution Engine] Error saving accumulated knowledge:`, error);
+      }
+    }
+
+    console.log(`[Evolution Engine] Saved top insights to accumulated_knowledge`);
+
+    if (!oldCycle.userId || !oldCycle.childId || !oldCycle.diagnosisContext) {
+      console.log(`[Evolution Engine] Missing required data for new cycle, skipping auto-start`);
+      return null;
+    }
+
+    const newEndDate = new Date();
+    newEndDate.setDate(newEndDate.getDate() + 26);
+
+    const newCycle = await startEvolutionCycle(
+      oldCycle.userId,
+      oldCycle.childId,
+      newEndDate,
+      oldCycle.triggerDocumentId,
+      oldCycle.diagnosisContext
+    );
+
+    console.log(`[Evolution Engine] Started new cycle ${newCycle.id} from completed cycle ${cycleId}`);
+    return newCycle;
+  } catch (error) {
+    console.error(`[Evolution Engine] Error in completeCycleAndStartNew:`, error);
+    return null;
+  }
+}
