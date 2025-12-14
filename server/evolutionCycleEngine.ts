@@ -11,6 +11,8 @@ import {
   CROSS_DISCIPLINARY_SCIENCES,
   DisciplineConfig,
 } from "./academicSearch";
+import { generateCycleSummaryPDF } from "./pdfGenerator";
+import { sendEmailWithAttachments } from "./resend";
 import type {
   EvolutionCycle,
   EvolutionDailyRun,
@@ -2344,6 +2346,9 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
 
     console.log(`[Evolution Engine] Saved top insights to accumulated_knowledge`);
 
+    // Generate and send PDF reports via email
+    await sendCycleCompletionEmail(cycleId, allInsightsFromCycle, oldCycle.diagnosisContext || "");
+
     if (!oldCycle.userId || !oldCycle.childId || !oldCycle.diagnosisContext) {
       console.log(`[Evolution Engine] Missing required data for new cycle, skipping auto-start`);
       return null;
@@ -2365,5 +2370,146 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
   } catch (error) {
     console.error(`[Evolution Engine] Error in completeCycleAndStartNew:`, error);
     return null;
+  }
+}
+
+// Send PDF reports via email when cycle completes
+async function sendCycleCompletionEmail(
+  cycleId: number, 
+  allInsights: EvolutionInsight[],
+  diagnosisContext: string
+): Promise<void> {
+  const EMAIL_RECIPIENT = "jincharadzeshako@gmail.com";
+  
+  try {
+    console.log(`[Evolution Engine] Generating PDF reports for cycle ${cycleId}...`);
+    
+    // Get all reports for this cycle
+    const dailyRuns = await storage.getEvolutionDailyRuns(cycleId);
+    const reports: EvolutionReport[] = [];
+    
+    for (const run of dailyRuns) {
+      const report = await storage.getEvolutionReportByDailyRun(run.id);
+      if (report) {
+        reports.push(report);
+      }
+    }
+
+    // Generate PDF in both languages
+    const [pdfEn, pdfKa] = await Promise.all([
+      generateCycleSummaryPDF(cycleId, reports, allInsights, { language: "en" }),
+      generateCycleSummaryPDF(cycleId, reports, allInsights, { language: "ka" }),
+    ]);
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    
+    // Get child info for email subject
+    const cycle = await storage.getEvolutionCycleById(cycleId);
+    let childName = "";
+    if (cycle?.childId && cycle?.userId) {
+      const child = await storage.getChild(cycle.childId, cycle.userId);
+      childName = child ? `${child.firstName} ${child.lastName}`.trim() : "";
+    }
+
+    const subjectEn = `HIE Research Cycle #${cycleId} Complete - ${childName || "Your Child"}`;
+    const subjectKa = `HIE კვლევის ციკლი #${cycleId} დასრულდა - ${childName || "თქვენი შვილი"}`;
+
+    const bodyEn = `
+Dear Parent,
+
+The HIE Parent Command Center has completed Evolution Cycle #${cycleId}.
+
+During this 6-day research cycle, our AI agents have:
+- Analyzed ${allInsights.length} research insights
+- Searched across multiple medical disciplines
+- Generated hypotheses and recommendations specific to your child's condition
+
+Please find attached the cycle summary report in both English and Georgian languages.
+
+Key Statistics:
+- Total Insights Gathered: ${allInsights.length}
+- Reports Generated: ${reports.length}
+- Cycle Duration: 6 days
+
+The next research cycle has automatically started and will continue to search for new treatments, clinical trials, and research relevant to your child's condition.
+
+Best regards,
+HIE Parent Command Center
+    `.trim();
+
+    const bodyKa = `
+ძვირფასო მშობელო,
+
+HIE მშობლის სარდლობის ცენტრმა დაასრულა Evolution ციკლი #${cycleId}.
+
+ამ 6-დღიანი კვლევის ციკლის განმავლობაში, ჩვენმა AI აგენტებმა:
+- გაანალიზეს ${allInsights.length} კვლევითი ინსაიტი
+- მოძებნეს სხვადასხვა სამედიცინო დისციპლინაში
+- შექმნეს ჰიპოთეზები და რეკომენდაციები თქვენი შვილის მდგომარეობისთვის
+
+გთხოვთ იხილოთ თანდართული ციკლის შემაჯამებელი ანგარიში ინგლისურ და ქართულ ენებზე.
+
+მთავარი სტატისტიკა:
+- სულ შეგროვებული ინსაიტები: ${allInsights.length}
+- გენერირებული ანგარიშები: ${reports.length}
+- ციკლის ხანგრძლივობა: 6 დღე
+
+შემდეგი კვლევის ციკლი ავტომატურად დაიწყო და გააგრძელებს თქვენი შვილის მდგომარეობისთვის შესაბამისი ახალი მკურნალობების, კლინიკური კვლევებისა და კვლევების ძიებას.
+
+პატივისცემით,
+HIE მშობლის სარდლობის ცენტრი
+    `.trim();
+
+    // Combine both languages in one email
+    const combinedBody = `${bodyKa}\n\n---\n\n${bodyEn}`;
+    const combinedHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); color: white; padding: 20px; text-align: center;">
+          <h1 style="margin: 0;">HIE Parent Command Center</h1>
+          <p style="margin: 5px 0 0 0; opacity: 0.9;">Evolution Cycle #${cycleId} Complete</p>
+        </div>
+        
+        <div style="padding: 20px; background: #f7fafc; border-left: 4px solid #3182ce;">
+          <h2 style="color: #2d3748; margin-top: 0;">ქართულად:</h2>
+          <p style="white-space: pre-line; color: #4a5568;">${bodyKa}</p>
+        </div>
+        
+        <div style="padding: 20px; background: #fff;">
+          <h2 style="color: #2d3748; margin-top: 0;">In English:</h2>
+          <p style="white-space: pre-line; color: #4a5568;">${bodyEn}</p>
+        </div>
+        
+        <div style="background: #2d3748; color: white; padding: 15px; text-align: center; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message from HIE Parent Command Center</p>
+        </div>
+      </div>
+    `;
+
+    const result = await sendEmailWithAttachments({
+      to: EMAIL_RECIPIENT,
+      subject: `${subjectKa} / ${subjectEn}`,
+      body: combinedBody,
+      html: combinedHtml,
+      attachments: [
+        {
+          filename: `HIE_Cycle_${cycleId}_Summary_EN_${dateStr}.pdf`,
+          content: pdfEn,
+          contentType: "application/pdf",
+        },
+        {
+          filename: `HIE_Cycle_${cycleId}_Summary_KA_${dateStr}.pdf`,
+          content: pdfKa,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    if (result.success) {
+      console.log(`[Evolution Engine] Successfully sent cycle completion email with PDFs to ${EMAIL_RECIPIENT}`);
+    } else {
+      console.error(`[Evolution Engine] Failed to send cycle completion email: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`[Evolution Engine] Error sending cycle completion email:`, error);
   }
 }
