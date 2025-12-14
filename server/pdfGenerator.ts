@@ -380,10 +380,7 @@ export async function generateCycleSummaryPDF(
           doc.text(`${index + 1}. [${hypo.confidence}%] `, { continued: true });
           setFont(doc, isGeorgian, false);
           
-          const hypoText = hypo.hypothesis.length > 200 
-            ? hypo.hypothesis.substring(0, 200) + "..." 
-            : hypo.hypothesis;
-          doc.text(hypoText);
+          doc.text(hypo.hypothesis);
           
           if (hypo.disciplines && hypo.disciplines.length > 0) {
             doc.fontSize(9);
