@@ -1907,14 +1907,43 @@ CRITICAL RULES:
 
     console.log(`[Evolution Engine] Calling Claude to synthesize report...`);
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: "user", content: query }],
-    });
-
-    const responseContent = response.content[0]?.type === "text" ? response.content[0].text : "{}";
+    let responseContent = "{}";
+    
+    try {
+      const claudePromise = anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{ role: "user", content: query }],
+      });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("Claude API timeout after 120s")), 120000)
+      );
+      
+      const response = await Promise.race([claudePromise, timeoutPromise]);
+      responseContent = response.content[0]?.type === "text" ? response.content[0].text : "{}";
+      console.log(`[Evolution Engine] Claude response received successfully`);
+    } catch (claudeError) {
+      console.error(`[Evolution Engine] Claude API failed:`, claudeError);
+      console.log(`[Evolution Engine] Falling back to OpenAI GPT-4o for report generation...`);
+      
+      try {
+        const openaiResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          max_tokens: 8192,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: query }
+          ],
+        });
+        responseContent = openaiResponse.choices[0]?.message?.content || "{}";
+        console.log(`[Evolution Engine] OpenAI fallback response received successfully`);
+      } catch (openaiError) {
+        console.error(`[Evolution Engine] OpenAI fallback also failed:`, openaiError);
+        throw new Error("Both Claude and OpenAI failed to generate report");
+      }
+    }
 
     let parsed: {
       title?: string;
