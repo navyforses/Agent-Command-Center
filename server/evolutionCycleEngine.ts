@@ -1539,6 +1539,49 @@ export async function runEvolutionTick(): Promise<{
         }
       }
 
+      // Backfill missing days: create daily runs for any missed days between cycle start and today
+      // Use UTC date strings to avoid timezone issues
+      const cycleStartDateStr = (cycle.startDate || cycle.createdAt).toString().split("T")[0];
+      const todayStr = new Date().toISOString().split("T")[0];
+      
+      const existingRunDates = new Set(allRuns.map(r => r.runDate));
+      
+      // Helper to add days to a date string (YYYY-MM-DD format)
+      const addDays = (dateStr: string, days: number): string => {
+        const date = new Date(dateStr + "T12:00:00Z"); // Use noon UTC to avoid DST issues
+        date.setUTCDate(date.getUTCDate() + days);
+        return date.toISOString().split("T")[0];
+      };
+      
+      let currentDateStr = cycleStartDateStr;
+      
+      while (currentDateStr < todayStr) {
+        if (!existingRunDates.has(currentDateStr)) {
+          console.log(`[Evolution Engine] Backfilling missing daily run for ${currentDateStr} in cycle ${cycle.id}`);
+          
+          // Create a completed run for the missed day (can't run phases retroactively)
+          const backfilledRun = await storage.createEvolutionDailyRun({
+            cycleId: cycle.id,
+            runDate: currentDateStr,
+            currentPhase: "adapt",
+            status: "completed",
+            phasesCompleted: [],
+          });
+          
+          // Add to existingRunDates to prevent duplicates within same loop
+          existingRunDates.add(currentDateStr);
+          
+          // Update with completedAt timestamp (end of that day in UTC)
+          await storage.updateEvolutionDailyRun(backfilledRun.id, {
+            completedAt: new Date(currentDateStr + "T23:59:59.999Z"),
+          });
+          
+          console.log(`[Evolution Engine] Created backfilled run ${backfilledRun.id} for ${currentDateStr} (marked as completed - server was offline)`);
+        }
+        
+        currentDateStr = addDays(currentDateStr, 1);
+      }
+
       let dailyRun = await storage.getTodaysDailyRun(cycle.id);
 
       if (!dailyRun) {
