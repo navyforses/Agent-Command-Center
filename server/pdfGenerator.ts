@@ -1,9 +1,29 @@
 import PDFDocument from "pdfkit";
+import path from "path";
+import fs from "fs";
 import type { EvolutionReport, EvolutionInsight } from "@shared/schema";
 
 interface PDFOptions {
   language: "en" | "ka";
   includeInsights?: boolean;
+}
+
+// Georgian font path
+const GEORGIAN_FONT_PATH = path.join(process.cwd(), "fonts", "NotoSansGeorgian-Regular.ttf");
+const hasGeorgianFont = fs.existsSync(GEORGIAN_FONT_PATH);
+
+function registerFonts(doc: PDFKit.PDFDocument) {
+  if (hasGeorgianFont) {
+    doc.registerFont("Georgian", GEORGIAN_FONT_PATH);
+  }
+}
+
+function setFont(doc: PDFKit.PDFDocument, isGeorgian: boolean, bold: boolean = false) {
+  if (isGeorgian && hasGeorgianFont) {
+    doc.font("Georgian");
+  } else {
+    doc.font(bold ? "Helvetica-Bold" : "Helvetica");
+  }
 }
 
 export async function generateReportPDF(
@@ -18,12 +38,14 @@ export async function generateReportPDF(
         margins: { top: 50, bottom: 50, left: 50, right: 50 },
         info: {
           Title: options.language === "ka" 
-            ? `HIE კვლევის ანგარიში - ${report.reportDate}` 
+            ? `HIE Research Report - ${report.reportDate}` 
             : `HIE Research Report - ${report.reportDate}`,
           Author: "HIE Parent Command Center",
           Subject: "Evolution Cycle Research Report",
         },
       });
+
+      registerFonts(doc);
 
       const buffers: Buffer[] = [];
       doc.on("data", buffers.push.bind(buffers));
@@ -34,19 +56,21 @@ export async function generateReportPDF(
 
       const isGeorgian = options.language === "ka";
 
-      doc.fontSize(20).font("Helvetica-Bold");
+      doc.fontSize(20);
+      setFont(doc, isGeorgian, true);
       doc.text(
         isGeorgian 
-          ? "HIE კვლევის ანგარიში" 
+          ? "HIE kvlevis angarishi" 
           : "HIE Research Report",
         { align: "center" }
       );
       
       doc.moveDown(0.5);
-      doc.fontSize(12).font("Helvetica");
+      doc.fontSize(12);
+      setFont(doc, isGeorgian, false);
       doc.text(
         isGeorgian 
-          ? `თარიღი: ${new Date(report.reportDate).toLocaleDateString("ka-GE")}` 
+          ? `Tarigi: ${new Date(report.reportDate).toLocaleDateString("ka-GE")}` 
           : `Date: ${new Date(report.reportDate).toLocaleDateString("en-US")}`,
         { align: "center" }
       );
@@ -55,14 +79,16 @@ export async function generateReportPDF(
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(1);
 
-      doc.fontSize(14).font("Helvetica-Bold");
+      doc.fontSize(14);
+      setFont(doc, isGeorgian, true);
       doc.text(
-        isGeorgian ? "შემაჯამებელი მიმოხილვა" : "Executive Summary",
+        isGeorgian ? "Shemajamebeli mimoxilva / Executive Summary" : "Executive Summary",
         { underline: true }
       );
       doc.moveDown(0.5);
       
-      doc.fontSize(11).font("Helvetica");
+      doc.fontSize(11);
+      setFont(doc, isGeorgian, false);
       const summary = isGeorgian 
         ? (report.summaryKa || report.summaryEn || "N/A")
         : (report.summaryEn || "N/A");
@@ -70,9 +96,10 @@ export async function generateReportPDF(
 
       doc.moveDown(1.5);
 
-      doc.fontSize(14).font("Helvetica-Bold");
+      doc.fontSize(14);
+      setFont(doc, isGeorgian, true);
       doc.text(
-        isGeorgian ? "მთავარი აღმოჩენები" : "Key Findings",
+        isGeorgian ? "Mtavari agmochenebi / Key Findings" : "Key Findings",
         { underline: true }
       );
       doc.moveDown(0.5);
@@ -82,7 +109,8 @@ export async function generateReportPDF(
         : (report.keyFindingsEn || []);
       
       if (keyFindings.length > 0) {
-        doc.fontSize(11).font("Helvetica");
+        doc.fontSize(11);
+        setFont(doc, isGeorgian, false);
         keyFindings.forEach((finding, index) => {
           if (finding) {
             doc.text(`${index + 1}. ${finding}`, { 
@@ -93,8 +121,9 @@ export async function generateReportPDF(
           }
         });
       } else {
-        doc.fontSize(11).font("Helvetica");
-        doc.text(isGeorgian ? "აღმოჩენები არ არის" : "No findings available");
+        doc.fontSize(11);
+        setFont(doc, isGeorgian, false);
+        doc.text(isGeorgian ? "No findings available" : "No findings available");
       }
 
       doc.moveDown(1.5);
@@ -234,13 +263,13 @@ export async function generateCycleSummaryPDF(
         size: "A4",
         margins: { top: 50, bottom: 50, left: 50, right: 50 },
         info: {
-          Title: options.language === "ka" 
-            ? `HIE ციკლის შემაჯამებელი ანგარიში #${cycleId}` 
-            : `HIE Cycle Summary Report #${cycleId}`,
+          Title: `HIE Cycle Summary Report #${cycleId}`,
           Author: "HIE Parent Command Center",
           Subject: "Evolution Cycle Summary",
         },
       });
+
+      registerFonts(doc);
 
       const buffers: Buffer[] = [];
       doc.on("data", buffers.push.bind(buffers));
@@ -251,19 +280,21 @@ export async function generateCycleSummaryPDF(
 
       const isGeorgian = options.language === "ka";
 
-      doc.fontSize(22).font("Helvetica-Bold");
+      doc.fontSize(22);
+      setFont(doc, isGeorgian, true);
       doc.text(
         isGeorgian 
-          ? `HIE ციკლის შემაჯამებელი ანგარიში` 
+          ? `HIE ciklis shemajamebeli angarishi` 
           : `HIE Cycle Summary Report`,
         { align: "center" }
       );
       
       doc.moveDown(0.5);
-      doc.fontSize(14).font("Helvetica");
+      doc.fontSize(14);
+      setFont(doc, isGeorgian, false);
       doc.text(
         isGeorgian 
-          ? `ციკლი #${cycleId}` 
+          ? `Cikli #${cycleId}` 
           : `Cycle #${cycleId}`,
         { align: "center" }
       );
@@ -272,7 +303,7 @@ export async function generateCycleSummaryPDF(
       doc.fontSize(11);
       doc.text(
         isGeorgian 
-          ? `სულ ${reports.length} ანგარიში | ${allInsights.length} ინსაიტი`
+          ? `Sul ${reports.length} angarishi | ${allInsights.length} insaiti`
           : `Total ${reports.length} reports | ${allInsights.length} insights`,
         { align: "center" }
       );
@@ -294,14 +325,16 @@ export async function generateCycleSummaryPDF(
       const uniqueFindings = Array.from(new Set(allKeyFindings)).slice(0, 15);
       
       if (uniqueFindings.length > 0) {
-        doc.fontSize(14).font("Helvetica-Bold");
+        doc.fontSize(14);
+        setFont(doc, isGeorgian, true);
         doc.text(
-          isGeorgian ? "მთავარი აღმოჩენები ციკლიდან" : "Key Findings from Cycle",
+          isGeorgian ? "Mtavari agmochenebi ciklidan / Key Findings" : "Key Findings from Cycle",
           { underline: true }
         );
         doc.moveDown(0.5);
         
-        doc.fontSize(11).font("Helvetica");
+        doc.fontSize(11);
+        setFont(doc, isGeorgian, false);
         uniqueFindings.forEach((finding, index) => {
           doc.text(`${index + 1}. ${finding}`, { 
             indent: 15,
@@ -332,18 +365,20 @@ export async function generateCycleSummaryPDF(
         .slice(0, 10);
 
       if (sortedHypotheses.length > 0) {
-        doc.fontSize(14).font("Helvetica-Bold");
+        doc.fontSize(14);
+        setFont(doc, isGeorgian, true);
         doc.text(
-          isGeorgian ? "ტოპ ჰიპოთეზები (სანდოობის მიხედვით)" : "Top Hypotheses (by confidence)",
+          isGeorgian ? "Top Hipotezebi (sandoobis mixedvit) / Top Hypotheses" : "Top Hypotheses (by confidence)",
           { underline: true }
         );
         doc.moveDown(0.5);
         
-        doc.fontSize(11).font("Helvetica");
+        doc.fontSize(11);
+        setFont(doc, isGeorgian, false);
         sortedHypotheses.forEach((hypo, index) => {
-          doc.font("Helvetica-Bold");
+          setFont(doc, isGeorgian, true);
           doc.text(`${index + 1}. [${hypo.confidence}%] `, { continued: true });
-          doc.font("Helvetica");
+          setFont(doc, isGeorgian, false);
           
           const hypoText = hypo.hypothesis.length > 200 
             ? hypo.hypothesis.substring(0, 200) + "..." 
@@ -351,9 +386,9 @@ export async function generateCycleSummaryPDF(
           doc.text(hypoText);
           
           if (hypo.disciplines && hypo.disciplines.length > 0) {
-            doc.fontSize(9).font("Helvetica-Oblique");
+            doc.fontSize(9);
             doc.text(`   ${hypo.disciplines.join(", ")}`, { indent: 20 });
-            doc.fontSize(11).font("Helvetica");
+            doc.fontSize(11);
           }
           
           doc.moveDown(0.4);
@@ -364,10 +399,11 @@ export async function generateCycleSummaryPDF(
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(0.5);
       
-      doc.fontSize(9).font("Helvetica-Oblique");
+      doc.fontSize(9);
+      setFont(doc, isGeorgian, false);
       doc.text(
         isGeorgian 
-          ? `გენერირებულია: ${new Date().toLocaleString("ka-GE")} | HIE Parent Command Center`
+          ? `Generated: ${new Date().toLocaleString("en-US")} | HIE Parent Command Center`
           : `Generated: ${new Date().toLocaleString("en-US")} | HIE Parent Command Center`,
         { align: "center" }
       );
