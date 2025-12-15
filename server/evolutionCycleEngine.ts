@@ -552,6 +552,75 @@ async function executeObservePhase(
     ? `\n\n=== ACCUMULATED KNOWLEDGE FROM PREVIOUS CYCLES ===\nThe following insights were synthesized from previous research cycles. Build upon this knowledge and look for NEW developments, confirmations, or contradictions:\n\n${previousCycleInsights.map((i, idx) => `[Previous Insight ${idx + 1}]\n${i.contentEn}`).join("\n\n")}\n\n=== END ACCUMULATED KNOWLEDGE ===\n`
     : "";
 
+  // Step 1: Identify unsolved problems using expert panel
+  const { problems, consensusProblems } = await identifyUnsolvedProblems(diagnosisContext);
+  console.log(`[Evolution Engine] Expert panel identified ${problems.length} problems, top consensus: ${consensusProblems.length}`);
+
+  // Store problems as insights from expert panel
+  for (const problem of problems.slice(0, 10)) {
+    insights.push({
+      phase: "observe",
+      insightType: "problem_identification",
+      contentEn: `[${problem.expertSource}]: ${problem.descriptionEn}`,
+      contentKa: `[${problem.expertSource}]: ${problem.descriptionKa}`,
+      sources: [],
+      metadata: {
+        expertSource: problem.expertSource,
+        expertSpecialty: problem.expertSpecialty,
+        priority: problem.priority,
+        searchQueries: problem.searchQueries,
+      },
+      confidence: 85,
+      relevanceScore: problem.priority * 10,
+    });
+  }
+
+  // Step 2: Search for solutions to each problem in parallel
+  const problemSearchPromises = problems.slice(0, 5).map(async (problem) => {
+    try {
+      const searchResult = await searchAcademicSources(problem.searchQueries[0] || problem.descriptionEn, {
+        maxResults: 10,
+        yearFrom: new Date().getFullYear() - 3,
+        openAccessOnly: false,
+      });
+      return { problem, searchResult, success: true };
+    } catch (error) {
+      console.error(`[Evolution Engine] Search failed for problem: ${problem.id}`, error);
+      return { problem, searchResult: null, success: false };
+    }
+  });
+
+  const problemSearchResults = await Promise.all(problemSearchPromises);
+  
+  // Add search results for each problem as insights
+  for (const { problem, searchResult, success } of problemSearchResults) {
+    if (success && searchResult && searchResult.papers.length > 0) {
+      const solutionSummary = `Potential solutions for "${problem.descriptionEn}":\n${searchResult.papers.slice(0, 5).map((p, i) => `${i + 1}. "${p.title}" (${p.year || "N/A"}) - ${p.citationCount || 0} citations`).join("\n")}`;
+      const solutionSummaryKa = await translateToGeorgian(solutionSummary);
+      
+      insights.push({
+        phase: "observe",
+        insightType: "solution_search",
+        contentEn: solutionSummary,
+        contentKa: solutionSummaryKa,
+        sources: searchResult.papers.slice(0, 5).map((p) => ({
+          title: p.title,
+          url: p.url || p.openAccessUrl,
+          snippet: p.abstract?.substring(0, 200),
+          source: p.source,
+        })),
+        metadata: {
+          problemId: problem.id,
+          expertSource: problem.expertSource,
+          searchQuery: problem.searchQueries[0],
+          papersFound: searchResult.papers.length,
+        },
+        confidence: 80,
+        relevanceScore: problem.priority * 8,
+      });
+    }
+  }
+
   // მულტიდისციპლინური ძიება: სამედიცინო კლინიკური სპეციალობები + ტრადიციული/ხალხური მედიცინა + კროს-დისციპლინური
   // Comprehensive list for academic search (OpenAlex/Semantic Scholar free-text search)
   const targetDisciplines = [
@@ -1061,6 +1130,86 @@ Respond with JSON containing synthesized conclusions.`;
   };
 }
 
+interface ExpertRecommendation {
+  expertName: string;
+  specialty: string;
+  recommendationEn: string;
+  recommendationKa: string;
+  priority: number;
+  actionItems: string[];
+}
+
+async function conductExpertPanelDebate(
+  diagnosisContext: string,
+  researchFindings: string
+): Promise<ExpertRecommendation[]> {
+  console.log(`[Evolution Engine] Conducting expert panel debate...`);
+  
+  const expertKeys = Object.keys(EXPERT_PERSONAS) as (keyof typeof EXPERT_PERSONAS)[];
+  const recommendations: ExpertRecommendation[] = [];
+  
+  const debatePromises = expertKeys.map(async (key) => {
+    const expert = EXPERT_PERSONAS[key];
+    const systemPrompt = `${expert.prompt}
+
+${FIGHTER_SPIRIT}
+
+You have reviewed the research findings from a multi-disciplinary search on this patient's condition. Based on your 50 years of experience in ${expert.specialtyEn}, provide:
+
+1. Your TOP 3 most actionable recommendations
+2. Priority level (1-10) for each
+3. Specific action items the parents can take
+4. Any clinical trials or experimental treatments you recommend exploring
+
+Be SPECIFIC and PRACTICAL. Parents need actionable guidance, not general advice.
+
+Respond with JSON:
+{
+  "overallRecommendation": "Your main recommendation as an expert",
+  "priority": 1-10,
+  "actionItems": ["Specific action 1", "Specific action 2", "Specific action 3"],
+  "clinicalTrialsToExplore": ["Trial 1", "Trial 2"],
+  "urgentActions": ["What to do this week"]
+}`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Based on this diagnosis and research findings, provide your expert recommendations:\n\nDIAGNOSIS:\n${diagnosisContext}\n\nRESEARCH FINDINGS:\n${researchFindings}` }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const parsed = JSON.parse(content);
+      
+      if (parsed.overallRecommendation) {
+        const recKa = await translateToGeorgian(parsed.overallRecommendation);
+        recommendations.push({
+          expertName: expert.nameEn,
+          specialty: expert.specialtyEn,
+          recommendationEn: parsed.overallRecommendation,
+          recommendationKa: recKa,
+          priority: parsed.priority || 5,
+          actionItems: parsed.actionItems || []
+        });
+      }
+    } catch (error) {
+      console.error(`[Evolution Engine] Expert ${expert.nameEn} debate failed:`, error);
+    }
+  });
+
+  await Promise.all(debatePromises);
+  
+  recommendations.sort((a, b) => b.priority - a.priority);
+  
+  console.log(`[Evolution Engine] Expert panel generated ${recommendations.length} recommendations`);
+  
+  return recommendations;
+}
+
 async function executeSynthesizePhase(
   diagnosisContext: string,
   theorizeInsights: EvolutionInsight[]
@@ -1217,6 +1366,30 @@ Respond with JSON containing the final synthesized conclusions.`;
         confidence: finalSynthesis.confidence,
         relevanceScore: 98,
       });
+      
+      // Step 3: Expert Panel Debate - get domain-specific recommendations
+      const expertRecommendations = await conductExpertPanelDebate(diagnosisContext, finalSynthesis.content);
+      
+      for (const rec of expertRecommendations) {
+        insights.push({
+          phase: "synthesize",
+          insightType: "recommendation",
+          contentEn: `[${rec.expertName} - ${rec.specialty}]: ${rec.recommendationEn}\n\nAction Items:\n${rec.actionItems.map((a, i) => `${i + 1}. ${a}`).join("\n")}`,
+          contentKa: `[${rec.expertName} - ${rec.specialty}]: ${rec.recommendationKa}`,
+          sources: [],
+          metadata: {
+            expertName: rec.expertName,
+            specialty: rec.specialty,
+            priority: rec.priority,
+            actionItems: rec.actionItems,
+            recommendationType: "expert-panel",
+          },
+          confidence: 90,
+          relevanceScore: rec.priority * 10,
+        });
+      }
+      
+      console.log(`[Evolution Engine] Added ${expertRecommendations.length} expert recommendations to synthesis`);
     }
   }
 
