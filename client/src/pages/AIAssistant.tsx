@@ -1405,7 +1405,7 @@ export default function AIAssistant() {
                 </Badge>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" data-testid="button-chat-menu">
+                    <Button size="icon" variant="ghost" data-testid="button-chat-menu" aria-label="Chat menu">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -1637,6 +1637,7 @@ export default function AIAssistant() {
                   onClick={() => handleSend()}
                   disabled={(!input.trim() && pendingAttachments.length === 0) || sendMessage.isPending || isUploadingAttachments}
                   data-testid="button-send-message"
+                  aria-label="Send message"
                 >
                   {(sendMessage.isPending || isUploadingAttachments) ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

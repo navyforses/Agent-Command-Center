@@ -253,6 +253,7 @@ export function AIChatPanel({ childName = "your child" }: AIChatPanelProps) {
                 size="icon" 
                 variant="ghost"
                 data-testid="button-chat-menu"
+                aria-label="Chat menu"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -350,6 +351,7 @@ export function AIChatPanel({ childName = "your child" }: AIChatPanelProps) {
               size="icon" 
               disabled={!input.trim() || isLoading} 
               data-testid="button-send-message"
+              aria-label="Send message"
             >
               <Send className="h-4 w-4" />
             </Button>
