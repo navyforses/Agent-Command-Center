@@ -1025,8 +1025,17 @@ export async function searchAcademicSources(
     yearTo,
     openAccessOnly = false,
     includeCrossDisciplinary = true,
-    targetDisciplines = ["physics", "engineering", "mathematics", "computer science"],
+    targetDisciplines = ["neonatology", "pediatric neurology", "neurology", "rehabilitation medicine", "stem cell therapy"],
   } = options;
+  
+  // HIE-specific exclusion terms to filter out irrelevant results
+  const EXCLUSION_TERMS = [
+    "oncology", "cancer", "tumor", "carcinoma", "melanoma",
+    "cigarette", "smoking", "tobacco", "nicotine",
+    "adult stroke", "geriatric", "alzheimer", "parkinson",
+    "covid", "coronavirus", "sars-cov",
+    "veterinary", "animal model only",
+  ];
 
   const searchPromises: Promise<AcademicSearchResult>[] = [
     searchOpenAlex(query, { maxResults, yearFrom, yearTo, openAccessOnly, sortBy: "relevance" }),
@@ -1054,22 +1063,40 @@ export async function searchAcademicSources(
   }
 
   const uniquePapers = deduplicatePapers(allPapers);
+  
+  // Filter out irrelevant papers using exclusion terms
+  const filteredPapers = uniquePapers.filter((paper) => {
+    const titleLower = (paper.title || "").toLowerCase();
+    const abstractLower = (paper.abstract || "").toLowerCase();
+    const combinedText = titleLower + " " + abstractLower;
+    
+    // Check if any exclusion term is present
+    const isExcluded = EXCLUSION_TERMS.some((term) => combinedText.includes(term.toLowerCase()));
+    
+    if (isExcluded) {
+      console.log(`[Academic Search] Excluded irrelevant paper: "${paper.title?.substring(0, 50)}..."`);
+    }
+    
+    return !isExcluded;
+  });
+  
+  console.log(`[Academic Search] Filtered ${uniquePapers.length - filteredPapers.length} irrelevant papers, ${filteredPapers.length} remaining`);
 
-  uniquePapers.sort((a, b) => {
+  filteredPapers.sort((a, b) => {
     const aScore = (a.citationCount || 0) * 0.7 + (a.year || 2000) * 0.3;
     const bScore = (b.citationCount || 0) * 0.7 + (b.year || 2000) * 0.3;
     return bScore - aScore;
   });
 
   const crossDisciplinaryInsights = includeCrossDisciplinary
-    ? extractCrossDisciplinaryInsights(uniquePapers, targetDisciplines)
+    ? extractCrossDisciplinaryInsights(filteredPapers, targetDisciplines)
     : undefined;
 
   return {
-    papers: uniquePapers.slice(0, maxResults * 2),
+    papers: filteredPapers.slice(0, maxResults * 2),
     query,
     sources,
-    totalResults: uniquePapers.length,
+    totalResults: filteredPapers.length,
     crossDisciplinaryInsights,
   };
 }
