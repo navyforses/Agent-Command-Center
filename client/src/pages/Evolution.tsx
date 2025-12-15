@@ -275,6 +275,7 @@ function ReportChatDialog({
             onClick={handleSend}
             disabled={!message.trim() || sendMessageMutation.isPending}
             data-testid="button-send-message"
+            aria-label="Send message"
           >
             {sendMessageMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

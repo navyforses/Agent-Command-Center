@@ -32,7 +32,7 @@ export function UpcomingAppointments({ appointments, onAddAppointment }: Upcomin
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
         <CardTitle className="text-lg font-semibold">Upcoming Appointments</CardTitle>
-        <Button variant="ghost" size="icon" onClick={onAddAppointment} data-testid="button-add-appointment">
+        <Button variant="ghost" size="icon" onClick={onAddAppointment} data-testid="button-add-appointment" aria-label="Add appointment">
           <Plus className="h-4 w-4" />
         </Button>
       </CardHeader>
