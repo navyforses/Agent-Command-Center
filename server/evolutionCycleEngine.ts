@@ -85,6 +85,139 @@ const FIGHTER_SPIRIT = `
 **დევიზი:** "სადაც სხვები ხედავენ კედელს, მე ვხედავ კარს."
 `;
 
+const EXPERT_PERSONAS = {
+  neurologist: {
+    name: "Dr. ნიკოლოზ წერეთელი",
+    nameEn: "Dr. Nikoloz Tsereteli",
+    specialty: "პედიატრიული ნევროლოგია",
+    specialtyEn: "Pediatric Neurology",
+    experience: "50 years",
+    focus: ["HIE pathophysiology", "Neuroplasticity", "Seizure management", "Developmental delay"],
+    prompt: `You are Dr. Nikoloz Tsereteli, a pediatric neurologist with 50 years of experience specializing in Hypoxic-Ischemic Encephalopathy (HIE). Your expertise includes understanding brain injury mechanisms, neuroplasticity windows, seizure management, and developmental outcomes. When analyzing a diagnosis, focus on: What neurological problems remain unsolved? What brain repair mechanisms are not fully understood? What prevents optimal recovery?`
+  },
+  researcher: {
+    name: "Dr. მარიამ ბერიძე",
+    nameEn: "Dr. Mariam Beridze",
+    specialty: "სისტემატური მიმოხილვა",
+    specialtyEn: "Systematic Review Methodology",
+    experience: "50 years",
+    focus: ["Cochrane methodology", "Meta-analysis", "Evidence grading", "Research gaps"],
+    prompt: `You are Dr. Mariam Beridze, a systematic review specialist with 50 years of experience in medical evidence synthesis. Your expertise includes Cochrane methodology, meta-analysis, and identifying research gaps. When analyzing a diagnosis, focus on: What questions lack high-quality evidence? Where are the gaps in randomized controlled trials? What interventions need more research?`
+  },
+  rehabilitologist: {
+    name: "Dr. გიორგი ხარაიშვილი",
+    nameEn: "Dr. Giorgi Kharaishvili",
+    specialty: "ნეირორეაბილიტაცია",
+    specialtyEn: "Neurorehabilitation",
+    experience: "50 years",
+    focus: ["Vojta therapy", "Bobath concept", "Motor development", "Functional recovery"],
+    prompt: `You are Dr. Giorgi Kharaishvili, a neurorehabilitation specialist with 50 years of experience in pediatric motor recovery. Your expertise includes Vojta, Bobath, and intensive rehabilitation programs. When analyzing a diagnosis, focus on: What functional limitations are hardest to overcome? What rehabilitation approaches need improvement? What prevents optimal motor recovery?`
+  },
+  geneticist: {
+    name: "Dr. ნინო გელაშვილი",
+    nameEn: "Dr. Nino Gelashvili",
+    specialty: "მოლეკულური გენეტიკა",
+    specialtyEn: "Molecular Genetics & Regenerative Medicine",
+    experience: "50 years",
+    focus: ["Stem cell therapy", "Gene therapy", "Neuroregeneration", "Cell-based treatments"],
+    prompt: `You are Dr. Nino Gelashvili, a molecular geneticist with 50 years of experience in regenerative medicine. Your expertise includes stem cell therapy, gene therapy for neurological conditions, and tissue regeneration. When analyzing a diagnosis, focus on: What cellular repair mechanisms are not working? What regenerative therapies show promise but lack clinical validation? What genetic factors influence recovery?`
+  },
+  pharmacologist: {
+    name: "Dr. დავით მაისურაძე",
+    nameEn: "Dr. Davit Maisuradze",
+    specialty: "ნეიროფარმაკოლოგია",
+    specialtyEn: "Neuropharmacology",
+    experience: "50 years",
+    focus: ["Neuroprotection", "Experimental drugs", "Drug delivery to brain", "Combination therapies"],
+    prompt: `You are Dr. Davit Maisuradze, a neuropharmacologist with 50 years of experience in developing treatments for brain injury. Your expertise includes neuroprotective agents, blood-brain barrier penetration, and experimental therapeutics. When analyzing a diagnosis, focus on: What pharmacological interventions are missing? What drug targets remain unexplored? What combination therapies might work?`
+  }
+};
+
+interface UnsolvedProblem {
+  id: string;
+  descriptionEn: string;
+  descriptionKa: string;
+  expertSource: string;
+  expertSpecialty: string;
+  priority: number;
+  searchQueries: string[];
+}
+
+async function identifyUnsolvedProblems(diagnosisContext: string): Promise<{
+  problems: UnsolvedProblem[];
+  consensusProblems: string[];
+}> {
+  console.log(`[Evolution Engine] Identifying unsolved problems with expert panel...`);
+  
+  const expertKeys = Object.keys(EXPERT_PERSONAS) as (keyof typeof EXPERT_PERSONAS)[];
+  const allProblems: UnsolvedProblem[] = [];
+  
+  const expertPromises = expertKeys.map(async (key) => {
+    const expert = EXPERT_PERSONAS[key];
+    const systemPrompt = `${expert.prompt}
+
+${FIGHTER_SPIRIT}
+
+Based on the diagnosis provided, identify 3-5 SPECIFIC unsolved problems in your field of expertise that science has not yet solved for this condition. For each problem:
+1. Describe the problem clearly
+2. Explain why it remains unsolved
+3. Suggest search queries to find potential solutions
+
+Respond with JSON:
+{
+  "problems": [
+    {
+      "description": "Specific unsolved problem",
+      "whyUnsolved": "Brief explanation",
+      "searchQueries": ["query1", "query2"],
+      "priority": 1-10
+    }
+  ]
+}`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Analyze this diagnosis and identify unsolved problems in your specialty:\n\n${diagnosisContext}` }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const parsed = JSON.parse(content);
+      
+      if (parsed.problems && Array.isArray(parsed.problems)) {
+        for (const p of parsed.problems) {
+          const descKa = await translateToGeorgian(p.description);
+          allProblems.push({
+            id: `${key}-${allProblems.length}`,
+            descriptionEn: p.description,
+            descriptionKa: descKa,
+            expertSource: expert.nameEn,
+            expertSpecialty: expert.specialtyEn,
+            priority: p.priority || 5,
+            searchQueries: p.searchQueries || [p.description]
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[Evolution Engine] Expert ${expert.nameEn} analysis failed:`, error);
+    }
+  });
+
+  await Promise.all(expertPromises);
+
+  allProblems.sort((a, b) => b.priority - a.priority);
+
+  const consensusProblems = allProblems.slice(0, 10).map(p => p.descriptionEn);
+
+  console.log(`[Evolution Engine] Identified ${allProblems.length} problems, top 10 selected for research`);
+  
+  return { problems: allProblems, consensusProblems };
+}
+
 interface PhaseResult {
   insights: InsertEvolutionInsight[];
   success: boolean;
