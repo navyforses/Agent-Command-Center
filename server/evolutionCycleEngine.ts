@@ -2645,7 +2645,7 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
 
     for (const insight of topInsights) {
       try {
-        const knowledgeType = categorizeInsight(insight);
+        const knowledgeType = determineKnowledgeType(insight);
         const existingKnowledge = await storage.getAccumulatedKnowledgeByChild(
           oldCycle.userId || "",
           oldCycle.childId || 0
@@ -2666,11 +2666,11 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
             contentEn: insight.contentEn,
             contentKa: insight.contentKa || null,
             confidence: insight.confidence || 70,
-            sourceCycleId: cycleId,
-            sourcePhase: insight.phase || "observe",
-            validatedCount: 0,
-            contradictedCount: 0,
-            isActive: true,
+            originCycleId: cycleId,
+            contributingCycleIds: [cycleId],
+            validationCount: 0,
+            contradictionCount: 0,
+            status: "active",
             metadata: insight.metadata || {},
           });
         }

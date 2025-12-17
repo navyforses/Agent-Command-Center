@@ -53,8 +53,8 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProces
     return {
       success: true,
       text,
-      pageCount: textResult.numpages,
-      metadata: textResult.info,
+      pageCount: textResult.total || textResult.pages?.length || 1,
+      metadata: { pageCount: textResult.total || textResult.pages?.length || 1 },
       extractionMethod: "pdf",
       language,
     };

@@ -1546,7 +1546,8 @@ Format your response as JSON with the following structure:
       const executedActions: ActionResult[] = [];
       
       // Helper to create pending action message
-      const createPendingAction = async (action: typeof analysis.suggestedActions[0]) => {
+      type SuggestedAction = { type: string; description: string; descriptionKa?: string; data?: Record<string, any> };
+      const createPendingAction = async (action: SuggestedAction) => {
         const actionMessage = await storage.createChatMessage({
           userId,
           role: "assistant",
@@ -2594,6 +2595,9 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
       }
       
       // Verify ownership via the cycle
+      if (!run.cycleId) {
+        return res.status(400).json({ message: "Run does not have an associated cycle" });
+      }
       const cycle = await storage.getEvolutionCycle(run.cycleId, userId);
       if (!cycle) {
         return res.status(403).json({ message: "Not authorized to access this run" });

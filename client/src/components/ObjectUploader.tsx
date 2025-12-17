@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
-import { DashboardModal } from "@uppy/react";
+// @ts-ignore - Direct import from lib since main export doesn't include Dashboard
+import Dashboard from "@uppy/react/lib/Dashboard.js";
 import "@uppy/core/dist/style.min.css";
 import "@uppy/dashboard/dist/style.min.css";
 import AwsS3 from "@uppy/aws-s3";
@@ -54,12 +55,22 @@ export function ObjectUploader({
         {children}
       </Button>
 
-      <DashboardModal
-        uppy={uppy}
-        open={showModal}
-        onRequestClose={() => setShowModal(false)}
-        proudlyDisplayPoweredByUppy={false}
-      />
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background rounded-lg p-4 max-w-lg w-full">
+            <Dashboard
+              uppy={uppy}
+              proudlyDisplayPoweredByUppy={false}
+            />
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-2 w-full py-2 bg-secondary rounded hover:bg-secondary/80"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

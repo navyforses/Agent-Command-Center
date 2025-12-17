@@ -250,7 +250,7 @@ export default function Dashboard() {
               <DialogHeader>
                 <DialogTitle>{t("uploadDocuments")}</DialogTitle>
               </DialogHeader>
-              <DocumentUploadZone onFilesSelected={() => setShowUploadDialog(false)} />
+              <DocumentUploadZone onUploadComplete={() => setShowUploadDialog(false)} />
             </DialogContent>
           </Dialog>
           <Button className="gap-2" data-testid="button-add-child">
