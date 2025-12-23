@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppSidebar } from "@/components/shared/AppSidebar";
+import { MobileBottomNav } from "@/components/shared/MobileBottomNav";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
@@ -131,13 +132,15 @@ function AppContent() {
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-auto" role="main" id="main-content">
+          <main className="flex-1 overflow-auto pb-20 md:pb-0" role="main" id="main-content">
             <ErrorBoundary>
               <Router />
             </ErrorBoundary>
           </main>
         </div>
       </div>
+      {/* Mobile Bottom Navigation - visible only on mobile */}
+      <MobileBottomNav />
     </SidebarProvider>
   );
 }

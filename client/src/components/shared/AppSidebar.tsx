@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -15,6 +15,11 @@ import {
   Dna,
   BookOpen,
   Pill,
+  ChevronDown,
+  Baby,
+  Stethoscope,
+  Search,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -22,12 +27,19 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -39,30 +51,141 @@ interface AppSidebarProps {
   };
 }
 
+interface MenuItem {
+  title: string;
+  icon: React.ElementType;
+  url: string;
+}
+
+interface MenuSection {
+  title: string;
+  icon: React.ElementType;
+  items: MenuItem[];
+}
+
 export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
   const { t, language } = useLanguage();
 
-  const mainMenuItems = useMemo(() => [
-    { title: t("dashboard"), icon: LayoutDashboard, url: "/" },
-    { title: t("childProfile"), icon: User, url: "/child-profile" },
-    { title: t("documents"), icon: FileText, url: "/documents" },
-    { title: t("therapyRecommendations"), icon: Activity, url: "/therapy" },
-    { title: t("clinicalTrials"), icon: FlaskConical, url: "/trials" },
-    { title: t("research") || "Research", icon: BookOpen, url: "/research" },
-    { title: t("medications") || "Medications", icon: Pill, url: "/medications" },
-    { title: t("emailHub"), icon: Mail, url: "/email" },
-    { title: t("calendar"), icon: Calendar, url: "/calendar" },
-  ], [t, language]);
+  // Check if any sub-item in a section is active
+  const isSectionActive = (items: MenuItem[]) =>
+    items.some(item => location === item.url || location.startsWith(item.url + "/"));
 
-  const aiMenuItems = useMemo(() => [
-    { title: t("aiAssistant"), icon: Bot, url: "/assistant" },
-    { title: t("evolutionCycles"), icon: Dna, url: "/evolution" },
-  ], [t, language]);
+  // 6 Section Navigation Structure
+  const navigationSections = useMemo(() => ({
+    // Section 1: Dashboard (standalone)
+    dashboard: {
+      title: t("dashboard") || "Dashboard",
+      icon: LayoutDashboard,
+      url: "/",
+    },
 
-  const bottomMenuItems = useMemo(() => [
-    { title: t("settings"), icon: Settings, url: "/settings" },
-  ], [t, language]);
+    // Section 2: My Child (ჩემი შვილი)
+    child: {
+      title: language === "ka" ? "ჩემი შვილი" : "My Child",
+      icon: Baby,
+      items: [
+        { title: t("childProfile") || "Child Profile", icon: User, url: "/child-profile" },
+        { title: t("documents") || "Documents", icon: FileText, url: "/documents" },
+      ],
+    } as MenuSection,
+
+    // Section 3: Therapy & Treatment (თერაპია & მკურნალობა)
+    therapy: {
+      title: language === "ka" ? "თერაპია & მკურნალობა" : "Therapy & Treatment",
+      icon: Stethoscope,
+      items: [
+        { title: t("therapyRecommendations") || "Therapy", icon: Activity, url: "/therapy" },
+        { title: t("medications") || "Medications", icon: Pill, url: "/medications" },
+      ],
+    } as MenuSection,
+
+    // Section 4: Research & Resources (კვლევა & რესურსები)
+    research: {
+      title: language === "ka" ? "კვლევა & რესურსები" : "Research & Resources",
+      icon: Search,
+      items: [
+        { title: t("research") || "Research", icon: BookOpen, url: "/research" },
+        { title: t("clinicalTrials") || "Clinical Trials", icon: FlaskConical, url: "/trials" },
+      ],
+    } as MenuSection,
+
+    // Section 5: Schedule & Communication (განრიგი & კომუნიკაცია)
+    schedule: {
+      title: language === "ka" ? "განრიგი & კომუნიკაცია" : "Schedule & Communication",
+      icon: MessageSquare,
+      items: [
+        { title: t("calendar") || "Calendar", icon: Calendar, url: "/calendar" },
+        { title: t("emailHub") || "Email Hub", icon: Mail, url: "/email" },
+      ],
+    } as MenuSection,
+
+    // Section 6: AI Assistant (AI ასისტენტი)
+    ai: {
+      title: language === "ka" ? "AI ასისტენტი" : "AI Assistant",
+      icon: Bot,
+      items: [
+        { title: t("aiAssistant") || "AI Chat", icon: Bot, url: "/assistant" },
+        { title: t("evolutionCycles") || "Evolution", icon: Dna, url: "/evolution" },
+      ],
+    } as MenuSection,
+  }), [t, language]);
+
+  // Collapsible section state - open sections that have active items
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    Object.entries(navigationSections).forEach(([key, section]) => {
+      if ('items' in section && isSectionActive(section.items)) {
+        initial[key] = true;
+      }
+    });
+    return initial;
+  });
+
+  const toggleSection = (key: string) => {
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const renderCollapsibleSection = (key: string, section: MenuSection) => (
+    <Collapsible
+      key={key}
+      open={openSections[key] || isSectionActive(section.items)}
+      onOpenChange={() => toggleSection(key)}
+    >
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            className="w-full justify-between"
+            isActive={isSectionActive(section.items)}
+            data-testid={`nav-section-${key}`}
+          >
+            <span className="flex items-center gap-2">
+              <section.icon className="h-4 w-4" />
+              <span>{section.title}</span>
+            </span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${openSections[key] ? 'rotate-180' : ''}`} />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {section.items.map((item) => (
+              <SidebarMenuSubItem key={item.url}>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={location === item.url || location.startsWith(item.url + "/")}
+                >
+                  <Link href={item.url} data-testid={`nav-${item.url.replace("/", "")}`}>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
 
   return (
     <Sidebar>
@@ -73,52 +196,37 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
           </div>
           <div>
             <h1 className="font-semibold text-sm">HIE Command Center</h1>
-            <p className="text-xs text-muted-foreground">Parent Portal</p>
+            <p className="text-xs text-muted-foreground">
+              {language === "ka" ? "მშობლის პორტალი" : "Parent Portal"}
+            </p>
           </div>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={`nav-${item.url.replace("/", "") || "dashboard"}`}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              {/* Dashboard - Standalone */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/"}
+                  data-testid="nav-dashboard"
+                >
+                  <Link href="/">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span>{navigationSections.dashboard.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>AI Tools</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {aiMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={`nav-${item.url.replace("/", "")}`}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {/* Collapsible Sections */}
+              {renderCollapsibleSection("child", navigationSections.child)}
+              {renderCollapsibleSection("therapy", navigationSections.therapy)}
+              {renderCollapsibleSection("research", navigationSections.research)}
+              {renderCollapsibleSection("schedule", navigationSections.schedule)}
+              {renderCollapsibleSection("ai", navigationSections.ai)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -126,20 +234,18 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
 
       <SidebarFooter className="p-4 space-y-2">
         <SidebarMenu>
-          {bottomMenuItems.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton
-                asChild
-                isActive={location === item.url}
-                data-testid={`nav-${item.url.replace("/", "")}`}
-              >
-                <Link href={item.url}>
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location === "/settings"}
+              data-testid="nav-settings"
+            >
+              <Link href="/settings">
+                <Settings className="h-4 w-4" />
+                <span>{t("settings") || "Settings"}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
 
         {user && (
