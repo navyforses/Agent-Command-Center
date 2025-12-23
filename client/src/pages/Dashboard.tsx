@@ -38,6 +38,7 @@ import {
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
 import { QuickLog } from "@/components/therapy/QuickLog";
+import { AIDailyBrief } from "@/components/dashboard/AIDailyBrief";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import type { Child, Appointment, Therapy } from "@shared/schema";
@@ -312,44 +313,12 @@ export default function Dashboard() {
       </div>
 
       {/* AI Daily Brief */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-        <CardContent className="p-4 md:p-6">
-          <div className="flex items-start gap-4">
-            <div className="p-2 rounded-full bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                {language === "ka" ? "AI დღის მიმოხილვა" : "AI Daily Brief"}
-                <Badge variant="secondary" className="text-xs">
-                  {language === "ka" ? "ახალი" : "New"}
-                </Badge>
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {hasChildren && primaryChild
-                  ? language === "ka"
-                    ? `${primaryChild.firstName}-ს დღეს აქვს ${
-                        upcomingAppointments?.filter((a) => isToday(new Date(a.appointmentDate))).length || 0
-                      } ვიზიტი დაგეგმილი. ${
-                        therapies?.filter((t) => t.isActive).length || 0
-                      } აქტიური თერაპია მიმდინარეობს.`
-                    : `${primaryChild.firstName} has ${
-                        upcomingAppointments?.filter((a) => isToday(new Date(a.appointmentDate))).length || 0
-                      } appointments scheduled today. ${
-                        therapies?.filter((t) => t.isActive).length || 0
-                      } active therapies in progress.`
-                  : language === "ka"
-                  ? "დაამატეთ თქვენი შვილის პროფილი პერსონალიზებული რეკომენდაციებისთვის."
-                  : "Add your child's profile to get personalized recommendations."}
-              </p>
-              <Button variant="link" className="p-0 h-auto" onClick={() => navigateTo("/assistant")}>
-                {language === "ka" ? "სრული ანალიზის ნახვა" : "View full analysis"}
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <AIDailyBrief
+        children={childrenList}
+        appointments={appointments}
+        therapies={therapies}
+        onNavigate={navigateTo}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Tasks & Actions */}
