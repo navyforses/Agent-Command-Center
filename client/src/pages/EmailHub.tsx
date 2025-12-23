@@ -32,6 +32,9 @@ import {
   Clock,
   Sparkles,
   Loader2,
+  Trash2,
+  Edit,
+  Eye,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -82,6 +85,9 @@ export default function EmailHub() {
   const [subject, setSubject] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [tone, setTone] = useState("professional");
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isEditingDraft, setIsEditingDraft] = useState(false);
 
   const { data: emails, isLoading } = useQuery<Email[]>({
     queryKey: ['/api/emails']
@@ -256,6 +262,67 @@ Best regards`,
     } catch {
       return "";
     }
+  };
+
+  const deleteEmail = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest('DELETE', `/api/emails/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/emails'] });
+      toast({
+        title: "Success",
+        description: "Email deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete email",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleEmailClick = (email: Email) => {
+    setSelectedEmail(email);
+    setIsEditingDraft(false);
+    setShowEmailDialog(true);
+  };
+
+  const handleEditDraft = (email: Email) => {
+    setSelectedEmail(email);
+    setIsEditingDraft(true);
+    setRecipientEmail(email.recipient || "");
+    setSubject(email.subject || "");
+    setEmailContent(email.body || "");
+    setSelectedTemplate(email.category || "");
+    setShowEmailDialog(false);
+    setShowComposeDialog(true);
+  };
+
+  const handleSendDraft = (email: Email) => {
+    if (!email.recipient?.trim()) {
+      toast({
+        title: "Recipient required",
+        description: "Please edit the draft and add a recipient",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateEmail.mutate({
+      id: email.id,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+    });
+    setShowEmailDialog(false);
+    setSelectedEmail(null);
+  };
+
+  const handleDeleteEmail = (email: Email) => {
+    deleteEmail.mutate(email.id);
+    setShowEmailDialog(false);
+    setSelectedEmail(null);
   };
 
   const allEmails = emails || [];
@@ -459,8 +526,9 @@ Best regards`,
                     {filteredEmails.map((email) => (
                       <div
                         key={email.id}
-                        className="p-4 hover-elevate cursor-pointer"
+                        className="p-4 hover-elevate cursor-pointer transition-colors hover:bg-muted/50"
                         data-testid={`email-thread-${email.id}`}
+                        onClick={() => handleEmailClick(email)}
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <div className="flex-1 min-w-0">
@@ -502,8 +570,9 @@ Best regards`,
                     {filteredEmails.map((email) => (
                       <div
                         key={email.id}
-                        className="p-4 hover-elevate cursor-pointer"
+                        className="p-4 hover-elevate cursor-pointer transition-colors hover:bg-muted/50"
                         data-testid={`email-sent-${email.id}`}
+                        onClick={() => handleEmailClick(email)}
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <div className="flex-1 min-w-0">
@@ -544,8 +613,9 @@ Best regards`,
                     {filteredEmails.map((email) => (
                       <div
                         key={email.id}
-                        className="p-4 hover-elevate cursor-pointer"
+                        className="p-4 hover-elevate cursor-pointer transition-colors hover:bg-muted/50"
                         data-testid={`email-draft-${email.id}`}
+                        onClick={() => handleEmailClick(email)}
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <div className="flex-1 min-w-0">
@@ -570,6 +640,97 @@ Best regards`,
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Email Detail Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Email Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedEmail && (
+            <div className="space-y-4 mt-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    {getStatusBadge(selectedEmail.status)}
+                    {selectedEmail.category && (
+                      <Badge variant="outline">{selectedEmail.category}</Badge>
+                    )}
+                  </div>
+                  <h3 className="font-semibold text-lg">{selectedEmail.subject || "(No subject)"}</h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">To:</span>{" "}
+                  <span className="font-medium">{selectedEmail.recipient || "(No recipient)"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Date:</span>{" "}
+                  <span className="font-medium">
+                    {formatEmailDate(selectedEmail.sentAt || selectedEmail.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Message</h4>
+                <div className="bg-muted/50 rounded-lg p-4 whitespace-pre-wrap text-sm">
+                  {selectedEmail.body || "(No content)"}
+                </div>
+              </div>
+
+              <div className="flex justify-between gap-2 pt-4 border-t">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDeleteEmail(selectedEmail)}
+                  disabled={deleteEmail.isPending}
+                  data-testid="button-delete-email"
+                >
+                  {deleteEmail.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete
+                </Button>
+
+                {selectedEmail.status === "draft" && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditDraft(selectedEmail)}
+                      data-testid="button-edit-draft"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Draft
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleSendDraft(selectedEmail)}
+                      disabled={updateEmail.isPending}
+                      data-testid="button-send-draft"
+                    >
+                      {updateEmail.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Send Now
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
