@@ -2,18 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Users, Calendar, Activity } from "lucide-react";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { ChildCard } from "@/components/dashboard/ChildCard";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { UpcomingAppointments } from "@/components/dashboard/UpcomingAppointments";
-import { AIInsightsCard } from "@/components/dashboard/AIInsightsCard";
-import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
-import { AIChatPanel } from "@/components/dashboard/AIChatPanel";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -21,349 +13,554 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { Child, Appointment, Document, Therapy } from "@shared/schema";
-import { format } from "date-fns";
+import {
+  Plus,
+  FileText,
+  Calendar,
+  Activity,
+  Pill,
+  CheckCircle2,
+  Circle,
+  Clock,
+  ArrowRight,
+  Sparkles,
+  Sun,
+  Moon,
+  Sunrise,
+  TrendingUp,
+  AlertCircle,
+  MessageSquare,
+  Upload,
+  Baby,
+  BookOpen,
+} from "lucide-react";
+import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/hooks/useAuth";
+import type { Child, Appointment, Therapy } from "@shared/schema";
+import { format, isToday, isTomorrow, differenceInHours } from "date-fns";
+
+// Get greeting based on time of day
+function getGreeting(language: string): { text: string; icon: React.ElementType } {
+  const hour = new Date().getHours();
+  if (hour < 12) {
+    return {
+      text: language === "ka" ? "დილა მშვიდობისა" : "Good morning",
+      icon: Sunrise,
+    };
+  } else if (hour < 18) {
+    return {
+      text: language === "ka" ? "შუადღე მშვიდობისა" : "Good afternoon",
+      icon: Sun,
+    };
+  } else {
+    return {
+      text: language === "ka" ? "საღამო მშვიდობისა" : "Good evening",
+      icon: Moon,
+    };
+  }
+}
+
+// Task item component
+function TaskItem({
+  title,
+  time,
+  completed,
+  type,
+  onToggle,
+}: {
+  title: string;
+  time?: string;
+  completed: boolean;
+  type: "medication" | "therapy" | "appointment";
+  onToggle?: () => void;
+}) {
+  const typeConfig = {
+    medication: { color: "text-blue-500", bg: "bg-blue-500/10" },
+    therapy: { color: "text-green-500", bg: "bg-green-500/10" },
+    appointment: { color: "text-purple-500", bg: "bg-purple-500/10" },
+  };
+
+  const config = typeConfig[type];
+
+  return (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+        completed ? "opacity-60" : "hover:bg-muted/50"
+      }`}
+    >
+      <button
+        onClick={onToggle}
+        className={`flex-shrink-0 ${config.color}`}
+        aria-label={completed ? "Mark as incomplete" : "Mark as complete"}
+      >
+        {completed ? (
+          <CheckCircle2 className="h-5 w-5" />
+        ) : (
+          <Circle className="h-5 w-5" />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={`font-medium ${completed ? "line-through" : ""}`}>{title}</p>
+        {time && (
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {time}
+          </p>
+        )}
+      </div>
+      <Badge variant="outline" className={`${config.bg} ${config.color} border-0`}>
+        {type === "medication" ? <Pill className="h-3 w-3" /> :
+         type === "therapy" ? <Activity className="h-3 w-3" /> :
+         <Calendar className="h-3 w-3" />}
+      </Badge>
+    </div>
+  );
+}
+
+// Quick action button component
+function QuickActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  color = "default",
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  color?: "default" | "primary" | "success" | "warning";
+}) {
+  const colorClasses = {
+    default: "hover:bg-muted",
+    primary: "hover:bg-primary/10 text-primary",
+    success: "hover:bg-green-500/10 text-green-600",
+    warning: "hover:bg-orange-500/10 text-orange-600",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${colorClasses[color]}`}
+    >
+      <div className={`p-3 rounded-full bg-muted`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <span className="text-sm font-medium text-center">{label}</span>
+    </button>
+  );
+}
 
 export default function Dashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
 
-  // Navigation handlers
-  const navigateToChildren = () => setLocation("/children");
-  const navigateToChild = (childId: number) => setLocation(`/child/${childId}`);
-  const navigateToCalendar = () => setLocation("/calendar");
-  const navigateToDocuments = () => setLocation("/documents");
-  const navigateToTherapy = () => setLocation("/therapy");
+  const greeting = getGreeting(language);
+  const GreetingIcon = greeting.icon;
 
+  // Data fetching
   const { data: children, isLoading: childrenLoading } = useQuery<Child[]>({
-    queryKey: ['/api/children']
+    queryKey: ["/api/children"],
   });
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery<Appointment[]>({
-    queryKey: ['/api/appointments']
-  });
-
-  const { data: documents, isLoading: documentsLoading } = useQuery<Document[]>({
-    queryKey: ['/api/documents']
+    queryKey: ["/api/appointments"],
   });
 
   const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
-    queryKey: ['/api/therapies']
+    queryKey: ["/api/therapies"],
   });
 
-  const isLoading = childrenLoading || appointmentsLoading || documentsLoading || therapiesLoading;
+  const isLoading = childrenLoading || appointmentsLoading || therapiesLoading;
 
-  const userName = user?.firstName || "Parent";
+  const userName = user?.firstName || (language === "ka" ? "მშობელი" : "Parent");
+  const childrenList = children || [];
+  const hasChildren = childrenList.length > 0;
+  const primaryChild = childrenList[0];
 
-  const getNextAppointmentForChild = (childId: number): string | undefined => {
-    if (!appointments) return undefined;
-    const childAppointments = appointments
-      .filter(apt => apt.childId === childId && new Date(apt.appointmentDate) > new Date())
-      .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
-    
-    if (childAppointments.length === 0) return undefined;
-    const nextApt = childAppointments[0];
-    return format(new Date(nextApt.appointmentDate), "MMM d, yyyy 'at' h:mm a");
-  };
-
-  const getDocumentsCountForChild = (childId: number): number => {
-    if (!documents) return 0;
-    return documents.filter(doc => doc.childId === childId).length;
-  };
-
-  const getTherapiesCountForChild = (childId: number): number => {
-    if (!therapies) return 0;
-    return therapies.filter(t => t.childId === childId && t.isActive).length;
-  };
-
-  const transformAppointments = () => {
-    if (!appointments) return [];
-    const now = new Date();
-    return appointments
-      .filter(apt => new Date(apt.appointmentDate) > now)
-      .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
-      .slice(0, 5)
-      .map(apt => ({
-        id: apt.id.toString(),
-        title: apt.title,
-        provider: apt.description || "",
-        location: apt.location || "",
-        date: format(new Date(apt.appointmentDate), "MMM d, yyyy"),
-        time: format(new Date(apt.appointmentDate), "h:mm a"),
-        type: (apt.status === "therapy" ? "therapy" : apt.status === "consultation" ? "consultation" : "medical") as "therapy" | "medical" | "consultation"
-      }));
-  };
-
-  const generateRecentActivities = () => {
-    const activities: Array<{
+  // Generate today's tasks
+  const todaysTasks = () => {
+    const tasks: Array<{
       id: string;
-      type: "document" | "email" | "appointment" | "ai_analysis" | "therapy";
       title: string;
-      description: string;
-      timestamp: string;
-      status: "success" | "pending" | "info";
+      time?: string;
+      type: "medication" | "therapy" | "appointment";
     }> = [];
 
-    if (documents && documents.length > 0) {
-      const recentDocs = [...documents]
-        .sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime())
-        .slice(0, 2);
-      
-      recentDocs.forEach((doc, index) => {
-        activities.push({
-          id: `doc-${doc.id}`,
-          type: "document",
-          title: `${doc.title} Uploaded`,
-          description: doc.category || "Medical document",
-          timestamp: doc.uploadedAt ? format(new Date(doc.uploadedAt), "MMM d, yyyy") : "Recently",
-          status: doc.aiSummary ? "success" : "pending"
-        });
-      });
-    }
-
-    if (appointments && appointments.length > 0) {
-      const recentApts = [...appointments]
-        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, 2);
-      
-      recentApts.forEach((apt) => {
-        activities.push({
+    // Add appointments for today
+    appointments?.forEach((apt) => {
+      const aptDate = new Date(apt.appointmentDate);
+      if (isToday(aptDate)) {
+        tasks.push({
           id: `apt-${apt.id}`,
-          type: "appointment",
           title: apt.title,
-          description: apt.location || "Upcoming appointment",
-          timestamp: format(new Date(apt.appointmentDate), "MMM d, yyyy"),
-          status: "info"
+          time: format(aptDate, "HH:mm"),
+          type: "appointment",
         });
+      }
+    });
+
+    // Add active therapies as daily tasks
+    therapies?.filter(t => t.isActive).slice(0, 2).forEach((therapy) => {
+      tasks.push({
+        id: `therapy-${therapy.id}`,
+        title: therapy.name,
+        type: "therapy",
       });
+    });
+
+    // Add sample medication tasks if we have children
+    if (hasChildren) {
+      tasks.push(
+        { id: "med-1", title: language === "ka" ? "დილის წამალი" : "Morning medication", time: "09:00", type: "medication" },
+        { id: "med-2", title: language === "ka" ? "საღამოს წამალი" : "Evening medication", time: "21:00", type: "medication" }
+      );
     }
 
-    return activities.slice(0, 4);
+    return tasks.sort((a, b) => {
+      if (!a.time) return 1;
+      if (!b.time) return -1;
+      return a.time.localeCompare(b.time);
+    });
   };
 
-  const staticInsights = [
-    {
-      id: "upload-docs",
-      title: "Upload Documents for AI Analysis",
-      description: "Upload medical records, therapy notes, or assessments to get AI-powered insights and summaries.",
-      priority: "medium" as const,
-      actionLabel: "Upload Documents",
-    },
-    {
-      id: "track-therapy",
-      title: "Track Therapy Progress",
-      description: "Log therapy sessions regularly to monitor your child's developmental progress over time.",
-      priority: "low" as const,
-      actionLabel: "View Therapies",
-    },
-  ];
+  // Calculate task completion percentage
+  const tasks = todaysTasks();
+  const completedCount = tasks.filter((t) => completedTasks.has(t.id)).length;
+  const completionPercentage = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
 
-  // Handle insight action
-  const handleInsightAction = (insightId: string) => {
-    switch (insightId) {
-      case "upload-docs":
-        setShowUploadDialog(true);
-        break;
-      case "track-therapy":
-        navigateToTherapy();
-        break;
-      default:
-        break;
-    }
+  // Get upcoming appointments
+  const upcomingAppointments = appointments
+    ?.filter((apt) => new Date(apt.appointmentDate) > new Date())
+    .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
+    .slice(0, 3);
+
+  // Navigation handlers
+  const navigateTo = (path: string) => setLocation(path);
+
+  const toggleTask = (taskId: string) => {
+    setCompletedTasks((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
   };
-
-  const upcomingAppointmentsCount = appointments?.filter(
-    apt => new Date(apt.appointmentDate) > new Date()
-  ).length || 0;
-
-  const activeTherapiesCount = therapies?.filter(t => t.isActive).length || 0;
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-36" />
-            <Skeleton className="h-9 w-28" />
-          </div>
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
         </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
             <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-12 mb-1" />
-                <Skeleton className="h-3 w-20" />
+              <CardContent className="p-6">
+                <Skeleton className="h-32 w-full" />
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <Skeleton className="h-6 w-32 mb-4" />
-              <div className="grid md:grid-cols-2 gap-4">
-                {[...Array(2)].map((_, i) => (
-                  <Card key={i}>
-                    <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-12 w-12 rounded-full" />
-                        <div>
-                          <Skeleton className="h-5 w-32 mb-1" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-9 w-full" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-5 w-24" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
     );
   }
 
-  const childrenList = children || [];
-  const hasChildren = childrenList.length > 0;
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t("welcome")}, {userName}</h1>
-          <p className="text-muted-foreground">{t("manageYourChild")}</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2" data-testid="button-upload-document">
-                <FileText className="h-4 w-4" />
-                {t("uploadDocuments")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>{t("uploadDocuments")}</DialogTitle>
-              </DialogHeader>
-              <DocumentUploadZone onUploadComplete={() => setShowUploadDialog(false)} />
-            </DialogContent>
-          </Dialog>
-          <Button className="gap-2" onClick={navigateToChildren} data-testid="button-add-child">
-            <Plus className="h-4 w-4" />
-            {t("addChild")}
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Documents"
-          value={documents?.length || 0}
-          description="Across all children"
-          icon={FileText}
-        />
-        <StatCard
-          title="Active Therapies"
-          value={activeTherapiesCount}
-          description="Currently active"
-          icon={Activity}
-        />
-        <StatCard
-          title="Appointments"
-          value={upcomingAppointmentsCount}
-          description="Upcoming"
-          icon={Calendar}
-        />
-        <StatCard
-          title="Children"
-          value={childrenList.length}
-          icon={Users}
-        />
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold mb-4">{t("childProfile")}s</h2>
-            {hasChildren ? (
-              <div className="grid md:grid-cols-2 gap-4">
-                {childrenList.map((child) => (
-                  <ChildCard
-                    key={child.id}
-                    firstName={child.firstName}
-                    lastName={child.lastName}
-                    dateOfBirth={child.dateOfBirth || ""}
-                    diagnosis={child.diagnosis || "Not specified"}
-                    severity="moderate"
-                    nextAppointment={getNextAppointmentForChild(child.id)}
-                    documentsCount={getDocumentsCountForChild(child.id)}
-                    therapiesCount={getTherapiesCountForChild(child.id)}
-                    onClick={() => navigateToChild(child.id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No children added yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Add your child's profile to start tracking their medical journey
-                  </p>
-                  <Button className="gap-2" onClick={navigateToChildren} data-testid="button-add-child-empty">
-                    <Plus className="h-4 w-4" />
-                    Add Child
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+    <div className="p-4 md:p-6 space-y-6" data-testid="text-page-title">
+      {/* Greeting Section */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <GreetingIcon className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-bold">
+              {greeting.text}, {userName}
+            </h1>
           </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            <RecentActivity activities={generateRecentActivities()} />
-            <UpcomingAppointments
-              appointments={transformAppointments()}
-              onAddAppointment={navigateToCalendar}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <AIInsightsCard
-            insights={staticInsights}
-            onViewInsight={handleInsightAction}
-          />
-          {hasChildren && (
-            <AIChatPanel childName={childrenList[0]?.firstName} />
+          {hasChildren && primaryChild && (
+            <p className="text-muted-foreground">
+              {language === "ka"
+                ? `${primaryChild.firstName}-ს დღეს აქვს ${tasks.length} დავალება`
+                : `${primaryChild.firstName} has ${tasks.length} tasks today`}
+            </p>
           )}
+        </div>
+
+        {/* Progress indicator */}
+        {tasks.length > 0 && (
+          <div className="flex items-center gap-3 bg-muted/50 px-4 py-2 rounded-full">
+            <div className="text-sm font-medium">
+              {completedCount}/{tasks.length}
+            </div>
+            <Progress value={completionPercentage} className="w-24 h-2" />
+            <span className="text-sm text-muted-foreground">
+              {language === "ka" ? "შესრულებული" : "completed"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* AI Daily Brief */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+        <CardContent className="p-4 md:p-6">
+          <div className="flex items-start gap-4">
+            <div className="p-2 rounded-full bg-primary/10">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                {language === "ka" ? "AI დღის მიმოხილვა" : "AI Daily Brief"}
+                <Badge variant="secondary" className="text-xs">
+                  {language === "ka" ? "ახალი" : "New"}
+                </Badge>
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {hasChildren && primaryChild
+                  ? language === "ka"
+                    ? `${primaryChild.firstName}-ს დღეს აქვს ${
+                        upcomingAppointments?.filter((a) => isToday(new Date(a.appointmentDate))).length || 0
+                      } ვიზიტი დაგეგმილი. ${
+                        therapies?.filter((t) => t.isActive).length || 0
+                      } აქტიური თერაპია მიმდინარეობს.`
+                    : `${primaryChild.firstName} has ${
+                        upcomingAppointments?.filter((a) => isToday(new Date(a.appointmentDate))).length || 0
+                      } appointments scheduled today. ${
+                        therapies?.filter((t) => t.isActive).length || 0
+                      } active therapies in progress.`
+                  : language === "ka"
+                  ? "დაამატეთ თქვენი შვილის პროფილი პერსონალიზებული რეკომენდაციებისთვის."
+                  : "Add your child's profile to get personalized recommendations."}
+              </p>
+              <Button variant="link" className="p-0 h-auto" onClick={() => navigateTo("/assistant")}>
+                {language === "ka" ? "სრული ანალიზის ნახვა" : "View full analysis"}
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left Column - Tasks & Actions */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Today's Tasks */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {language === "ka" ? "დღის დავალებები" : "Today's Tasks"}
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => navigateTo("/therapy")}>
+                  {language === "ka" ? "ყველას ნახვა" : "View all"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {tasks.length > 0 ? (
+                tasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    title={task.title}
+                    time={task.time}
+                    completed={completedTasks.has(task.id)}
+                    type={task.type}
+                    onToggle={() => toggleTask(task.id)}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>{language === "ka" ? "დღეს დავალებები არ არის" : "No tasks for today"}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions Grid */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">
+                {language === "ka" ? "სწრაფი მოქმედებები" : "Quick Actions"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                  <DialogTrigger asChild>
+                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors hover:bg-purple-500/10 text-purple-600">
+                      <div className="p-3 rounded-full bg-purple-500/10">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <span className="text-sm font-medium text-center">
+                        {language === "ka" ? "დოკუმენტი" : "Upload"}
+                      </span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {language === "ka" ? "დოკუმენტის ატვირთვა" : "Upload Document"}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <DocumentUploadZone onUploadComplete={() => setShowUploadDialog(false)} />
+                  </DialogContent>
+                </Dialog>
+
+                <QuickActionButton
+                  icon={Calendar}
+                  label={language === "ka" ? "ახალი ვიზიტი" : "New Appointment"}
+                  onClick={() => navigateTo("/calendar")}
+                  color="primary"
+                />
+                <QuickActionButton
+                  icon={MessageSquare}
+                  label={language === "ka" ? "AI ჩატი" : "AI Chat"}
+                  onClick={() => navigateTo("/assistant")}
+                  color="success"
+                />
+                <QuickActionButton
+                  icon={BookOpen}
+                  label={language === "ka" ? "კვლევები" : "Research"}
+                  onClick={() => navigateTo("/research")}
+                  color="warning"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Appointments & Insights */}
+        <div className="space-y-6">
+          {/* Upcoming Appointments */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {language === "ka" ? "მომავალი ვიზიტები" : "Upcoming"}
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => navigateTo("/calendar")}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingAppointments && upcomingAppointments.length > 0 ? (
+                upcomingAppointments.map((apt) => {
+                  const aptDate = new Date(apt.appointmentDate);
+                  const isAptToday = isToday(aptDate);
+                  const isAptTomorrow = isTomorrow(aptDate);
+
+                  return (
+                    <div
+                      key={apt.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigateTo("/calendar")}
+                    >
+                      <div className={`p-2 rounded-lg ${isAptToday ? "bg-red-500/10" : "bg-muted"}`}>
+                        <Calendar className={`h-4 w-4 ${isAptToday ? "text-red-500" : ""}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{apt.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {isAptToday
+                            ? language === "ka"
+                              ? "დღეს"
+                              : "Today"
+                            : isAptTomorrow
+                            ? language === "ka"
+                              ? "ხვალ"
+                              : "Tomorrow"
+                            : format(aptDate, "MMM d")}
+                          {" • "}
+                          {format(aptDate, "HH:mm")}
+                        </p>
+                      </div>
+                      {isAptToday && (
+                        <Badge variant="destructive" className="text-xs">
+                          {language === "ka" ? "დღეს" : "Today"}
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">
+                    {language === "ka" ? "ვიზიტები არ არის" : "No upcoming appointments"}
+                  </p>
+                  <Button variant="link" size="sm" onClick={() => navigateTo("/calendar")}>
+                    {language === "ka" ? "დაამატე" : "Add one"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Child Quick View */}
+          {hasChildren && primaryChild ? (
+            <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigateTo(`/child/${primaryChild.id}`)}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-full bg-primary/10">
+                    <Baby className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">
+                      {primaryChild.firstName} {primaryChild.lastName}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {primaryChild.diagnosis || (language === "ka" ? "პროფილის ნახვა" : "View profile")}
+                    </p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Baby className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                <h3 className="font-medium mb-1">
+                  {language === "ka" ? "შვილის დამატება" : "Add Your Child"}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {language === "ka"
+                    ? "დაიწყეთ თქვენი შვილის პროფილის შექმნით"
+                    : "Start by creating your child's profile"}
+                </p>
+                <Button onClick={() => navigateTo("/child-profile")} className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {language === "ka" ? "დამატება" : "Add Child"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AI Tip */}
+          <Card className="border-dashed">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">
+                    {language === "ka" ? "AI რჩევა" : "AI Tip"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "ka"
+                      ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
+                      : "Upload medical documents for AI analysis and get personalized recommendations."}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
