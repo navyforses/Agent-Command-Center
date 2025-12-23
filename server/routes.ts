@@ -3,8 +3,8 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { 
-  insertChildSchema, 
+import {
+  insertChildSchema,
   insertDocumentSchema,
   insertTherapySchema,
   insertTherapySessionSchema,
@@ -17,6 +17,7 @@ import {
   insertNexusHypothesisSchema,
   insertNexusActionItemSchema,
   insertAccumulatedKnowledgeSchema,
+  updateUserPreferencesSchema,
 } from "@shared/schema";
 import { openai, AI_MODEL } from "./openai";
 import { getConsensusResponse, getConsensusSearchResponse } from "./multiAI";
@@ -76,6 +77,120 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // User Profile routes
+  app.put("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, email } = req.body;
+
+      const user = await storage.updateUserProfile(userId, {
+        firstName,
+        lastName,
+        email,
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update user profile" });
+    }
+  });
+
+  // User Preferences routes
+  app.get("/api/user/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let preferences = await storage.getUserPreferences(userId);
+
+      // If no preferences exist, create default ones
+      if (!preferences) {
+        preferences = await storage.createUserPreferences({
+          userId,
+          emailNotifications: true,
+          appointmentReminders: true,
+          clinicalTrialAlerts: true,
+          dataSharing: false,
+          language: "en",
+          theme: "light",
+        });
+      }
+
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching user preferences:", error);
+      res.status(500).json({ message: "Failed to fetch user preferences" });
+    }
+  });
+
+  app.put("/api/user/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = updateUserPreferencesSchema.safeParse(req.body);
+
+      if (!parseResult.success) {
+        return res.status(400).json({
+          message: "Invalid preferences data",
+          errors: parseResult.error.errors,
+        });
+      }
+
+      const preferences = await storage.updateUserPreferences(userId, parseResult.data);
+
+      if (!preferences) {
+        return res.status(404).json({ message: "Failed to update preferences" });
+      }
+
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error updating user preferences:", error);
+      res.status(500).json({ message: "Failed to update user preferences" });
+    }
+  });
+
+  // Export user data
+  app.get("/api/user/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Gather all user data
+      const [user, preferences, children, documents, therapies, appointments, emails] = await Promise.all([
+        storage.getUser(userId),
+        storage.getUserPreferences(userId),
+        storage.getChildren(userId),
+        storage.getDocuments(userId),
+        storage.getTherapies(userId),
+        storage.getAppointments(userId),
+        storage.getEmails(userId),
+      ]);
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        user,
+        preferences,
+        children,
+        documents: documents.map(d => ({
+          ...d,
+          // Exclude file paths for security
+          filePath: undefined,
+        })),
+        therapies,
+        appointments,
+        emails,
+      };
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="user-data-export-${new Date().toISOString().split("T")[0]}.json"`);
+      res.json(exportData);
+    } catch (error) {
+      console.error("Error exporting user data:", error);
+      res.status(500).json({ message: "Failed to export user data" });
     }
   });
 

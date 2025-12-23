@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Users, Calendar, Activity } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -26,7 +27,15 @@ import { format } from "date-fns";
 export default function Dashboard() {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+  // Navigation handlers
+  const navigateToChildren = () => setLocation("/children");
+  const navigateToChild = (childId: number) => setLocation(`/child/${childId}`);
+  const navigateToCalendar = () => setLocation("/calendar");
+  const navigateToDocuments = () => setLocation("/documents");
+  const navigateToTherapy = () => setLocation("/therapy");
 
   const { data: children, isLoading: childrenLoading } = useQuery<Child[]>({
     queryKey: ['/api/children']
@@ -136,20 +145,34 @@ export default function Dashboard() {
 
   const staticInsights = [
     {
-      id: "1",
+      id: "upload-docs",
       title: "Upload Documents for AI Analysis",
       description: "Upload medical records, therapy notes, or assessments to get AI-powered insights and summaries.",
       priority: "medium" as const,
       actionLabel: "Upload Documents",
     },
     {
-      id: "2",
+      id: "track-therapy",
       title: "Track Therapy Progress",
       description: "Log therapy sessions regularly to monitor your child's developmental progress over time.",
       priority: "low" as const,
       actionLabel: "View Therapies",
     },
   ];
+
+  // Handle insight action
+  const handleInsightAction = (insightId: string) => {
+    switch (insightId) {
+      case "upload-docs":
+        setShowUploadDialog(true);
+        break;
+      case "track-therapy":
+        navigateToTherapy();
+        break;
+      default:
+        break;
+    }
+  };
 
   const upcomingAppointmentsCount = appointments?.filter(
     apt => new Date(apt.appointmentDate) > new Date()
@@ -250,10 +273,10 @@ export default function Dashboard() {
               <DialogHeader>
                 <DialogTitle>{t("uploadDocuments")}</DialogTitle>
               </DialogHeader>
-              <DocumentUploadZone onFilesSelected={() => setShowUploadDialog(false)} />
+              <DocumentUploadZone onUploadComplete={() => setShowUploadDialog(false)} />
             </DialogContent>
           </Dialog>
-          <Button className="gap-2" data-testid="button-add-child">
+          <Button className="gap-2" onClick={navigateToChildren} data-testid="button-add-child">
             <Plus className="h-4 w-4" />
             {t("addChild")}
           </Button>
@@ -303,7 +326,7 @@ export default function Dashboard() {
                     nextAppointment={getNextAppointmentForChild(child.id)}
                     documentsCount={getDocumentsCountForChild(child.id)}
                     therapiesCount={getTherapiesCountForChild(child.id)}
-                    onClick={() => console.log("View child:", child.firstName)}
+                    onClick={() => navigateToChild(child.id)}
                   />
                 ))}
               </div>
@@ -315,7 +338,7 @@ export default function Dashboard() {
                   <p className="text-muted-foreground mb-4">
                     Add your child's profile to start tracking their medical journey
                   </p>
-                  <Button className="gap-2" data-testid="button-add-child-empty">
+                  <Button className="gap-2" onClick={navigateToChildren} data-testid="button-add-child-empty">
                     <Plus className="h-4 w-4" />
                     Add Child
                   </Button>
@@ -328,7 +351,7 @@ export default function Dashboard() {
             <RecentActivity activities={generateRecentActivities()} />
             <UpcomingAppointments
               appointments={transformAppointments()}
-              onAddAppointment={() => console.log("Add appointment")}
+              onAddAppointment={navigateToCalendar}
             />
           </div>
         </div>
@@ -336,7 +359,7 @@ export default function Dashboard() {
         <div className="space-y-6">
           <AIInsightsCard
             insights={staticInsights}
-            onViewInsight={(id) => console.log("View insight:", id)}
+            onViewInsight={handleInsightAction}
           />
           {hasChildren && (
             <AIChatPanel childName={childrenList[0]?.firstName} />

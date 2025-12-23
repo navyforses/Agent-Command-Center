@@ -1,5 +1,6 @@
 import {
   users,
+  userPreferences,
   children,
   documents,
   therapies,
@@ -27,6 +28,9 @@ import {
   accumulatedKnowledge,
   type User,
   type UpsertUser,
+  type UserPreferences,
+  type InsertUserPreferences,
+  type UpdateUserPreferences,
   type Child,
   type InsertChild,
   type Document,
@@ -84,6 +88,12 @@ import { eq, and, desc, isNull, or } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined>;
+
+  // User Preferences
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferences(userId: string, prefs: UpdateUserPreferences): Promise<UserPreferences | undefined>;
 
   getChildren(userId: string): Promise<Child[]>;
   getChild(id: number, userId: string): Promise<Child | undefined>;
@@ -245,6 +255,56 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  // User Preferences
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences> {
+    const [newPrefs] = await db.insert(userPreferences).values(prefs).returning();
+    return newPrefs;
+  }
+
+  async updateUserPreferences(userId: string, prefs: UpdateUserPreferences): Promise<UserPreferences | undefined> {
+    // Try to update existing preferences
+    const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+
+    if (existing) {
+      const [updated] = await db
+        .update(userPreferences)
+        .set({
+          ...prefs,
+          updatedAt: new Date(),
+        })
+        .where(eq(userPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      // Create new preferences if they don't exist
+      const [newPrefs] = await db
+        .insert(userPreferences)
+        .values({
+          userId,
+          ...prefs,
+        })
+        .returning();
+      return newPrefs;
+    }
   }
 
   async getChildren(userId: string): Promise<Child[]> {
