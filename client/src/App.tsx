@@ -19,6 +19,8 @@ import ChildrenList from "@/pages/ChildrenList";
 import Documents from "@/pages/Documents";
 import Therapy from "@/pages/Therapy";
 import ClinicalTrials from "@/pages/ClinicalTrials";
+import Research from "@/pages/Research";
+import Medications from "@/pages/Medications";
 import EmailHub from "@/pages/EmailHub";
 import CalendarPage from "@/pages/CalendarPage";
 import AIAssistant from "@/pages/AIAssistant";
@@ -35,6 +37,8 @@ function Router() {
       <Route path="/documents" component={Documents} />
       <Route path="/therapy" component={Therapy} />
       <Route path="/trials" component={ClinicalTrials} />
+      <Route path="/research" component={Research} />
+      <Route path="/medications" component={Medications} />
       <Route path="/email" component={EmailHub} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/assistant" component={AIAssistant} />

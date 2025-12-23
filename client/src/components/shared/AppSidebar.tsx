@@ -12,6 +12,8 @@ import {
   LogOut,
   Heart,
   Dna,
+  BookOpen,
+  Pill,
 } from "lucide-react";
 import {
   Sidebar,
@@ -46,6 +48,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
     { title: t("documents"), icon: FileText, url: "/documents" },
     { title: t("therapyRecommendations"), icon: Activity, url: "/therapy" },
     { title: t("clinicalTrials"), icon: FlaskConical, url: "/trials" },
+    { title: t("research") || "Research", icon: BookOpen, url: "/research" },
+    { title: t("medications") || "Medications", icon: Pill, url: "/medications" },
     { title: t("emailHub"), icon: Mail, url: "/email" },
     { title: t("calendar"), icon: Calendar, url: "/calendar" },
   ];
