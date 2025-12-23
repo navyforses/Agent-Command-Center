@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -38,11 +39,11 @@ interface AppSidebarProps {
   };
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
-  const mainMenuItems = [
+  const mainMenuItems = useMemo(() => [
     { title: t("dashboard"), icon: LayoutDashboard, url: "/" },
     { title: t("childProfile"), icon: User, url: "/child-profile" },
     { title: t("documents"), icon: FileText, url: "/documents" },
@@ -52,16 +53,16 @@ export function AppSidebar({ user }: AppSidebarProps) {
     { title: t("medications") || "Medications", icon: Pill, url: "/medications" },
     { title: t("emailHub"), icon: Mail, url: "/email" },
     { title: t("calendar"), icon: Calendar, url: "/calendar" },
-  ];
+  ], [t, language]);
 
-  const aiMenuItems = [
+  const aiMenuItems = useMemo(() => [
     { title: t("aiAssistant"), icon: Bot, url: "/assistant" },
     { title: t("evolutionCycles"), icon: Dna, url: "/evolution" },
-  ];
+  ], [t, language]);
 
-  const bottomMenuItems = [
+  const bottomMenuItems = useMemo(() => [
     { title: t("settings"), icon: Settings, url: "/settings" },
-  ];
+  ], [t, language]);
 
   return (
     <Sidebar>
@@ -161,4 +162,4 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarFooter>
     </Sidebar>
   );
-}
+});

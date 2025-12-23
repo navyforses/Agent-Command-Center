@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { Suspense, lazy } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,41 +12,59 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, Loader2 } from "lucide-react";
+
+// Eagerly loaded pages (small, frequently used)
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
-import ChildProfile from "@/pages/ChildProfile";
-import ChildrenList from "@/pages/ChildrenList";
-import Documents from "@/pages/Documents";
-import Therapy from "@/pages/Therapy";
-import ClinicalTrials from "@/pages/ClinicalTrials";
-import Research from "@/pages/Research";
-import Medications from "@/pages/Medications";
-import EmailHub from "@/pages/EmailHub";
-import CalendarPage from "@/pages/CalendarPage";
-import AIAssistant from "@/pages/AIAssistant";
-import Evolution from "@/pages/Evolution";
-import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
+
+// Lazy loaded pages (larger, less frequently accessed)
+const ChildProfile = lazy(() => import("@/pages/ChildProfile"));
+const ChildrenList = lazy(() => import("@/pages/ChildrenList"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Therapy = lazy(() => import("@/pages/Therapy"));
+const ClinicalTrials = lazy(() => import("@/pages/ClinicalTrials"));
+const Research = lazy(() => import("@/pages/Research"));
+const Medications = lazy(() => import("@/pages/Medications"));
+const EmailHub = lazy(() => import("@/pages/EmailHub"));
+const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
+const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const Evolution = lazy(() => import("@/pages/Evolution"));
+const Settings = lazy(() => import("@/pages/Settings"));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="flex h-full w-full items-center justify-center min-h-[400px]">
+      <div className="flex flex-col items-center gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/child-profile" component={ChildrenList} />
-      <Route path="/child/:id" component={ChildProfile} />
-      <Route path="/documents" component={Documents} />
-      <Route path="/therapy" component={Therapy} />
-      <Route path="/trials" component={ClinicalTrials} />
-      <Route path="/research" component={Research} />
-      <Route path="/medications" component={Medications} />
-      <Route path="/email" component={EmailHub} />
-      <Route path="/calendar" component={CalendarPage} />
-      <Route path="/assistant" component={AIAssistant} />
-      <Route path="/evolution" component={Evolution} />
-      <Route path="/settings" component={Settings} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/child-profile" component={ChildrenList} />
+        <Route path="/child/:id" component={ChildProfile} />
+        <Route path="/documents" component={Documents} />
+        <Route path="/therapy" component={Therapy} />
+        <Route path="/trials" component={ClinicalTrials} />
+        <Route path="/research" component={Research} />
+        <Route path="/medications" component={Medications} />
+        <Route path="/email" component={EmailHub} />
+        <Route path="/calendar" component={CalendarPage} />
+        <Route path="/assistant" component={AIAssistant} />
+        <Route path="/evolution" component={Evolution} />
+        <Route path="/settings" component={Settings} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
