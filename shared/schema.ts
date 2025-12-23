@@ -40,6 +40,37 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// User Preferences table
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).unique().notNull(),
+  // Notification preferences
+  emailNotifications: boolean("email_notifications").default(true),
+  appointmentReminders: boolean("appointment_reminders").default(true),
+  clinicalTrialAlerts: boolean("clinical_trial_alerts").default(true),
+  // Privacy preferences
+  dataSharing: boolean("data_sharing").default(false),
+  // Language preference
+  language: varchar("language").default("en"),
+  // Theme preference
+  theme: varchar("theme").default("light"),
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateUserPreferencesSchema = insertUserPreferencesSchema.partial();
+
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UpdateUserPreferences = z.infer<typeof updateUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+
 // Children table
 export const children = pgTable("children", {
   id: serial("id").primaryKey(),

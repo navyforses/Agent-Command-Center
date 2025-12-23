@@ -25,11 +25,13 @@ import {
   ArrowLeft,
   Sparkles,
   Clock,
+  Wand2,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "wouter";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { EditChildDialog } from "@/components/dashboard/EditChildDialog";
+import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
 import type { Child, Therapy, Document } from "@shared/schema";
 
 export default function ChildProfile() {
@@ -38,6 +40,7 @@ export default function ChildProfile() {
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [smartFillOpen, setSmartFillOpen] = useState(false);
 
   const { data: child, isLoading: childLoading, error: childError } = useQuery<Child>({
     queryKey: ['/api/children', id],
@@ -161,15 +164,48 @@ export default function ChildProfile() {
             </div>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          className="gap-2" 
-          data-testid="button-edit-profile"
-          onClick={() => setEditDialogOpen(true)}
-        >
-          <Edit className="h-4 w-4" />
-          {t("editProfile")}
-        </Button>
+        <div className="flex gap-2">
+          <Dialog open={smartFillOpen} onOpenChange={setSmartFillOpen}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              data-testid="button-smart-fill"
+              onClick={() => setSmartFillOpen(true)}
+            >
+              <Wand2 className="h-4 w-4" />
+              {language === "ka" ? "სმარტ შევსება" : "Smart Fill"}
+            </Button>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <SmartOnboarding
+                childId={id ? parseInt(id, 10) : undefined}
+                existingChild={child ? {
+                  id: child.id,
+                  firstName: child.firstName,
+                  lastName: child.lastName,
+                  dateOfBirth: child.dateOfBirth,
+                  diagnosis: child.diagnosis,
+                  diagnosisDate: child.diagnosisDate,
+                  notes: child.notes,
+                } : undefined}
+                onComplete={() => {
+                  setSmartFillOpen(false);
+                  window.location.reload();
+                }}
+                onCancel={() => setSmartFillOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Button
+            variant="outline"
+            className="gap-2"
+            data-testid="button-edit-profile"
+            onClick={() => setEditDialogOpen(true)}
+          >
+            <Edit className="h-4 w-4" />
+            {t("editProfile")}
+          </Button>
+        </div>
 
         <EditChildDialog 
           child={child} 

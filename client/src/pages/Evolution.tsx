@@ -39,6 +39,7 @@ import {
   Telescope,
   Copy,
   Check,
+  Download,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -488,6 +489,23 @@ function ReportDetailDialog({
               {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
               {t("copy")}
             </Button>
+            {report.filePath && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = report.filePath!;
+                  link.download = `report-${format(parseISO(report.reportDate), "yyyy-MM-dd")}.pdf`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                data-testid="button-download-pdf"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t("downloadPdf")}
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -575,11 +593,20 @@ function ReportCard({ report, onDetailOpen, onChatOpen }: { report: EvolutionRep
       </CardContent>
       {report.filePath && (
         <CardFooter className="pt-0">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-xs" 
-            onClick={(e) => e.stopPropagation()}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Create download link for the PDF
+              const link = document.createElement('a');
+              link.href = report.filePath!;
+              link.download = `report-${format(parseISO(report.reportDate), "yyyy-MM-dd")}.pdf`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
             data-testid={`button-download-report-${report.id}`}
           >
             <FileText className="h-3 w-3 mr-1" />
