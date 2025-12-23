@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppSidebar } from "@/components/shared/AppSidebar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { LogIn, LogOut, Loader2 } from "lucide-react";
@@ -104,19 +105,36 @@ function AppContent() {
 
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      {/* Skip to main content link for keyboard accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <div className="flex h-screen w-full">
-        <AppSidebar />
+        <nav aria-label="Main navigation">
+          <AppSidebar />
+        </nav>
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-2 p-2 border-b bg-background sticky top-0 z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-1">
+          <header
+            className="flex items-center justify-between gap-2 p-2 border-b bg-background sticky top-0 z-50"
+            role="banner"
+          >
+            <SidebarTrigger
+              data-testid="button-sidebar-toggle"
+              aria-label="Toggle sidebar navigation"
+            />
+            <div className="flex items-center gap-1" role="group" aria-label="User actions">
               <AuthButton />
               <LanguageToggle />
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-auto">
-            <Router />
+          <main className="flex-1 overflow-auto" role="main" id="main-content">
+            <ErrorBoundary>
+              <Router />
+            </ErrorBoundary>
           </main>
         </div>
       </div>
@@ -144,16 +162,18 @@ function AuthenticatedApp() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <LanguageProvider>
-          <TooltipProvider>
-            <AuthenticatedApp />
-            <Toaster />
-          </TooltipProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <LanguageProvider>
+            <TooltipProvider>
+              <AuthenticatedApp />
+              <Toaster />
+            </TooltipProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
