@@ -39,9 +39,9 @@ import {
 import { runNexusResearch } from "./nexusOrchestrator";
 import { extractTextFromPDF, extractTextFromImage } from "./documentProcessor";
 import { generateReportPDF, generateCycleSummaryPDF } from "./pdfGenerator";
-import { 
-  searchOpenAlex, 
-  searchSemanticScholar, 
+import {
+  searchOpenAlex,
+  searchSemanticScholar,
   searchAcademicSources,
   searchOpenAlexCrossDisciplinary,
   searchSemanticScholarRecommendations,
@@ -49,6 +49,25 @@ import {
   type AcademicPaper,
   type UnifiedAcademicSearchResult,
 } from "./academicSearch";
+import {
+  searchClinicalTrials,
+  getClinicalTrial,
+  searchHIETrials,
+} from "./services/clinicalTrialsApi";
+import {
+  searchPubMed,
+  getArticle as getPubMedArticle,
+  searchHIEResearch,
+  getRelatedArticles,
+} from "./services/pubmedApi";
+import {
+  searchDrugLabels,
+  getDrugLabel,
+  searchAdverseEvents,
+  searchDrugRecalls,
+  searchHIEMedications,
+  getDrugInteractions,
+} from "./services/openfdaApi";
 
 const diagnosisUpload = multer({
   storage: multer.memoryStorage(),
@@ -2980,6 +2999,314 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     } catch (error) {
       console.error("Error updating accumulated knowledge:", error);
       res.status(500).json({ message: "Failed to update accumulated knowledge" });
+    }
+  });
+
+  // ============================================================================
+  // EXTERNAL MEDICAL DATA APIs - ClinicalTrials.gov, PubMed, OpenFDA
+  // ============================================================================
+
+  // ----- ClinicalTrials.gov API Routes -----
+
+  // Search clinical trials
+  app.get("/api/clinical-trials", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        condition,
+        term,
+        location,
+        status,
+        phase,
+        pageSize,
+        pageToken,
+      } = req.query;
+
+      const result = await searchClinicalTrials({
+        condition: condition as string,
+        term: term as string,
+        location: location as string,
+        status: status ? (status as string).split(',') : undefined,
+        phase: phase ? (phase as string).split(',') : undefined,
+        pageSize: pageSize ? parseInt(pageSize as string) : 20,
+        pageToken: pageToken as string,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching clinical trials:", error);
+      res.status(500).json({ message: "Failed to search clinical trials" });
+    }
+  });
+
+  // Search HIE-specific clinical trials
+  app.get("/api/clinical-trials/hie", isAuthenticated, async (req: any, res) => {
+    try {
+      const { childAge, location, status, pageSize } = req.query;
+
+      const result = await searchHIETrials({
+        childAge: childAge ? parseInt(childAge as string) : undefined,
+        location: location as string,
+        status: status ? (status as string).split(',') : undefined,
+        pageSize: pageSize ? parseInt(pageSize as string) : 20,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching HIE trials:", error);
+      res.status(500).json({ message: "Failed to search HIE clinical trials" });
+    }
+  });
+
+  // Get specific clinical trial by NCT ID
+  app.get("/api/clinical-trials/:nctId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { nctId } = req.params;
+
+      if (!nctId || !nctId.startsWith('NCT')) {
+        return res.status(400).json({ message: "Invalid NCT ID" });
+      }
+
+      const trial = await getClinicalTrial(nctId);
+
+      if (!trial) {
+        return res.status(404).json({ message: "Clinical trial not found" });
+      }
+
+      res.json(trial);
+    } catch (error) {
+      console.error("Error fetching clinical trial:", error);
+      res.status(500).json({ message: "Failed to fetch clinical trial" });
+    }
+  });
+
+  // ----- PubMed API Routes -----
+
+  // Search PubMed articles
+  app.get("/api/pubmed/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        term,
+        maxResults,
+        start,
+        sort,
+        dateFrom,
+        dateTo,
+      } = req.query;
+
+      if (!term) {
+        return res.status(400).json({ message: "Search term is required" });
+      }
+
+      const result = await searchPubMed({
+        term: term as string,
+        maxResults: maxResults ? parseInt(maxResults as string) : 20,
+        start: start ? parseInt(start as string) : 0,
+        sort: sort as 'relevance' | 'pub_date' | 'first_author' | 'journal',
+        dateFrom: dateFrom as string,
+        dateTo: dateTo as string,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching PubMed:", error);
+      res.status(500).json({ message: "Failed to search PubMed" });
+    }
+  });
+
+  // Search HIE-specific research articles
+  app.get("/api/pubmed/hie", isAuthenticated, async (req: any, res) => {
+    try {
+      const { topic, maxResults, recentOnly } = req.query;
+
+      const result = await searchHIEResearch({
+        specificTopic: topic as string,
+        maxResults: maxResults ? parseInt(maxResults as string) : 20,
+        recentOnly: recentOnly === 'true',
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching HIE research:", error);
+      res.status(500).json({ message: "Failed to search HIE research articles" });
+    }
+  });
+
+  // Get specific PubMed article by PMID
+  app.get("/api/pubmed/article/:pmid", isAuthenticated, async (req: any, res) => {
+    try {
+      const { pmid } = req.params;
+
+      if (!pmid || !/^\d+$/.test(pmid)) {
+        return res.status(400).json({ message: "Invalid PMID" });
+      }
+
+      const article = await getPubMedArticle(pmid);
+
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      res.json(article);
+    } catch (error) {
+      console.error("Error fetching PubMed article:", error);
+      res.status(500).json({ message: "Failed to fetch article" });
+    }
+  });
+
+  // Get related articles for a PMID
+  app.get("/api/pubmed/article/:pmid/related", isAuthenticated, async (req: any, res) => {
+    try {
+      const { pmid } = req.params;
+      const { maxResults } = req.query;
+
+      if (!pmid || !/^\d+$/.test(pmid)) {
+        return res.status(400).json({ message: "Invalid PMID" });
+      }
+
+      const result = await getRelatedArticles(
+        pmid,
+        maxResults ? parseInt(maxResults as string) : 10
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching related articles:", error);
+      res.status(500).json({ message: "Failed to fetch related articles" });
+    }
+  });
+
+  // ----- OpenFDA API Routes -----
+
+  // Search drug labels
+  app.get("/api/fda/drugs", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        query,
+        brandName,
+        genericName,
+        manufacturer,
+        route,
+        limit,
+        skip,
+      } = req.query;
+
+      const result = await searchDrugLabels({
+        query: query as string,
+        brandName: brandName as string,
+        genericName: genericName as string,
+        manufacturer: manufacturer as string,
+        route: route as string,
+        limit: limit ? parseInt(limit as string) : 20,
+        skip: skip ? parseInt(skip as string) : 0,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching drug labels:", error);
+      res.status(500).json({ message: "Failed to search drug labels" });
+    }
+  });
+
+  // Search HIE-related medications
+  app.get("/api/fda/drugs/hie", isAuthenticated, async (req: any, res) => {
+    try {
+      const { type, limit } = req.query;
+
+      const result = await searchHIEMedications({
+        medicationType: type as 'anticonvulsant' | 'neuroprotective' | 'analgesic' | 'all',
+        limit: limit ? parseInt(limit as string) : 20,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching HIE medications:", error);
+      res.status(500).json({ message: "Failed to search HIE medications" });
+    }
+  });
+
+  // Get specific drug label by ID
+  app.get("/api/fda/drugs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+
+      const drug = await getDrugLabel(id);
+
+      if (!drug) {
+        return res.status(404).json({ message: "Drug label not found" });
+      }
+
+      res.json(drug);
+    } catch (error) {
+      console.error("Error fetching drug label:", error);
+      res.status(500).json({ message: "Failed to fetch drug label" });
+    }
+  });
+
+  // Get drug interactions
+  app.get("/api/fda/drugs/:name/interactions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { name } = req.params;
+
+      const result = await getDrugInteractions(name);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching drug interactions:", error);
+      res.status(500).json({ message: "Failed to fetch drug interactions" });
+    }
+  });
+
+  // Search drug adverse events
+  app.get("/api/fda/adverse-events", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        drugName,
+        reaction,
+        serious,
+        limit,
+        skip,
+      } = req.query;
+
+      const result = await searchAdverseEvents({
+        drugName: drugName as string,
+        reaction: reaction as string,
+        serious: serious === 'true' ? true : serious === 'false' ? false : undefined,
+        limit: limit ? parseInt(limit as string) : 20,
+        skip: skip ? parseInt(skip as string) : 0,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching adverse events:", error);
+      res.status(500).json({ message: "Failed to search adverse events" });
+    }
+  });
+
+  // Search drug recalls
+  app.get("/api/fda/recalls", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        query,
+        firm,
+        recallClass,
+        status,
+        limit,
+        skip,
+      } = req.query;
+
+      const result = await searchDrugRecalls({
+        query: query as string,
+        firm: firm as string,
+        recallClass: recallClass as '1' | '2' | '3',
+        status: status as 'Ongoing' | 'Completed' | 'Terminated',
+        limit: limit ? parseInt(limit as string) : 20,
+        skip: skip ? parseInt(skip as string) : 0,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching drug recalls:", error);
+      res.status(500).json({ message: "Failed to search drug recalls" });
     }
   });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,13 +23,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Filter, RefreshCw, ExternalLink, Mail, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Search, Filter, RefreshCw, ExternalLink, Mail, MapPin, Calendar, CheckCircle, XCircle, AlertCircle, Database } from "lucide-react";
 import { ClinicalTrialCard } from "@/components/dashboard/ClinicalTrialCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import type { Child } from "@shared/schema";
 
-// Clinical trial type definition
+// Clinical trial type definition (frontend)
 interface ClinicalTrial {
   id: string;
   title: string;
@@ -48,10 +49,108 @@ interface ClinicalTrial {
   nctId?: string;
 }
 
-// Initial trials data - will be replaced by API data when available
-const initialTrials: ClinicalTrial[] = [
+// API response types
+interface ApiClinicalTrialStudy {
+  nctId: string;
+  title: string;
+  officialTitle?: string;
+  status: string;
+  phase?: string;
+  studyType?: string;
+  conditions: string[];
+  interventions: string[];
+  sponsor: string;
+  collaborators: string[];
+  locations: {
+    facility?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    status?: string;
+    contacts?: { name?: string; phone?: string; email?: string }[];
+  }[];
+  eligibility: {
+    criteria?: string;
+    gender?: string;
+    minAge?: string;
+    maxAge?: string;
+    healthyVolunteers?: boolean;
+  };
+  contacts: { name?: string; phone?: string; email?: string }[];
+  startDate?: string;
+  completionDate?: string;
+  enrollmentCount?: number;
+  briefSummary?: string;
+  detailedDescription?: string;
+  lastUpdateDate?: string;
+  _eligibilityScore?: number;
+}
+
+interface ApiClinicalTrialsResponse {
+  studies: ApiClinicalTrialStudy[];
+  totalCount: number;
+  nextPageToken?: string;
+}
+
+// Transform API response to frontend format
+function transformApiTrial(apiTrial: ApiClinicalTrialStudy): ClinicalTrial {
+  // Map API status to frontend status
+  const statusMap: Record<string, ClinicalTrial["status"]> = {
+    'RECRUITING': 'recruiting',
+    'ACTIVE_NOT_RECRUITING': 'active',
+    'NOT_YET_RECRUITING': 'not_yet_recruiting',
+    'COMPLETED': 'completed',
+    'ENROLLING_BY_INVITATION': 'recruiting',
+    'SUSPENDED': 'active',
+    'TERMINATED': 'completed',
+    'WITHDRAWN': 'completed',
+  };
+
+  // Get primary location
+  const primaryLocation = apiTrial.locations[0];
+  const locationStr = primaryLocation
+    ? [primaryLocation.facility, primaryLocation.city, primaryLocation.country].filter(Boolean).join(', ')
+    : 'Location not specified';
+
+  // Get contact email
+  const contactEmail = apiTrial.contacts[0]?.email
+    || primaryLocation?.contacts?.[0]?.email
+    || undefined;
+
+  // Parse eligibility criteria into matched/unmatched
+  const eligibilityCriteria = apiTrial.eligibility.criteria || '';
+  const criteriaLines = eligibilityCriteria.split('\n').filter(line => line.trim().length > 0);
+  const inclusionCriteria = criteriaLines.filter(line =>
+    line.toLowerCase().includes('inclusion') || !line.toLowerCase().includes('exclusion')
+  ).slice(0, 4);
+  const exclusionCriteria = criteriaLines.filter(line =>
+    line.toLowerCase().includes('exclusion')
+  ).slice(0, 2);
+
+  return {
+    id: apiTrial.nctId,
+    nctId: apiTrial.nctId,
+    title: apiTrial.title,
+    sponsor: apiTrial.sponsor,
+    status: statusMap[apiTrial.status] || 'active',
+    phase: apiTrial.phase || 'Not specified',
+    location: locationStr,
+    distance: 'Distance varies', // Would need geolocation to calculate
+    eligibilityScore: apiTrial._eligibilityScore || 75,
+    matchedCriteria: inclusionCriteria.length > 0 ? inclusionCriteria : ['See full eligibility criteria'],
+    unmatchedCriteria: exclusionCriteria,
+    enrollmentDeadline: apiTrial.completionDate || 'Ongoing',
+    contactEmail,
+    contactPhone: apiTrial.contacts[0]?.phone,
+    description: apiTrial.briefSummary,
+  };
+}
+
+// Fallback data when API is unavailable
+const fallbackTrials: ClinicalTrial[] = [
   {
-    id: "1",
+    id: "NCT04567890",
+    nctId: "NCT04567890",
     title: "Erythropoietin for Neuroprotection in Neonatal HIE",
     sponsor: "National Institutes of Health",
     status: "recruiting",
@@ -59,21 +158,15 @@ const initialTrials: ClinicalTrial[] = [
     location: "Boston Children's Hospital, USA",
     distance: "8,500 km",
     eligibilityScore: 85,
-    matchedCriteria: [
-      "Age 0-3 years with HIE diagnosis",
-      "GMFCS Level I-III",
-      "No active seizures in past 30 days",
-    ],
-    unmatchedCriteria: [
-      "Must be able to travel to study site",
-    ],
+    matchedCriteria: ["Age 0-3 years with HIE diagnosis", "GMFCS Level I-III"],
+    unmatchedCriteria: ["Must be able to travel to study site"],
     enrollmentDeadline: "March 2026",
     contactEmail: "hie-study@nih.gov",
-    description: "This study evaluates the neuroprotective effects of erythropoietin in infants with hypoxic-ischemic encephalopathy.",
-    nctId: "NCT04567890",
+    description: "This study evaluates the neuroprotective effects of erythropoietin.",
   },
   {
-    id: "2",
+    id: "NCT04567891",
+    nctId: "NCT04567891",
     title: "Stem Cell Therapy for Pediatric Cerebral Palsy",
     sponsor: "Duke University Medical Center",
     status: "recruiting",
@@ -81,60 +174,11 @@ const initialTrials: ClinicalTrial[] = [
     location: "Durham, NC, USA",
     distance: "9,200 km",
     eligibilityScore: 72,
-    matchedCriteria: [
-      "Diagnosis of CP secondary to HIE",
-      "Age 1-6 years",
-    ],
-    unmatchedCriteria: [
-      "Cord blood must be available",
-      "No prior stem cell therapy",
-    ],
+    matchedCriteria: ["Diagnosis of CP secondary to HIE", "Age 1-6 years"],
+    unmatchedCriteria: ["Cord blood must be available"],
     enrollmentDeadline: "June 2026",
     contactEmail: "stemcell-trial@duke.edu",
-    description: "Investigating the safety and efficacy of autologous cord blood infusion for children with cerebral palsy.",
-    nctId: "NCT04567891",
-  },
-  {
-    id: "3",
-    title: "Intensive Physiotherapy for Motor Development",
-    sponsor: "European HIE Consortium",
-    status: "active",
-    phase: "Phase 3",
-    location: "Berlin, Germany",
-    distance: "2,100 km",
-    eligibilityScore: 92,
-    matchedCriteria: [
-      "HIE diagnosis with motor impairment",
-      "Age 1-4 years",
-      "GMFCS Level II-IV",
-      "Able to attend daily sessions for 4 weeks",
-    ],
-    unmatchedCriteria: [],
-    enrollmentDeadline: "January 2026",
-    contactEmail: "physio-study@hie-consortium.eu",
-    description: "A randomized controlled trial comparing intensive physiotherapy protocols for motor development in children with HIE.",
-    nctId: "NCT04567892",
-  },
-  {
-    id: "4",
-    title: "Pharmacological Study of Melatonin in HIE",
-    sponsor: "University of Barcelona",
-    status: "not_yet_recruiting",
-    phase: "Phase 2",
-    location: "Barcelona, Spain",
-    distance: "3,400 km",
-    eligibilityScore: 78,
-    matchedCriteria: [
-      "Moderate to severe HIE",
-      "Age 6 months - 2 years",
-    ],
-    unmatchedCriteria: [
-      "No current anticonvulsant medication",
-    ],
-    enrollmentDeadline: "September 2026",
-    contactEmail: "melatonin-hie@ub.edu",
-    description: "Evaluating the potential of melatonin as an adjunct therapy for infants with hypoxic-ischemic encephalopathy.",
-    nctId: "NCT04567893",
+    description: "Investigating autologous cord blood infusion for children with cerebral palsy.",
   },
 ];
 
@@ -159,25 +203,53 @@ export default function ClinicalTrials() {
     queryKey: ['/api/children']
   });
 
-  // Future API integration: Replace initialTrials with API data
-  // const { data: trials, isLoading, refetch } = useQuery<ClinicalTrial[]>({
-  //   queryKey: ['/api/clinical-trials'],
-  // });
+  // Build status filter for API
+  const apiStatusFilter = useMemo(() => {
+    if (statusFilter === 'all') return 'RECRUITING,NOT_YET_RECRUITING,ACTIVE_NOT_RECRUITING';
+    const statusMap: Record<string, string> = {
+      'recruiting': 'RECRUITING',
+      'active': 'ACTIVE_NOT_RECRUITING',
+      'not_yet_recruiting': 'NOT_YET_RECRUITING',
+    };
+    return statusMap[statusFilter] || 'RECRUITING';
+  }, [statusFilter]);
 
-  // For now, use initial data with simulated loading
-  const [trials, setTrials] = useState<ClinicalTrial[]>(initialTrials);
-  const [isLoading, setIsLoading] = useState(false);
+  // Fetch clinical trials from ClinicalTrials.gov API
+  const {
+    data: apiResponse,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<ApiClinicalTrialsResponse>({
+    queryKey: ['/api/clinical-trials/hie', apiStatusFilter],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+  });
 
-  const refetch = async () => {
-    setIsLoading(true);
-    // Simulate API call - replace with actual API call when available
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setTrials(initialTrials);
-    setIsLoading(false);
-    toast({
-      title: "Results refreshed",
-      description: "Clinical trial data has been updated.",
-    });
+  // Transform API trials to frontend format, with fallback
+  const trials = useMemo(() => {
+    if (apiResponse?.studies && apiResponse.studies.length > 0) {
+      return apiResponse.studies.map(transformApiTrial);
+    }
+    // Use fallback data if API fails or returns empty
+    return fallbackTrials;
+  }, [apiResponse]);
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: "Results refreshed",
+        description: `Found ${apiResponse?.totalCount || trials.length} clinical trials from ClinicalTrials.gov`,
+      });
+    } catch {
+      toast({
+        title: "Refresh failed",
+        description: "Using cached data. Please try again later.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleSave = (id: string) => {
@@ -259,7 +331,7 @@ export default function ClinicalTrials() {
         <Button
           variant="outline"
           className="gap-2"
-          onClick={() => refetch()}
+          onClick={handleRefresh}
           disabled={isLoading}
           data-testid="button-refresh-trials"
         >
@@ -267,6 +339,23 @@ export default function ClinicalTrials() {
           {isLoading ? "Refreshing..." : "Refresh Results"}
         </Button>
       </div>
+
+      {/* Data source indicator */}
+      {apiResponse?.studies && apiResponse.studies.length > 0 ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-green-50 dark:bg-green-950 px-3 py-2 rounded-md">
+          <Database className="h-4 w-4 text-green-600" />
+          <span>
+            Showing {apiResponse.totalCount} trials from <strong>ClinicalTrials.gov</strong> (live data)
+          </span>
+        </div>
+      ) : isError ? (
+        <div className="flex items-center gap-2 text-sm bg-yellow-50 dark:bg-yellow-950 px-3 py-2 rounded-md">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <span>
+            Unable to fetch live data. Showing sample trials. <button onClick={handleRefresh} className="underline">Try again</button>
+          </span>
+        </div>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
