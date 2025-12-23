@@ -35,6 +35,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
+import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import type { Child, Appointment, Therapy } from "@shared/schema";
@@ -155,6 +156,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showSmartOnboarding, setShowSmartOnboarding] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
 
   const greeting = getGreeting(language);
@@ -524,20 +526,47 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
               <CardContent className="p-6 text-center">
-                <Baby className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                <div className="inline-flex p-3 bg-primary/10 rounded-full mb-3">
+                  <Sparkles className="h-8 w-8 text-primary" />
+                </div>
                 <h3 className="font-medium mb-1">
-                  {language === "ka" ? "შვილის დამატება" : "Add Your Child"}
+                  {language === "ka" ? "სმარტ პროფილის შექმნა" : "Smart Profile Setup"}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   {language === "ka"
-                    ? "დაიწყეთ თქვენი შვილის პროფილის შექმნით"
-                    : "Start by creating your child's profile"}
+                    ? "ატვირთეთ დოკუმენტი და AI ავტომატურად შეავსებს პროფილს"
+                    : "Upload a document and AI will auto-fill the profile"}
                 </p>
-                <Button onClick={() => navigateTo("/child-profile")} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {language === "ka" ? "დამატება" : "Add Child"}
+                <Dialog open={showSmartOnboarding} onOpenChange={setShowSmartOnboarding}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full gap-2" data-testid="button-smart-onboarding">
+                      <Upload className="h-4 w-4" />
+                      {language === "ka" ? "დაწყება" : "Get Started"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <SmartOnboarding
+                      onComplete={() => {
+                        setShowSmartOnboarding(false);
+                        // Refresh children data
+                        window.location.reload();
+                      }}
+                      onCancel={() => {
+                        setShowSmartOnboarding(false);
+                        navigateTo("/child-profile");
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 w-full text-muted-foreground"
+                  onClick={() => navigateTo("/child-profile")}
+                >
+                  {language === "ka" ? "ხელით შევსება" : "Fill Manually"}
                 </Button>
               </CardContent>
             </Card>
