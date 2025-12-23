@@ -33,9 +33,11 @@ import {
   Upload,
   Baby,
   BookOpen,
+  Zap,
 } from "lucide-react";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
+import { QuickLog } from "@/components/therapy/QuickLog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import type { Child, Appointment, Therapy } from "@shared/schema";
@@ -157,6 +159,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showSmartOnboarding, setShowSmartOnboarding] = useState(false);
+  const [showQuickLog, setShowQuickLog] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
 
   const greeting = getGreeting(language);
@@ -393,6 +396,26 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Quick Log - Primary action */}
+                <Dialog open={showQuickLog} onOpenChange={setShowQuickLog}>
+                  <DialogTrigger asChild>
+                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors hover:bg-green-500/10 text-green-600 border-green-200 dark:border-green-900" data-testid="button-quick-log">
+                      <div className="p-3 rounded-full bg-green-500/10">
+                        <Zap className="h-5 w-5" />
+                      </div>
+                      <span className="text-sm font-medium text-center">
+                        {language === "ka" ? "სწრაფი ჩანაწერი" : "Quick Log"}
+                      </span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md p-0">
+                    <QuickLog
+                      onComplete={() => setShowQuickLog(false)}
+                      onCancel={() => setShowQuickLog(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+
                 <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                   <DialogTrigger asChild>
                     <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors hover:bg-purple-500/10 text-purple-600">
@@ -425,12 +448,6 @@ export default function Dashboard() {
                   label={language === "ka" ? "AI ჩატი" : "AI Chat"}
                   onClick={() => navigateTo("/assistant")}
                   color="success"
-                />
-                <QuickActionButton
-                  icon={BookOpen}
-                  label={language === "ka" ? "კვლევები" : "Research"}
-                  onClick={() => navigateTo("/research")}
-                  color="warning"
                 />
               </div>
             </CardContent>
