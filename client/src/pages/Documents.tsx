@@ -208,16 +208,49 @@ export default function Documents() {
     },
   });
 
-  const handleDownload = (doc: TransformedDocument) => {
+  const handleDownload = async (doc: TransformedDocument) => {
     if (doc.filePath) {
-      const downloadUrl = doc.filePath.startsWith('/objects/') 
-        ? doc.filePath 
-        : `/api/objects${doc.filePath.startsWith('/') ? '' : '/'}${doc.filePath}`;
-      window.open(downloadUrl, '_blank');
+      try {
+        // Correct URL: /objects/... (not /api/objects/)
+        const downloadUrl = doc.filePath.startsWith('/objects/')
+          ? doc.filePath
+          : `/objects/${doc.filePath.replace(/^\//, '')}`;
+
+        const response = await fetch(downloadUrl, {
+          credentials: 'include', // Include auth cookies
+        });
+
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: language === "ka" ? "წარმატება" : "Success",
+          description: language === "ka" ? "ფაილი ჩამოიტვირთა" : "File downloaded successfully",
+        });
+      } catch (error) {
+        console.error('Download error:', error);
+        toast({
+          title: language === "ka" ? "შეცდომა" : "Download Failed",
+          description: language === "ka" ? "ფაილის ჩამოტვირთვა ვერ მოხერხდა" : "Failed to download file",
+          variant: "destructive",
+        });
+      }
     } else {
       toast({
-        title: "Download Unavailable",
-        description: "File is not available for download",
+        title: language === "ka" ? "მიუწვდომელია" : "Download Unavailable",
+        description: language === "ka" ? "ფაილი არ არის ხელმისაწვდომი" : "File is not available for download",
         variant: "destructive",
       });
     }
