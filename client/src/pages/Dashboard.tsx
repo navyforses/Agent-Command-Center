@@ -34,6 +34,9 @@ import {
   Baby,
   BookOpen,
   Zap,
+  Brain,
+  Lightbulb,
+  FlaskConical,
 } from "lucide-react";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
@@ -41,8 +44,8 @@ import { QuickLog } from "@/components/therapy/QuickLog";
 import { AIDailyBrief } from "@/components/dashboard/AIDailyBrief";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
-import type { Child, Appointment, Therapy } from "@shared/schema";
-import { format, isToday, isTomorrow, differenceInHours } from "date-fns";
+import type { Child, Appointment, Therapy, EvolutionReport, AccumulatedKnowledge } from "@shared/schema";
+import { format, isToday, isTomorrow, differenceInHours, parseISO } from "date-fns";
 
 // Get greeting based on time of day
 function getGreeting(language: string): { text: string; icon: React.ElementType } {
@@ -177,6 +180,15 @@ export default function Dashboard() {
 
   const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
     queryKey: ["/api/therapies"],
+  });
+
+  // Evolution research data
+  const { data: evolutionReports } = useQuery<EvolutionReport[]>({
+    queryKey: ["/api/evolution/reports"],
+  });
+
+  const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
+    queryKey: ["/api/evolution/accumulated-knowledge"],
   });
 
   const isLoading = childrenLoading || appointmentsLoading || therapiesLoading;
@@ -558,24 +570,137 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* AI Tip */}
-          <Card className="border-dashed">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {language === "ka" ? "AI რჩევა" : "AI Tip"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "ka"
-                      ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
-                      : "Upload medical documents for AI analysis and get personalized recommendations."}
-                  </p>
+          {/* Research Results Section */}
+          {(evolutionReports && evolutionReports.length > 0) || (accumulatedKnowledge && accumulatedKnowledge.length > 0) ? (
+            <Card
+              className="cursor-pointer hover:bg-muted/50 transition-colors border-primary/20 bg-gradient-to-br from-primary/5 to-transparent"
+              onClick={() => navigateTo("/evolution")}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FlaskConical className="h-5 w-5 text-primary" />
+                    {language === "ka" ? "კვლევის შედეგები" : "Research Results"}
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {language === "ka" ? "ახალი" : "New"}
+                  </Badge>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Daily Discovery - Narrative Format */}
+                {(() => {
+                  const latestReport = evolutionReports?.[0];
+                  const latestKnowledge = accumulatedKnowledge?.find(k => k.status === "active" || k.status === "validated");
+
+                  // Get narrative content from report summary or knowledge content
+                  const narrativeText = latestReport
+                    ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
+                    : latestKnowledge
+                      ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
+                      : null;
+
+                  const narrativeTitle = latestReport
+                    ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
+                    : latestKnowledge
+                      ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
+                      : null;
+
+                  const narrativeDate = latestReport?.reportDate
+                    ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
+                    : latestKnowledge?.createdAt
+                      ? format(new Date(latestKnowledge.createdAt), "d MMM, yyyy")
+                      : null;
+
+                  if (!narrativeText) return null;
+
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-primary/5 to-blue-500/5 rounded-lg border border-primary/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Brain className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-primary">
+                          {language === "ka" ? "დღის აღმოჩენა" : "Today's Discovery"}
+                        </span>
+                        {narrativeDate && (
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {narrativeDate}
+                          </span>
+                        )}
+                      </div>
+                      {narrativeTitle && (
+                        <h4 className="font-medium text-sm mb-1">{narrativeTitle}</h4>
+                      )}
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
+                        {narrativeText}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Knowledge Stats */}
+                {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-primary">
+                        {accumulatedKnowledge.filter(k => k.status === "validated").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "დადასტურებული" : "Validated"}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-green-600">
+                        {accumulatedKnowledge.filter(k => k.status === "active").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "აქტიური" : "Active"}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-blue-600">
+                        {accumulatedKnowledge.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "სულ" : "Total"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-primary hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateTo("/evolution");
+                  }}
+                >
+                  {language === "ka" ? "სრულად ნახვა" : "View Full Details"}
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            /* AI Tip - shown when no research results */
+            <Card className="border-dashed">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {language === "ka" ? "AI რჩევა" : "AI Tip"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "ka"
+                        ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
+                        : "Upload medical documents for AI analysis and get personalized recommendations."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
