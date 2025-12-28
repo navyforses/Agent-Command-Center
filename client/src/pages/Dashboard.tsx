@@ -34,6 +34,9 @@ import {
   Baby,
   BookOpen,
   Zap,
+  Brain,
+  Lightbulb,
+  FlaskConical,
 } from "lucide-react";
 import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
 import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
@@ -41,8 +44,8 @@ import { QuickLog } from "@/components/therapy/QuickLog";
 import { AIDailyBrief } from "@/components/dashboard/AIDailyBrief";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
-import type { Child, Appointment, Therapy } from "@shared/schema";
-import { format, isToday, isTomorrow, differenceInHours } from "date-fns";
+import type { Child, Appointment, Therapy, EvolutionReport, AccumulatedKnowledge } from "@shared/schema";
+import { format, isToday, isTomorrow, differenceInHours, parseISO } from "date-fns";
 
 // Get greeting based on time of day
 function getGreeting(language: string): { text: string; icon: React.ElementType } {
@@ -177,6 +180,15 @@ export default function Dashboard() {
 
   const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
     queryKey: ["/api/therapies"],
+  });
+
+  // Evolution research data
+  const { data: evolutionReports } = useQuery<EvolutionReport[]>({
+    queryKey: ["/api/evolution/reports"],
+  });
+
+  const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
+    queryKey: ["/api/evolution/accumulated-knowledge"],
   });
 
   const isLoading = childrenLoading || appointmentsLoading || therapiesLoading;
@@ -558,24 +570,157 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* AI Tip */}
-          <Card className="border-dashed">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {language === "ka" ? "AI რჩევა" : "AI Tip"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "ka"
-                      ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
-                      : "Upload medical documents for AI analysis and get personalized recommendations."}
-                  </p>
+          {/* Research Results Section */}
+          {(evolutionReports && evolutionReports.length > 0) || (accumulatedKnowledge && accumulatedKnowledge.length > 0) ? (
+            <Card
+              className="cursor-pointer hover:bg-muted/50 transition-colors border-primary/20 bg-gradient-to-br from-primary/5 to-transparent"
+              onClick={() => navigateTo("/evolution")}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FlaskConical className="h-5 w-5 text-primary" />
+                    {language === "ka" ? "კვლევის შედეგები" : "Research Results"}
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {language === "ka" ? "ახალი" : "New"}
+                  </Badge>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <CardDescription>
+                  {language === "ka"
+                    ? "Evolution-ის ავტომატური კვლევის შედეგები"
+                    : "Automated Evolution research findings"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Knowledge Stats */}
+                {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-primary">
+                        {accumulatedKnowledge.filter(k => k.status === "validated").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "დადასტურებული" : "Validated"}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-green-600">
+                        {accumulatedKnowledge.filter(k => k.status === "active").length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "აქტიური" : "Active"}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-md">
+                      <p className="text-lg font-bold text-blue-600">
+                        {accumulatedKnowledge.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === "ka" ? "სულ" : "Total"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Latest Reports Preview */}
+                {evolutionReports && evolutionReports.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {language === "ka" ? "უახლესი რეპორტები" : "Latest Reports"}
+                    </p>
+                    {evolutionReports.slice(0, 2).map((report) => {
+                      const title = language === "ka" && report.titleKa
+                        ? report.titleKa
+                        : report.titleEn;
+                      return (
+                        <div
+                          key={report.id}
+                          className="flex items-start gap-2 p-2 bg-muted/30 rounded-md"
+                        >
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {title || (language === "ka" ? "დღიური რეპორტი" : "Daily Report")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(parseISO(report.reportDate), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Latest Knowledge Items */}
+                {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {language === "ka" ? "ბოლო აღმოჩენები" : "Recent Discoveries"}
+                    </p>
+                    {accumulatedKnowledge
+                      .filter(k => k.status === "active" || k.status === "validated")
+                      .slice(0, 2)
+                      .map((knowledge) => {
+                        const title = language === "ka" && knowledge.titleKa
+                          ? knowledge.titleKa
+                          : knowledge.titleEn;
+                        return (
+                          <div
+                            key={knowledge.id}
+                            className="flex items-start gap-2 p-2 bg-muted/30 rounded-md"
+                          >
+                            <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{title}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{knowledge.confidence ?? 50}% {language === "ka" ? "სანდოობა" : "confidence"}</span>
+                                <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                  {knowledge.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-primary hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateTo("/evolution");
+                  }}
+                >
+                  {language === "ka" ? "ყველას ნახვა" : "View All"}
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            /* AI Tip - shown when no research results */
+            <Card className="border-dashed">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {language === "ka" ? "AI რჩევა" : "AI Tip"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "ka"
+                        ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
+                        : "Upload medical documents for AI analysis and get personalized recommendations."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
