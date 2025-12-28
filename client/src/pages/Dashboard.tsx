@@ -586,13 +586,57 @@ export default function Dashboard() {
                     {language === "ka" ? "ახალი" : "New"}
                   </Badge>
                 </div>
-                <CardDescription>
-                  {language === "ka"
-                    ? "Evolution-ის ავტომატური კვლევის შედეგები"
-                    : "Automated Evolution research findings"}
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Daily Discovery - Narrative Format */}
+                {(() => {
+                  const latestReport = evolutionReports?.[0];
+                  const latestKnowledge = accumulatedKnowledge?.find(k => k.status === "active" || k.status === "validated");
+
+                  // Get narrative content from report summary or knowledge content
+                  const narrativeText = latestReport
+                    ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
+                    : latestKnowledge
+                      ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
+                      : null;
+
+                  const narrativeTitle = latestReport
+                    ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
+                    : latestKnowledge
+                      ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
+                      : null;
+
+                  const narrativeDate = latestReport?.reportDate
+                    ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
+                    : latestKnowledge?.createdAt
+                      ? format(new Date(latestKnowledge.createdAt), "d MMM, yyyy")
+                      : null;
+
+                  if (!narrativeText) return null;
+
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-primary/5 to-blue-500/5 rounded-lg border border-primary/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Brain className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-primary">
+                          {language === "ka" ? "დღის აღმოჩენა" : "Today's Discovery"}
+                        </span>
+                        {narrativeDate && (
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {narrativeDate}
+                          </span>
+                        )}
+                      </div>
+                      {narrativeTitle && (
+                        <h4 className="font-medium text-sm mb-1">{narrativeTitle}</h4>
+                      )}
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
+                        {narrativeText}
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 {/* Knowledge Stats */}
                 {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 text-center">
@@ -623,70 +667,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Latest Reports Preview */}
-                {evolutionReports && evolutionReports.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {language === "ka" ? "უახლესი რეპორტები" : "Latest Reports"}
-                    </p>
-                    {evolutionReports.slice(0, 2).map((report) => {
-                      const title = language === "ka" && report.titleKa
-                        ? report.titleKa
-                        : report.titleEn;
-                      return (
-                        <div
-                          key={report.id}
-                          className="flex items-start gap-2 p-2 bg-muted/30 rounded-md"
-                        >
-                          <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {title || (language === "ka" ? "დღიური რეპორტი" : "Daily Report")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(parseISO(report.reportDate), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Latest Knowledge Items */}
-                {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {language === "ka" ? "ბოლო აღმოჩენები" : "Recent Discoveries"}
-                    </p>
-                    {accumulatedKnowledge
-                      .filter(k => k.status === "active" || k.status === "validated")
-                      .slice(0, 2)
-                      .map((knowledge) => {
-                        const title = language === "ka" && knowledge.titleKa
-                          ? knowledge.titleKa
-                          : knowledge.titleEn;
-                        return (
-                          <div
-                            key={knowledge.id}
-                            className="flex items-start gap-2 p-2 bg-muted/30 rounded-md"
-                          >
-                            <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{title}</p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{knowledge.confidence ?? 50}% {language === "ka" ? "სანდოობა" : "confidence"}</span>
-                                <Badge variant="outline" className="text-[10px] h-4 px-1">
-                                  {knowledge.status}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-
                 <Button
                   variant="ghost"
                   size="sm"
@@ -696,7 +676,7 @@ export default function Dashboard() {
                     navigateTo("/evolution");
                   }}
                 >
-                  {language === "ka" ? "ყველას ნახვა" : "View All"}
+                  {language === "ka" ? "სრულად ნახვა" : "View Full Details"}
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </CardContent>
