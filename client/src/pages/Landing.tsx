@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,8 @@ import {
   Star,
   Lightbulb,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -129,6 +132,7 @@ function anonymizeText(text: string | null | undefined, language: string): strin
 
 export default function Landing() {
   const { language, t } = useLanguage();
+  const [expandedKnowledgeId, setExpandedKnowledgeId] = useState<number | null>(null);
   
   const { data: testimonials = [] } = useQuery<Testimonial[]>({
     queryKey: ['/api/testimonials'],
@@ -339,16 +343,39 @@ export default function Landing() {
                               ? knowledge.titleKa
                               : knowledge.titleEn;
                             const title = anonymizeText(rawTitle, language);
+                            const rawContent = language === "ka" && knowledge.contentKa
+                              ? knowledge.contentKa
+                              : knowledge.contentEn;
+                            const content = anonymizeText(rawContent, language);
+                            const isExpanded = expandedKnowledgeId === knowledge.id;
                             return (
                               <div
                                 key={knowledge.id}
-                                className="flex items-center gap-2 p-2 bg-background/50 rounded-md"
+                                className="bg-background/50 rounded-md overflow-hidden"
                               >
-                                <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
-                                <span className="text-sm truncate">{title}</span>
-                                <Badge variant="outline" className="ml-auto text-xs shrink-0">
-                                  {knowledge.confidence ?? 50}%
-                                </Badge>
+                                <button
+                                  onClick={() => setExpandedKnowledgeId(isExpanded ? null : knowledge.id)}
+                                  className="w-full flex items-center gap-2 p-2 hover-elevate active-elevate-2 text-left"
+                                  data-testid={`button-expand-finding-${knowledge.id}`}
+                                >
+                                  <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
+                                  <span className={`text-sm flex-1 ${isExpanded ? '' : 'truncate'}`}>{title}</span>
+                                  <Badge variant="outline" className="text-xs shrink-0">
+                                    {knowledge.confidence ?? 50}%
+                                  </Badge>
+                                  {isExpanded ? (
+                                    <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )}
+                                </button>
+                                {isExpanded && (
+                                  <div className="px-3 pb-3 pt-1 border-t">
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                      {content}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
