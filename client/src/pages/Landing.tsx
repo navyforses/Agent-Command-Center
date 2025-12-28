@@ -329,7 +329,7 @@ export default function Landing() {
                   )}
 
                   {/* Recent Findings */}
-                  {accumulatedKnowledge && accumulatedKnowledge.length > 1 && (
+                  {accumulatedKnowledge && accumulatedKnowledge.length >= 1 && (
                     <div className="mt-6 pt-6 border-t">
                       <p className="text-sm font-medium mb-3">
                         {language === "en" ? "Recent Findings" : "ბოლო აღმოჩენები"}
