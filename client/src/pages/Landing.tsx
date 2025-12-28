@@ -113,13 +113,13 @@ export default function Landing() {
     queryKey: ['/api/testimonials'],
   });
 
-  // Evolution research data - visible to everyone
+  // Evolution research data - PUBLIC endpoints (no auth required)
   const { data: evolutionReports } = useQuery<EvolutionReport[]>({
-    queryKey: ["/api/evolution/reports"],
+    queryKey: ["/api/public/evolution/reports"],
   });
 
   const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
-    queryKey: ["/api/evolution/accumulated-knowledge"],
+    queryKey: ["/api/public/evolution/knowledge"],
   });
 
   const displayTestimonials = testimonials.length > 0 ? testimonials : fallbackTestimonials;

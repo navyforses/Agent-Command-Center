@@ -234,6 +234,10 @@ export interface IStorage {
   createAccumulatedKnowledge(knowledge: InsertAccumulatedKnowledge): Promise<AccumulatedKnowledge>;
   updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined>;
   getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
+
+  // Public endpoints - no auth required
+  getAllPublicReports(): Promise<EvolutionReport[]>;
+  getAllPublicKnowledge(): Promise<AccumulatedKnowledge[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1082,6 +1086,23 @@ export class DatabaseStorage implements IStorage {
         )
       ))
       .orderBy(desc(accumulatedKnowledge.confidence));
+  }
+
+  // Public methods - return all data without user filtering
+  async getAllPublicReports(): Promise<EvolutionReport[]> {
+    return db.select().from(evolutionReports)
+      .orderBy(desc(evolutionReports.reportDate))
+      .limit(10);
+  }
+
+  async getAllPublicKnowledge(): Promise<AccumulatedKnowledge[]> {
+    return db.select().from(accumulatedKnowledge)
+      .where(or(
+        eq(accumulatedKnowledge.status, "active"),
+        eq(accumulatedKnowledge.status, "validated")
+      ))
+      .orderBy(desc(accumulatedKnowledge.updatedAt))
+      .limit(20);
   }
 }
 
