@@ -235,9 +235,9 @@ export interface IStorage {
   updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined>;
   getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
 
-  // Public endpoints - no auth required
-  getAllPublicReports(): Promise<EvolutionReport[]>;
-  getAllPublicKnowledge(): Promise<AccumulatedKnowledge[]>;
+  // Public endpoints - no auth required (anonymous data only)
+  getAllPublicReports(): Promise<Partial<EvolutionReport>[]>;
+  getAllPublicKnowledge(): Promise<Partial<AccumulatedKnowledge>[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1088,15 +1088,39 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(accumulatedKnowledge.confidence));
   }
 
-  // Public methods - return all data without user filtering
-  async getAllPublicReports(): Promise<EvolutionReport[]> {
-    return db.select().from(evolutionReports)
+  // Public methods - return anonymous data (no personal info)
+  async getAllPublicReports(): Promise<Partial<EvolutionReport>[]> {
+    // Select only non-personal fields
+    return db.select({
+      id: evolutionReports.id,
+      reportDate: evolutionReports.reportDate,
+      titleEn: evolutionReports.titleEn,
+      titleKa: evolutionReports.titleKa,
+      summaryEn: evolutionReports.summaryEn,
+      summaryKa: evolutionReports.summaryKa,
+      keyFindingsEn: evolutionReports.keyFindingsEn,
+      keyFindingsKa: evolutionReports.keyFindingsKa,
+      createdAt: evolutionReports.createdAt,
+    }).from(evolutionReports)
       .orderBy(desc(evolutionReports.reportDate))
       .limit(10);
   }
 
-  async getAllPublicKnowledge(): Promise<AccumulatedKnowledge[]> {
-    return db.select().from(accumulatedKnowledge)
+  async getAllPublicKnowledge(): Promise<Partial<AccumulatedKnowledge>[]> {
+    // Select only non-personal fields (exclude userId, childId)
+    return db.select({
+      id: accumulatedKnowledge.id,
+      knowledgeType: accumulatedKnowledge.knowledgeType,
+      titleEn: accumulatedKnowledge.titleEn,
+      titleKa: accumulatedKnowledge.titleKa,
+      contentEn: accumulatedKnowledge.contentEn,
+      contentKa: accumulatedKnowledge.contentKa,
+      confidence: accumulatedKnowledge.confidence,
+      validationCount: accumulatedKnowledge.validationCount,
+      status: accumulatedKnowledge.status,
+      createdAt: accumulatedKnowledge.createdAt,
+      updatedAt: accumulatedKnowledge.updatedAt,
+    }).from(accumulatedKnowledge)
       .where(or(
         eq(accumulatedKnowledge.status, "active"),
         eq(accumulatedKnowledge.status, "validated")
