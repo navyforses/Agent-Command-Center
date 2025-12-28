@@ -106,6 +106,27 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function anonymizeText(text: string | null | undefined, language: string): string {
+  if (!text) return "";
+  
+  const georgianNamePattern = /([ა-ჰ]+\s+[ა-ჰ]+ის\s+)/gi;
+  const georgianNamePattern2 = /([ა-ჰ]+\s+[ა-ჰ]+ი\s+)/gi;
+  const englishNamePattern = /([A-Z][a-z]+\s+[A-Z][a-z]+'s\s+)/g;
+  const englishNamePattern2 = /([A-Z][a-z]+\s+[A-Z][a-z]+\s+)/g;
+  
+  let result = text;
+  
+  if (language === "ka") {
+    result = result.replace(georgianNamePattern, "ბავშვის ");
+    result = result.replace(georgianNamePattern2, "ბავშვის ");
+  } else {
+    result = result.replace(englishNamePattern, "Child's ");
+    result = result.replace(englishNamePattern2, "Child's ");
+  }
+  
+  return result;
+}
+
 export default function Landing() {
   const { language, t } = useLanguage();
   
@@ -228,17 +249,20 @@ export default function Landing() {
                 <CardContent className="p-6 md:p-8">
                   {/* Narrative Discovery */}
                   {(() => {
-                    const narrativeText = latestReport
+                    const rawNarrativeText = latestReport
                       ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
                         : null;
 
-                    const narrativeTitle = latestReport
+                    const rawNarrativeTitle = latestReport
                       ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
                         : null;
+
+                    const narrativeText = anonymizeText(rawNarrativeText, language);
+                    const narrativeTitle = anonymizeText(rawNarrativeTitle, language);
 
                     const narrativeDate = latestReport?.reportDate
                       ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
@@ -311,9 +335,10 @@ export default function Landing() {
                           .filter(k => k.status === "active" || k.status === "validated")
                           .slice(0, 3)
                           .map((knowledge) => {
-                            const title = language === "ka" && knowledge.titleKa
+                            const rawTitle = language === "ka" && knowledge.titleKa
                               ? knowledge.titleKa
                               : knowledge.titleEn;
+                            const title = anonymizeText(rawTitle, language);
                             return (
                               <div
                                 key={knowledge.id}
