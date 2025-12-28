@@ -130,11 +130,15 @@ export default function Landing() {
   // Helper function to clean title (remove personal info like child names)
   const cleanTitle = (title: string | null | undefined): string | null => {
     if (!title) return null;
-    // Remove patterns like "Child's Child's Report" or specific names
+    // Remove patterns like "Child's", names, and personal references
     let cleaned = title
       .replace(/Child's\s+Child's\s+Report\s*-?\s*/gi, '')
       .replace(/Child's\s+Report\s*-?\s*/gi, '')
-      .replace(/^[\s-]+|[\s-]+$/g, '');
+      .replace(/Child's\s*/gi, 'patient ')
+      .replace(/Hypoxic-Child's/gi, 'Hypoxic-Ischemic')
+      .replace(/\bChild's\b/gi, "patient's")
+      .replace(/^[\s-]+|[\s-]+$/g, '')
+      .trim();
     // If title becomes empty or too short, return a generic title
     if (!cleaned || cleaned.length < 5) {
       return 'HIE Research Report';
@@ -348,9 +352,11 @@ export default function Landing() {
                           .filter(k => k.status === "active" || k.status === "validated")
                           .slice(0, 3)
                           .map((knowledge) => {
-                            const title = language === "ka" && knowledge.titleKa
+                            const rawTitle = language === "ka" && knowledge.titleKa
                               ? knowledge.titleKa
                               : knowledge.titleEn;
+                            // Clean personal info from findings titles
+                            const title = cleanTitle(rawTitle) || rawTitle;
                             return (
                               <div
                                 key={knowledge.id}
