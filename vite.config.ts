@@ -55,5 +55,12 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    hmr: process.env.REPL_ID
+      ? {
+          // Replit-ისთვის WebSocket კონფიგურაცია
+          clientPort: 443,
+          protocol: "wss",
+        }
+      : true,
   },
 });

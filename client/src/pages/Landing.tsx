@@ -13,12 +13,15 @@ import {
   ArrowRight,
   CheckCircle,
   Star,
+  Lightbulb,
+  Sparkles,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { useQuery } from "@tanstack/react-query";
-import type { Testimonial } from "@shared/schema";
+import type { Testimonial, EvolutionReport, AccumulatedKnowledge } from "@shared/schema";
+import { format, parseISO } from "date-fns";
 
 const features = [
   {
@@ -110,7 +113,21 @@ export default function Landing() {
     queryKey: ['/api/testimonials'],
   });
 
+  // Evolution research data - visible to everyone
+  const { data: evolutionReports } = useQuery<EvolutionReport[]>({
+    queryKey: ["/api/evolution/reports"],
+  });
+
+  const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
+    queryKey: ["/api/evolution/accumulated-knowledge"],
+  });
+
   const displayTestimonials = testimonials.length > 0 ? testimonials : fallbackTestimonials;
+
+  // Get latest research discovery for narrative display
+  const latestReport = evolutionReports?.[0];
+  const latestKnowledge = accumulatedKnowledge?.find(k => k.status === "active" || k.status === "validated");
+  const hasResearchData = (evolutionReports && evolutionReports.length > 0) || (accumulatedKnowledge && accumulatedKnowledge.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,6 +204,146 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        {/* Research Results Section - Visible to Everyone */}
+        {hasResearchData && (
+          <section className="py-16 px-4">
+            <div className="container mx-auto max-w-4xl">
+              <div className="text-center mb-8">
+                <Badge variant="secondary" className="mb-4">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  {language === "en" ? "Live Research" : "მიმდინარე კვლევა"}
+                </Badge>
+                <h2 className="text-2xl md:text-3xl font-bold mb-4">
+                  {language === "en" ? "Today's Discovery" : "დღის აღმოჩენა"}
+                </h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  {language === "en"
+                    ? "Our AI continuously researches the latest developments in HIE treatment and therapy"
+                    : "ჩვენი AI მუდმივად იკვლევს HIE მკურნალობის უახლეს მიღწევებს"}
+                </p>
+              </div>
+
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
+                <CardContent className="p-6 md:p-8">
+                  {/* Narrative Discovery */}
+                  {(() => {
+                    const narrativeText = latestReport
+                      ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
+                      : latestKnowledge
+                        ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
+                        : null;
+
+                    const narrativeTitle = latestReport
+                      ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
+                      : latestKnowledge
+                        ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
+                        : null;
+
+                    const narrativeDate = latestReport?.reportDate
+                      ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
+                      : latestKnowledge?.createdAt
+                        ? format(new Date(latestKnowledge.createdAt), "d MMM, yyyy")
+                        : null;
+
+                    if (!narrativeText) return null;
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-lg">
+                            <Brain className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            {narrativeTitle && (
+                              <h3 className="font-semibold text-lg">{narrativeTitle}</h3>
+                            )}
+                            {narrativeDate && (
+                              <p className="text-sm text-muted-foreground">{narrativeDate}</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed">
+                          {narrativeText}
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Knowledge Stats */}
+                  {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-primary">
+                          {accumulatedKnowledge.filter(k => k.status === "validated").length}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {language === "en" ? "Validated" : "დადასტურებული"}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">
+                          {accumulatedKnowledge.filter(k => k.status === "active").length}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {language === "en" ? "Active" : "აქტიური"}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-600">
+                          {accumulatedKnowledge.length}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {language === "en" ? "Total Discoveries" : "სულ აღმოჩენები"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Findings */}
+                  {accumulatedKnowledge && accumulatedKnowledge.length > 1 && (
+                    <div className="mt-6 pt-6 border-t">
+                      <p className="text-sm font-medium mb-3">
+                        {language === "en" ? "Recent Findings" : "ბოლო აღმოჩენები"}
+                      </p>
+                      <div className="space-y-2">
+                        {accumulatedKnowledge
+                          .filter(k => k.status === "active" || k.status === "validated")
+                          .slice(0, 3)
+                          .map((knowledge) => {
+                            const title = language === "ka" && knowledge.titleKa
+                              ? knowledge.titleKa
+                              : knowledge.titleEn;
+                            return (
+                              <div
+                                key={knowledge.id}
+                                className="flex items-center gap-2 p-2 bg-background/50 rounded-md"
+                              >
+                                <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
+                                <span className="text-sm truncate">{title}</span>
+                                <Badge variant="outline" className="ml-auto text-xs shrink-0">
+                                  {knowledge.confidence ?? 50}%
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-6 text-center">
+                    <a href="/api/login">
+                      <Button variant="outline" className="gap-2">
+                        {language === "en" ? "View Full Research" : "სრული კვლევის ნახვა"}
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
 
         <section className="py-16 px-4">
           <div className="container mx-auto max-w-4xl">
