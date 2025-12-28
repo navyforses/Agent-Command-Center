@@ -351,11 +351,11 @@ export default function Landing() {
                             return (
                               <div
                                 key={knowledge.id}
-                                className="bg-background/50 rounded-md overflow-hidden"
+                                className="bg-background/50 rounded-md border"
                               >
                                 <button
                                   onClick={() => setExpandedKnowledgeId(isExpanded ? null : knowledge.id)}
-                                  className="w-full flex items-center gap-2 p-2 hover-elevate active-elevate-2 text-left"
+                                  className="w-full flex items-center gap-2 p-3 text-left cursor-pointer transition-colors hover:bg-muted/50"
                                   data-testid={`button-expand-finding-${knowledge.id}`}
                                 >
                                   <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
@@ -370,8 +370,8 @@ export default function Landing() {
                                   )}
                                 </button>
                                 {isExpanded && (
-                                  <div className="px-3 pb-3 pt-1 border-t">
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                  <div className="px-3 pb-3 pt-1 border-t bg-muted/30">
+                                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                                       {content}
                                     </p>
                                   </div>
