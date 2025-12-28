@@ -3003,6 +3003,32 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // ============================================================================
+  // PUBLIC ENDPOINTS - No authentication required (for Landing page)
+  // ============================================================================
+
+  // Get all public evolution reports (for landing page)
+  app.get("/api/public/evolution/reports", async (req, res) => {
+    try {
+      const reports = await storage.getAllPublicReports();
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching public reports:", error);
+      res.status(500).json({ message: "Failed to fetch public reports" });
+    }
+  });
+
+  // Get all public accumulated knowledge (for landing page)
+  app.get("/api/public/evolution/knowledge", async (req, res) => {
+    try {
+      const knowledge = await storage.getAllPublicKnowledge();
+      res.json(knowledge);
+    } catch (error) {
+      console.error("Error fetching public knowledge:", error);
+      res.status(500).json({ message: "Failed to fetch public knowledge" });
+    }
+  });
+
+  // ============================================================================
   // EXTERNAL MEDICAL DATA APIs - ClinicalTrials.gov, PubMed, OpenFDA
   // ============================================================================
 
