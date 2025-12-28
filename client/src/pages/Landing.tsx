@@ -108,7 +108,44 @@ function StarRating({ rating }: { rating: number }) {
 
 export default function Landing() {
   const { language, t } = useLanguage();
-  
+
+  // Helper function to parse JSON content if stored as string
+  const parseContent = (text: string | null | undefined): string | null => {
+    if (!text) return null;
+    // Check if text looks like JSON
+    if (text.trim().startsWith('{') || text.trim().startsWith('```json')) {
+      try {
+        // Remove markdown code block if present
+        const cleanJson = text.replace(/```json\s*|\s*```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        // Try to extract meaningful content from parsed JSON
+        return parsed.executiveSummary || parsed.summary || parsed.content || text;
+      } catch {
+        return text;
+      }
+    }
+    return text;
+  };
+
+  // Helper function to clean title (remove personal info like child names)
+  const cleanTitle = (title: string | null | undefined): string | null => {
+    if (!title) return null;
+    // Remove patterns like "Child's", names, and personal references
+    let cleaned = title
+      .replace(/Child's\s+Child's\s+Report\s*-?\s*/gi, '')
+      .replace(/Child's\s+Report\s*-?\s*/gi, '')
+      .replace(/Child's\s*/gi, 'patient ')
+      .replace(/Hypoxic-Child's/gi, 'Hypoxic-Ischemic')
+      .replace(/\bChild's\b/gi, "patient's")
+      .replace(/^[\s-]+|[\s-]+$/g, '')
+      .trim();
+    // If title becomes empty or too short, return a generic title
+    if (!cleaned || cleaned.length < 5) {
+      return 'HIE Research Report';
+    }
+    return cleaned;
+  };
+
   const { data: testimonials = [] } = useQuery<Testimonial[]>({
     queryKey: ['/api/testimonials'],
   });
@@ -228,17 +265,21 @@ export default function Landing() {
                 <CardContent className="p-6 md:p-8">
                   {/* Narrative Discovery */}
                   {(() => {
-                    const narrativeText = latestReport
+                    const rawText = latestReport
                       ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
                         : null;
+                    // Parse JSON content if needed
+                    const narrativeText = parseContent(rawText);
 
-                    const narrativeTitle = latestReport
+                    const rawTitle = latestReport
                       ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
                         : null;
+                    // Clean title from personal info
+                    const narrativeTitle = cleanTitle(rawTitle);
 
                     const narrativeDate = latestReport?.reportDate
                       ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
@@ -311,9 +352,11 @@ export default function Landing() {
                           .filter(k => k.status === "active" || k.status === "validated")
                           .slice(0, 3)
                           .map((knowledge) => {
-                            const title = language === "ka" && knowledge.titleKa
+                            const rawTitle = language === "ka" && knowledge.titleKa
                               ? knowledge.titleKa
                               : knowledge.titleEn;
+                            // Clean personal info from findings titles
+                            const title = cleanTitle(rawTitle) || rawTitle;
                             return (
                               <div
                                 key={knowledge.id}
