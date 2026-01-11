@@ -17,10 +17,11 @@ import {
   prometheusKnowledgeNodes,
   prometheusErrors,
   prometheusLearningEvents,
+  prometheusNotifications,
   users,
   children
 } from "../../../shared/schema";
-import { eq, and, desc, gte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, sql, isNull, or } from "drizzle-orm";
 
 // ============================================================================
 // NOTIFICATION TYPES
@@ -33,16 +34,17 @@ export type NotificationCategory =
   | "clinical_trial_match"
   | "prediction_validation"
   | "knowledge_milestone"
+  | "verification_complete"
   | "error_detected"
   | "consolidation_complete"
   | "research_update"
   | "cross_child_insight"
-  | "verification_result";
+  | "system_alert"
+  | "weekly_digest";
 
 export interface PrometheusNotification {
-  id: string;
+  id: number;
   prometheusId: number;
-  childId: number;
   userId: string;
   category: NotificationCategory;
   priority: NotificationPriority;
@@ -50,15 +52,13 @@ export interface PrometheusNotification {
   titleKa?: string;
   message: string;
   messageKa?: string;
-  data?: Record<string, any>;
+  metadata?: Record<string, any>;
   actionUrl?: string;
-  read: boolean;
-  createdAt: Date;
+  isRead: boolean;
+  readAt?: Date;
   expiresAt?: Date;
+  createdAt: Date;
 }
-
-// In-memory notification store (would be database in production)
-const notificationStore: Map<string, PrometheusNotification[]> = new Map();
 
 // Notification subscribers (for real-time updates)
 type NotificationCallback = (notification: PrometheusNotification) => void;
@@ -69,42 +69,62 @@ const subscribers: Map<string, NotificationCallback[]> = new Map();
 // ============================================================================
 
 /**
- * Create a new notification
+ * Create a new notification (persisted to database)
  */
 export async function createNotification(
-  notification: Omit<PrometheusNotification, "id" | "read" | "createdAt">
+  notification: Omit<PrometheusNotification, "id" | "isRead" | "readAt" | "createdAt">
 ): Promise<PrometheusNotification> {
-  const newNotification: PrometheusNotification = {
-    ...notification,
-    id: `notif_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    read: false,
-    createdAt: new Date()
-  };
+  try {
+    const [inserted] = await db.insert(prometheusNotifications).values({
+      prometheusId: notification.prometheusId,
+      userId: notification.userId,
+      category: notification.category,
+      priority: notification.priority,
+      title: notification.title,
+      titleKa: notification.titleKa,
+      message: notification.message,
+      messageKa: notification.messageKa,
+      metadata: notification.metadata,
+      actionUrl: notification.actionUrl,
+      expiresAt: notification.expiresAt,
+      isRead: false
+    }).returning();
 
-  // Store notification
-  const userNotifications = notificationStore.get(notification.userId) || [];
-  userNotifications.unshift(newNotification);
+    const newNotification: PrometheusNotification = {
+      id: inserted.id,
+      prometheusId: inserted.prometheusId!,
+      userId: inserted.userId,
+      category: inserted.category as NotificationCategory,
+      priority: inserted.priority as NotificationPriority,
+      title: inserted.title,
+      titleKa: inserted.titleKa || undefined,
+      message: inserted.message,
+      messageKa: inserted.messageKa || undefined,
+      metadata: inserted.metadata as Record<string, any> | undefined,
+      actionUrl: inserted.actionUrl || undefined,
+      isRead: inserted.isRead || false,
+      readAt: inserted.readAt || undefined,
+      expiresAt: inserted.expiresAt || undefined,
+      createdAt: inserted.createdAt || new Date()
+    };
 
-  // Keep only last 100 notifications per user
-  if (userNotifications.length > 100) {
-    userNotifications.splice(100);
-  }
-
-  notificationStore.set(notification.userId, userNotifications);
-
-  // Notify subscribers
-  const userSubscribers = subscribers.get(notification.userId) || [];
-  for (const callback of userSubscribers) {
-    try {
-      callback(newNotification);
-    } catch (error) {
-      console.error("[PROMETHEUS] Notification callback error:", error);
+    // Notify subscribers
+    const userSubscribers = subscribers.get(notification.userId) || [];
+    for (const callback of userSubscribers) {
+      try {
+        callback(newNotification);
+      } catch (error) {
+        console.error("[PROMETHEUS] Notification callback error:", error);
+      }
     }
+
+    console.log(`[PROMETHEUS] Created notification: ${newNotification.title}`);
+
+    return newNotification;
+  } catch (error) {
+    console.error("[PROMETHEUS] Failed to create notification:", error);
+    throw error;
   }
-
-  console.log(`[PROMETHEUS] Created notification: ${newNotification.title}`);
-
-  return newNotification;
 }
 
 /**
@@ -133,104 +153,208 @@ export function subscribeToNotifications(
 // ============================================================================
 
 /**
- * Get notifications for a user
+ * Get notifications for a specific Prometheus instance
  */
 export async function getNotifications(
-  userId: string,
+  prometheusId: number,
   options: {
     unreadOnly?: boolean;
     category?: NotificationCategory;
     priority?: NotificationPriority;
     limit?: number;
-    childId?: number;
   } = {}
 ): Promise<PrometheusNotification[]> {
-  const { unreadOnly, category, priority, limit = 50, childId } = options;
+  const { unreadOnly = false, category, priority, limit = 50 } = options;
 
-  let notifications = notificationStore.get(userId) || [];
+  const conditions = [eq(prometheusNotifications.prometheusId, prometheusId)];
 
   if (unreadOnly) {
-    notifications = notifications.filter(n => !n.read);
+    conditions.push(eq(prometheusNotifications.isRead, false));
   }
 
   if (category) {
-    notifications = notifications.filter(n => n.category === category);
+    conditions.push(eq(prometheusNotifications.category, category));
   }
 
   if (priority) {
-    notifications = notifications.filter(n => n.priority === priority);
-  }
-
-  if (childId) {
-    notifications = notifications.filter(n => n.childId === childId);
+    conditions.push(eq(prometheusNotifications.priority, priority));
   }
 
   // Filter expired
-  const now = new Date();
-  notifications = notifications.filter(n => !n.expiresAt || n.expiresAt > now);
+  conditions.push(
+    or(
+      isNull(prometheusNotifications.expiresAt),
+      gte(prometheusNotifications.expiresAt, new Date())
+    )!
+  );
 
-  return notifications.slice(0, limit);
+  const results = await db.query.prometheusNotifications.findMany({
+    where: and(...conditions),
+    orderBy: [desc(prometheusNotifications.createdAt)],
+    limit
+  });
+
+  return results.map(r => ({
+    id: r.id,
+    prometheusId: r.prometheusId!,
+    userId: r.userId,
+    category: r.category as NotificationCategory,
+    priority: r.priority as NotificationPriority,
+    title: r.title,
+    titleKa: r.titleKa || undefined,
+    message: r.message,
+    messageKa: r.messageKa || undefined,
+    metadata: r.metadata as Record<string, any> | undefined,
+    actionUrl: r.actionUrl || undefined,
+    isRead: r.isRead || false,
+    readAt: r.readAt || undefined,
+    expiresAt: r.expiresAt || undefined,
+    createdAt: r.createdAt || new Date()
+  }));
 }
 
 /**
- * Get unread count
+ * Get notifications for a user (across all their children)
+ */
+export async function getUserNotifications(
+  userId: string,
+  options: {
+    unreadOnly?: boolean;
+    limit?: number;
+  } = {}
+): Promise<PrometheusNotification[]> {
+  const { unreadOnly = false, limit = 50 } = options;
+
+  const conditions = [eq(prometheusNotifications.userId, userId)];
+
+  if (unreadOnly) {
+    conditions.push(eq(prometheusNotifications.isRead, false));
+  }
+
+  // Filter expired
+  conditions.push(
+    or(
+      isNull(prometheusNotifications.expiresAt),
+      gte(prometheusNotifications.expiresAt, new Date())
+    )!
+  );
+
+  const results = await db.query.prometheusNotifications.findMany({
+    where: and(...conditions),
+    orderBy: [desc(prometheusNotifications.createdAt)],
+    limit
+  });
+
+  return results.map(r => ({
+    id: r.id,
+    prometheusId: r.prometheusId!,
+    userId: r.userId,
+    category: r.category as NotificationCategory,
+    priority: r.priority as NotificationPriority,
+    title: r.title,
+    titleKa: r.titleKa || undefined,
+    message: r.message,
+    messageKa: r.messageKa || undefined,
+    metadata: r.metadata as Record<string, any> | undefined,
+    actionUrl: r.actionUrl || undefined,
+    isRead: r.isRead || false,
+    readAt: r.readAt || undefined,
+    expiresAt: r.expiresAt || undefined,
+    createdAt: r.createdAt || new Date()
+  }));
+}
+
+/**
+ * Get unread count for a user
  */
 export async function getUnreadCount(userId: string): Promise<number> {
-  const notifications = notificationStore.get(userId) || [];
-  return notifications.filter(n => !n.read).length;
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(prometheusNotifications)
+    .where(and(
+      eq(prometheusNotifications.userId, userId),
+      eq(prometheusNotifications.isRead, false),
+      or(
+        isNull(prometheusNotifications.expiresAt),
+        gte(prometheusNotifications.expiresAt, new Date())
+      )
+    ));
+
+  return result[0]?.count || 0;
 }
 
 /**
  * Mark notification as read
  */
-export async function markAsRead(
-  userId: string,
-  notificationId: string
-): Promise<boolean> {
-  const notifications = notificationStore.get(userId) || [];
-  const notification = notifications.find(n => n.id === notificationId);
+export async function markNotificationRead(
+  notificationId: number,
+  userId: string
+): Promise<PrometheusNotification | null> {
+  const [updated] = await db.update(prometheusNotifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(
+      eq(prometheusNotifications.id, notificationId),
+      eq(prometheusNotifications.userId, userId)
+    ))
+    .returning();
 
-  if (notification) {
-    notification.read = true;
-    return true;
-  }
+  if (!updated) return null;
 
-  return false;
+  return {
+    id: updated.id,
+    prometheusId: updated.prometheusId!,
+    userId: updated.userId,
+    category: updated.category as NotificationCategory,
+    priority: updated.priority as NotificationPriority,
+    title: updated.title,
+    titleKa: updated.titleKa || undefined,
+    message: updated.message,
+    messageKa: updated.messageKa || undefined,
+    metadata: updated.metadata as Record<string, any> | undefined,
+    actionUrl: updated.actionUrl || undefined,
+    isRead: updated.isRead || false,
+    readAt: updated.readAt || undefined,
+    expiresAt: updated.expiresAt || undefined,
+    createdAt: updated.createdAt || new Date()
+  };
 }
 
 /**
  * Mark all notifications as read
  */
-export async function markAllAsRead(userId: string): Promise<number> {
-  const notifications = notificationStore.get(userId) || [];
-  let count = 0;
+export async function markAllNotificationsRead(
+  prometheusId?: number,
+  userId?: string
+): Promise<number> {
+  const conditions = [eq(prometheusNotifications.isRead, false)];
 
-  for (const notification of notifications) {
-    if (!notification.read) {
-      notification.read = true;
-      count++;
-    }
+  if (prometheusId) {
+    conditions.push(eq(prometheusNotifications.prometheusId, prometheusId));
+  }
+  if (userId) {
+    conditions.push(eq(prometheusNotifications.userId, userId));
   }
 
-  return count;
+  const result = await db.update(prometheusNotifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(...conditions));
+
+  return result.rowCount || 0;
 }
 
 /**
  * Delete notification
  */
 export async function deleteNotification(
-  userId: string,
-  notificationId: string
+  notificationId: number,
+  userId: string
 ): Promise<boolean> {
-  const notifications = notificationStore.get(userId) || [];
-  const index = notifications.findIndex(n => n.id === notificationId);
+  const result = await db.delete(prometheusNotifications)
+    .where(and(
+      eq(prometheusNotifications.id, notificationId),
+      eq(prometheusNotifications.userId, userId)
+    ));
 
-  if (index > -1) {
-    notifications.splice(index, 1);
-    return true;
-  }
-
-  return false;
+  return (result.rowCount || 0) > 0;
 }
 
 // ============================================================================
@@ -269,7 +393,6 @@ export async function notifyBreakthroughDiscovery(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "breakthrough_discovery",
     priority,
@@ -277,9 +400,10 @@ export async function notifyBreakthroughDiscovery(
     titleKa: discovery.titleKa ? `🔬 ${discovery.titleKa}` : undefined,
     message: discovery.description,
     messageKa: discovery.descriptionKa,
-    data: {
+    metadata: {
       confidence: discovery.confidence,
-      sourceNodeId: discovery.sourceNodeId
+      sourceNodeId: discovery.sourceNodeId,
+      childId: prometheus.childId
     },
     actionUrl: `/research?nodeId=${discovery.sourceNodeId}`
   });
@@ -313,7 +437,6 @@ export async function notifyNewTreatmentOption(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "new_treatment_option",
     priority: "high",
@@ -321,9 +444,10 @@ export async function notifyNewTreatmentOption(
     titleKa: treatment.nameKa ? `💊 ახალი მკურნალობის ვარიანტი: ${treatment.nameKa}` : undefined,
     message: treatment.description,
     messageKa: treatment.descriptionKa,
-    data: {
+    metadata: {
       treatmentName: treatment.name,
-      evidenceLevel: treatment.evidenceLevel
+      evidenceLevel: treatment.evidenceLevel,
+      childId: prometheus.childId
     },
     actionUrl: treatment.sourceUrl || "/treatments"
   });
@@ -357,7 +481,6 @@ export async function notifyClinicalTrialMatch(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "clinical_trial_match",
     priority: "critical",
@@ -365,11 +488,12 @@ export async function notifyClinicalTrialMatch(
     titleKa: `🏥 კლინიკური კვლევის შესაბამისობა`,
     message: `Phase ${trial.phase} trial in ${trial.location}. ${trial.eligibilitySummary}`,
     messageKa: `ფაზა ${trial.phase} კვლევა ${trial.location}-ში.`,
-    data: {
+    metadata: {
       trialId: trial.trialId,
       phase: trial.phase,
       location: trial.location,
-      contactInfo: trial.contactInfo
+      contactInfo: trial.contactInfo,
+      childId: prometheus.childId
     },
     actionUrl: `https://clinicaltrials.gov/study/${trial.trialId}`
   });
@@ -404,16 +528,16 @@ export async function notifyPredictionValidation(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "prediction_validation",
     priority: prediction.wasCorrect ? "medium" : "high",
     title: `${emoji} პროგნოზი ${status}`,
     message: prediction.statement.slice(0, 200),
-    data: {
+    metadata: {
       predictionId: prediction.predictionId,
       wasCorrect: prediction.wasCorrect,
-      lessonsLearned: prediction.lessonsLearned
+      lessonsLearned: prediction.lessonsLearned,
+      childId: prometheus.childId
     },
     actionUrl: `/prometheus/predictions?id=${prediction.predictionId}`
   });
@@ -445,16 +569,16 @@ export async function notifyKnowledgeMilestone(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "knowledge_milestone",
     priority: "low",
     title: `🎯 ცოდნის მაჩვენებელი: ${milestone.description}`,
     titleKa: milestone.descriptionKa ? `🎯 ${milestone.descriptionKa}` : undefined,
     message: `PROMETHEUS reached ${milestone.value} ${milestone.type.replace(/_/g, " ")}`,
-    data: {
+    metadata: {
       milestoneType: milestone.type,
-      value: milestone.value
+      value: milestone.value,
+      childId: prometheus.childId
     }
   });
 }
@@ -489,17 +613,17 @@ export async function notifyErrorDetected(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "error_detected",
     priority,
     title: `⚠️ შეცდომა აღმოჩენილი: ${error.errorType}`,
     message: `${error.description}${error.autoResolved ? " (ავტომატურად გამოსწორდა)" : ""}`,
     messageKa: error.autoResolved ? "შეცდომა ავტომატურად გამოსწორდა" : "საჭიროებს ყურადღებას",
-    data: {
+    metadata: {
       errorType: error.errorType,
       severity: error.severity,
-      autoResolved: error.autoResolved
+      autoResolved: error.autoResolved,
+      childId: prometheus.childId
     }
   });
 }
@@ -532,7 +656,6 @@ export async function notifyCrossChildInsight(
 
   return createNotification({
     prometheusId,
-    childId: prometheus.childId,
     userId: child.userId,
     category: "cross_child_insight",
     priority: insight.confidence >= 80 ? "high" : "medium",
@@ -540,12 +663,102 @@ export async function notifyCrossChildInsight(
     titleKa: insight.titleKa ? `👥 ${insight.titleKa}` : undefined,
     message: `${insight.description} (დაფუძნებული ${insight.caseCount} შემთხვევაზე)`,
     messageKa: insight.descriptionKa,
-    data: {
+    metadata: {
       caseCount: insight.caseCount,
-      confidence: insight.confidence
+      confidence: insight.confidence,
+      childId: prometheus.childId
     },
     actionUrl: "/prometheus/insights"
   });
+}
+
+/**
+ * Notify about verification completion
+ */
+export async function notifyVerificationComplete(
+  prometheusId: number,
+  verification: {
+    nodeLabel: string;
+    passed: boolean;
+    method: string;
+    confidence: number;
+  }
+): Promise<PrometheusNotification | null> {
+  const prometheus = await db.query.prometheusState.findFirst({
+    where: eq(prometheusState.id, prometheusId)
+  });
+
+  if (!prometheus) return null;
+
+  const child = await db.query.children.findFirst({
+    where: eq(children.id, prometheus.childId)
+  });
+
+  if (!child || !child.userId) return null;
+
+  const emoji = verification.passed ? "✅" : "❌";
+  const status = verification.passed ? "დადასტურდა" : "ვერ დადასტურდა";
+
+  return createNotification({
+    prometheusId,
+    userId: child.userId,
+    category: "verification_complete",
+    priority: verification.passed ? "low" : "high",
+    title: `${emoji} ვერიფიკაცია: ${verification.nodeLabel}`,
+    message: `${verification.method}: ${status} (${Math.round(verification.confidence)}% confidence)`,
+    metadata: {
+      nodeLabel: verification.nodeLabel,
+      passed: verification.passed,
+      method: verification.method,
+      confidence: verification.confidence,
+      childId: prometheus.childId
+    }
+  });
+}
+
+/**
+ * Check and notify about important discoveries
+ */
+export async function checkAndNotifyImportantDiscoveries(
+  prometheusId: number
+): Promise<PrometheusNotification[]> {
+  const notifications: PrometheusNotification[] = [];
+
+  // Get high-confidence knowledge nodes that haven't been notified
+  const nodes = await db.query.prometheusKnowledgeNodes.findMany({
+    where: and(
+      eq(prometheusKnowledgeNodes.prometheusId, prometheusId),
+      gte(prometheusKnowledgeNodes.confidence, 0.85)
+    ),
+    orderBy: [desc(prometheusKnowledgeNodes.createdAt)],
+    limit: 10
+  });
+
+  for (const node of nodes) {
+    // Check if we already notified about this node
+    const existingNotification = await db.query.prometheusNotifications.findFirst({
+      where: and(
+        eq(prometheusNotifications.prometheusId, prometheusId),
+        eq(prometheusNotifications.category, "breakthrough_discovery"),
+        sql`${prometheusNotifications.metadata}->>'sourceNodeId' = ${node.id.toString()}`
+      )
+    });
+
+    if (!existingNotification) {
+      const notification = await notifyBreakthroughDiscovery(prometheusId, {
+        title: node.label,
+        description: node.description || `High-confidence knowledge: ${node.label}`,
+        confidence: Math.round(node.confidence * 100),
+        sourceNodeId: node.id
+      });
+
+      if (notification) {
+        notifications.push(notification);
+      }
+    }
+  }
+
+  return notifications;
 }
 
 // ============================================================================
@@ -555,14 +768,13 @@ export async function notifyCrossChildInsight(
 export interface NotificationDigest {
   userId: string;
   period: "daily" | "weekly";
-  generatedAt: Date;
-  summary: {
-    totalNotifications: number;
-    byPriority: Record<NotificationPriority, number>;
-    byCategory: Record<string, number>;
-  };
+  startDate: string;
+  endDate: string;
+  totalNotifications: number;
+  unreadCount: number;
+  byPriority: Record<NotificationPriority, number>;
+  byCategory: Record<string, number>;
   highlights: PrometheusNotification[];
-  recommendations: string[];
 }
 
 /**
@@ -573,14 +785,39 @@ export async function generateDigest(
   period: "daily" | "weekly"
 ): Promise<NotificationDigest> {
   const cutoffDate = new Date();
+  const endDate = new Date();
   if (period === "daily") {
     cutoffDate.setDate(cutoffDate.getDate() - 1);
   } else {
     cutoffDate.setDate(cutoffDate.getDate() - 7);
   }
 
-  const notifications = (notificationStore.get(userId) || [])
-    .filter(n => n.createdAt >= cutoffDate);
+  // Fetch notifications from database
+  const dbNotifications = await db.query.prometheusNotifications.findMany({
+    where: and(
+      eq(prometheusNotifications.userId, userId),
+      gte(prometheusNotifications.createdAt, cutoffDate)
+    ),
+    orderBy: [desc(prometheusNotifications.createdAt)]
+  });
+
+  const notifications: PrometheusNotification[] = dbNotifications.map(n => ({
+    id: n.id,
+    prometheusId: n.prometheusId!,
+    userId: n.userId,
+    category: n.category as NotificationCategory,
+    priority: n.priority as NotificationPriority,
+    title: n.title,
+    titleKa: n.titleKa || undefined,
+    message: n.message,
+    messageKa: n.messageKa || undefined,
+    metadata: n.metadata as Record<string, any> | undefined,
+    actionUrl: n.actionUrl || undefined,
+    isRead: n.isRead || false,
+    readAt: n.readAt || undefined,
+    expiresAt: n.expiresAt || undefined,
+    createdAt: n.createdAt || new Date()
+  }));
 
   // Count by priority
   const byPriority: Record<NotificationPriority, number> = {
@@ -599,12 +836,13 @@ export async function generateDigest(
   }
 
   // Get highlights (top 5 by priority)
+  const priorityOrder: Record<NotificationPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
   const highlights = [...notifications]
-    .sort((a, b) => {
-      const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    })
+    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
     .slice(0, 5);
+
+  // Count unread
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // Generate recommendations
   const recommendations: string[] = [];
@@ -624,14 +862,13 @@ export async function generateDigest(
   return {
     userId,
     period,
-    generatedAt: new Date(),
-    summary: {
-      totalNotifications: notifications.length,
-      byPriority,
-      byCategory
-    },
-    highlights,
-    recommendations
+    startDate: cutoffDate.toISOString(),
+    endDate: endDate.toISOString(),
+    totalNotifications: notifications.length,
+    unreadCount,
+    byPriority,
+    byCategory,
+    highlights
   };
 }
 
