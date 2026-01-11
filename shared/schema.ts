@@ -919,3 +919,417 @@ export const insertAccumulatedKnowledgeSchema = createInsertSchema(accumulatedKn
 
 export type InsertAccumulatedKnowledge = z.infer<typeof insertAccumulatedKnowledgeSchema>;
 export type AccumulatedKnowledge = typeof accumulatedKnowledge.$inferSelect;
+
+// ============================================================================
+// PROMETHEUS-MIND - Living Cognitive Entity System
+// ============================================================================
+// Created by the Council of Minds (2125)
+// A self-evolving AI research system that never forgets and learns from mistakes
+
+// Prometheus State - Main system state tracking
+export const prometheusState = pgTable("prometheus_state", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  childId: integer("child_id").references(() => children.id),
+  status: varchar("status", { length: 50 }).default("initializing"), // initializing, active, consolidating, sleeping, error
+  currentPhase: varchar("current_phase", { length: 100 }),
+  totalKnowledgeNodes: integer("total_knowledge_nodes").default(0),
+  totalMemoryItems: integer("total_memory_items").default(0),
+  totalLearningEvents: integer("total_learning_events").default(0),
+  avgConfidence: real("avg_confidence").default(50),
+  predictionAccuracy: real("prediction_accuracy").default(0),
+  errorRate: real("error_rate").default(0),
+  lastConsolidationAt: timestamp("last_consolidation_at"),
+  lastErrorAt: timestamp("last_error_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const prometheusStatusEnum = z.enum([
+  "initializing",
+  "active",
+  "consolidating",
+  "sleeping",
+  "error"
+]);
+export type PrometheusStatus = z.infer<typeof prometheusStatusEnum>;
+
+export const insertPrometheusStateSchema = createInsertSchema(prometheusState, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusState = z.infer<typeof insertPrometheusStateSchema>;
+export type PrometheusState = typeof prometheusState.$inferSelect;
+
+// Prometheus Memory - Multi-layer memory system
+export const prometheusMemory = pgTable("prometheus_memory", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  memoryType: varchar("memory_type", { length: 50 }).notNull(), // working, episodic, semantic, procedural, meta
+  priority: varchar("priority", { length: 20 }).default("medium"), // critical, high, medium, low, ephemeral
+  content: text("content").notNull(),
+  contentKa: text("content_ka"),
+  embedding: jsonb("embedding"), // Vector embedding for semantic search
+  certaintyLevel: varchar("certainty_level", { length: 20 }).default("hypothesis"), // unknown, aware, hypothesis, belief, knowledge, truth
+  confidence: integer("confidence").default(50),
+  accessCount: integer("access_count").default(0),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  expiresAt: timestamp("expires_at"),
+  sourceIds: text("source_ids").array(),
+  linkedMemoryIds: integer("linked_memory_ids").array(),
+  tags: text("tags").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_prometheus_memory_type").on(table.memoryType),
+  index("idx_prometheus_memory_priority").on(table.priority),
+  index("idx_prometheus_memory_prometheus_id").on(table.prometheusId),
+]);
+
+export const memoryTypeEnum = z.enum([
+  "working",
+  "episodic",
+  "semantic",
+  "procedural",
+  "meta"
+]);
+export type MemoryType = z.infer<typeof memoryTypeEnum>;
+
+export const memoryPriorityEnum = z.enum([
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "ephemeral"
+]);
+export type MemoryPriority = z.infer<typeof memoryPriorityEnum>;
+
+export const certaintLevelEnum = z.enum([
+  "unknown",
+  "aware",
+  "hypothesis",
+  "belief",
+  "knowledge",
+  "truth"
+]);
+export type CertaintyLevel = z.infer<typeof certaintLevelEnum>;
+
+export const insertPrometheusMemorySchema = createInsertSchema(prometheusMemory, {
+  embedding: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusMemory = z.infer<typeof insertPrometheusMemorySchema>;
+export type PrometheusMemory = typeof prometheusMemory.$inferSelect;
+
+// Prometheus Knowledge Nodes - Concepts in the knowledge graph
+export const prometheusKnowledgeNodes = pgTable("prometheus_knowledge_nodes", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  nodeType: varchar("node_type", { length: 50 }).notNull(), // concept, fact, entity, mechanism, treatment, symptom, diagnosis, research, hypothesis, principle
+  label: text("label").notNull(),
+  labelKa: text("label_ka"),
+  description: text("description"),
+  descriptionKa: text("description_ka"),
+  certaintyLevel: varchar("certainty_level", { length: 20 }).default("hypothesis"),
+  confidence: integer("confidence").default(50),
+  evidenceCount: integer("evidence_count").default(0),
+  validationCount: integer("validation_count").default(0),
+  contradictionCount: integer("contradiction_count").default(0),
+  lastValidatedAt: timestamp("last_validated_at"),
+  sourceIds: text("source_ids").array(),
+  embedding: jsonb("embedding"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_prometheus_nodes_type").on(table.nodeType),
+  index("idx_prometheus_nodes_prometheus_id").on(table.prometheusId),
+  index("idx_prometheus_nodes_certainty").on(table.certaintyLevel),
+]);
+
+export const knowledgeNodeTypeEnum = z.enum([
+  "concept",
+  "fact",
+  "entity",
+  "mechanism",
+  "treatment",
+  "symptom",
+  "diagnosis",
+  "research",
+  "hypothesis",
+  "principle"
+]);
+export type KnowledgeNodeType = z.infer<typeof knowledgeNodeTypeEnum>;
+
+export const insertPrometheusKnowledgeNodeSchema = createInsertSchema(prometheusKnowledgeNodes, {
+  embedding: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusKnowledgeNode = z.infer<typeof insertPrometheusKnowledgeNodeSchema>;
+export type PrometheusKnowledgeNode = typeof prometheusKnowledgeNodes.$inferSelect;
+
+// Prometheus Knowledge Edges - Relationships between nodes
+export const prometheusKnowledgeEdges = pgTable("prometheus_knowledge_edges", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  sourceNodeId: integer("source_node_id").references(() => prometheusKnowledgeNodes.id),
+  targetNodeId: integer("target_node_id").references(() => prometheusKnowledgeNodes.id),
+  relationType: varchar("relation_type", { length: 50 }).notNull(), // causes, treats, prevents, correlates, contradicts, supports, etc.
+  strength: real("strength").default(0.5), // 0-1
+  confidence: integer("confidence").default(50),
+  bidirectional: boolean("bidirectional").default(false),
+  evidence: text("evidence").array(),
+  discoveredBy: varchar("discovered_by", { length: 100 }), // Which AI or process discovered this
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_prometheus_edges_source").on(table.sourceNodeId),
+  index("idx_prometheus_edges_target").on(table.targetNodeId),
+  index("idx_prometheus_edges_relation").on(table.relationType),
+]);
+
+export const knowledgeRelationTypeEnum = z.enum([
+  "causes",
+  "treats",
+  "prevents",
+  "correlates",
+  "contradicts",
+  "supports",
+  "part_of",
+  "instance_of",
+  "similar_to",
+  "leads_to",
+  "requires",
+  "inhibits",
+  "activates",
+  "modulates"
+]);
+export type KnowledgeRelationType = z.infer<typeof knowledgeRelationTypeEnum>;
+
+export const insertPrometheusKnowledgeEdgeSchema = createInsertSchema(prometheusKnowledgeEdges, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusKnowledgeEdge = z.infer<typeof insertPrometheusKnowledgeEdgeSchema>;
+export type PrometheusKnowledgeEdge = typeof prometheusKnowledgeEdges.$inferSelect;
+
+// Prometheus Errors - Error tracking for self-correction
+export const prometheusErrors = pgTable("prometheus_errors", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  errorType: varchar("error_type", { length: 50 }).notNull(), // factual, inference, context, temporal, confidence, integration
+  severity: varchar("severity", { length: 20 }).default("minor"), // critical, major, minor, cosmetic
+  description: text("description").notNull(),
+  prediction: text("prediction"),
+  actualOutcome: text("actual_outcome"),
+  rootCause: text("root_cause"),
+  correction: text("correction"),
+  preventionStrategy: text("prevention_strategy"),
+  affectedMemoryIds: integer("affected_memory_ids").array(),
+  affectedNodeIds: integer("affected_node_ids").array(),
+  resolved: boolean("resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_prometheus_errors_type").on(table.errorType),
+  index("idx_prometheus_errors_resolved").on(table.resolved),
+]);
+
+export const errorTypeEnum = z.enum([
+  "factual",
+  "inference",
+  "context",
+  "temporal",
+  "confidence",
+  "integration"
+]);
+export type ErrorType = z.infer<typeof errorTypeEnum>;
+
+export const errorSeverityEnum = z.enum([
+  "critical",
+  "major",
+  "minor",
+  "cosmetic"
+]);
+export type ErrorSeverity = z.infer<typeof errorSeverityEnum>;
+
+export const insertPrometheusErrorSchema = createInsertSchema(prometheusErrors, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusError = z.infer<typeof insertPrometheusErrorSchema>;
+export type PrometheusError = typeof prometheusErrors.$inferSelect;
+
+// Prometheus Learning Events - Track all learning moments
+export const prometheusLearningEvents = pgTable("prometheus_learning_events", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // prediction_success, prediction_failure, new_information, contradiction, validation, error_correction, knowledge_synthesis, pattern_recognition
+  description: text("description").notNull(),
+  impact: real("impact").default(0), // -1 to 1
+  affectedNodeIds: integer("affected_node_ids").array(),
+  affectedMemoryIds: integer("affected_memory_ids").array(),
+  beforeState: jsonb("before_state"),
+  afterState: jsonb("after_state"),
+  lessonsLearned: text("lessons_learned").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_prometheus_learning_type").on(table.eventType),
+  index("idx_prometheus_learning_impact").on(table.impact),
+]);
+
+export const learningEventTypeEnum = z.enum([
+  "prediction_success",
+  "prediction_failure",
+  "new_information",
+  "contradiction",
+  "validation",
+  "error_correction",
+  "knowledge_synthesis",
+  "pattern_recognition"
+]);
+export type LearningEventType = z.infer<typeof learningEventTypeEnum>;
+
+export const insertPrometheusLearningEventSchema = createInsertSchema(prometheusLearningEvents, {
+  beforeState: z.record(z.any()).nullable().optional(),
+  afterState: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusLearningEvent = z.infer<typeof insertPrometheusLearningEventSchema>;
+export type PrometheusLearningEvent = typeof prometheusLearningEvents.$inferSelect;
+
+// Prometheus Consolidation Cycles - Dream cycle tracking
+export const prometheusConsolidationCycles = pgTable("prometheus_consolidation_cycles", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  phase: varchar("phase", { length: 50 }).notNull(), // collection, evaluation, integration, compression, reorganization, pruning
+  status: varchar("status", { length: 20 }).default("pending"), // pending, running, completed, failed
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  memoriesProcessed: integer("memories_processed").default(0),
+  memoriesConsolidated: integer("memories_consolidated").default(0),
+  memoriesPruned: integer("memories_pruned").default(0),
+  nodesCreated: integer("nodes_created").default(0),
+  nodesUpdated: integer("nodes_updated").default(0),
+  edgesCreated: integer("edges_created").default(0),
+  errors: text("errors").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const consolidationPhaseEnum = z.enum([
+  "collection",
+  "evaluation",
+  "integration",
+  "compression",
+  "reorganization",
+  "pruning"
+]);
+export type ConsolidationPhase = z.infer<typeof consolidationPhaseEnum>;
+
+export const insertPrometheusConsolidationCycleSchema = createInsertSchema(prometheusConsolidationCycles, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusConsolidationCycle = z.infer<typeof insertPrometheusConsolidationCycleSchema>;
+export type PrometheusConsolidationCycle = typeof prometheusConsolidationCycles.$inferSelect;
+
+// Prometheus Verifications - Truth verification results
+export const prometheusVerifications = pgTable("prometheus_verifications", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  targetNodeId: integer("target_node_id").references(() => prometheusKnowledgeNodes.id),
+  method: varchar("method", { length: 50 }).notNull(), // source_triangulation, temporal_consistency, predictive_power, falsifiability_check, coherence_test
+  passed: boolean("passed").notNull(),
+  confidence: integer("confidence").default(50),
+  evidence: text("evidence").array(),
+  notes: text("notes"),
+  metadata: jsonb("metadata"),
+  verifiedAt: timestamp("verified_at").defaultNow(),
+});
+
+export const verificationMethodEnum = z.enum([
+  "source_triangulation",
+  "temporal_consistency",
+  "predictive_power",
+  "falsifiability_check",
+  "coherence_test"
+]);
+export type VerificationMethod = z.infer<typeof verificationMethodEnum>;
+
+export const insertPrometheusVerificationSchema = createInsertSchema(prometheusVerifications, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  verifiedAt: true,
+});
+
+export type InsertPrometheusVerification = z.infer<typeof insertPrometheusVerificationSchema>;
+export type PrometheusVerification = typeof prometheusVerifications.$inferSelect;
+
+// Prometheus Expert Debates - AI council debates
+export const prometheusExpertDebates = pgTable("prometheus_expert_debates", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  topic: text("topic").notNull(),
+  topicKa: text("topic_ka"),
+  participants: text("participants").array(), // AI expert IDs
+  positions: jsonb("positions"), // Array of positions with expertId, position, confidence, evidence
+  consensus: text("consensus"),
+  consensusKa: text("consensus_ka"),
+  consensusConfidence: integer("consensus_confidence"),
+  resolved: boolean("resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  relatedNodeIds: integer("related_node_ids").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusExpertDebateSchema = createInsertSchema(prometheusExpertDebates, {
+  positions: z.array(z.object({
+    expertId: z.string(),
+    position: z.string(),
+    confidence: z.number(),
+    evidence: z.array(z.string())
+  })).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusExpertDebate = z.infer<typeof insertPrometheusExpertDebateSchema>;
+export type PrometheusExpertDebate = typeof prometheusExpertDebates.$inferSelect;
