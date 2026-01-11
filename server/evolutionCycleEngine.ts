@@ -2,9 +2,9 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
-import { 
-  searchAcademicSources, 
-  formatAcademicResultsForAI, 
+import {
+  searchAcademicSources,
+  formatAcademicResultsForAI,
   ALL_DISCIPLINES,
   MEDICAL_CLINICAL_DISCIPLINES,
   TRADITIONAL_MEDICINE_DISCIPLINES,
@@ -13,6 +13,14 @@ import {
 } from "./academicSearch";
 import { generateCycleSummaryPDF } from "./pdfGenerator";
 import { sendEmailWithAttachments } from "./resend";
+
+// PROMETHEUS-MIND Integration
+import {
+  onEvolutionCycleStart,
+  onEvolutionPhaseComplete,
+  onEvolutionDailyRunComplete,
+  onEvolutionCycleComplete,
+} from "./prometheus";
 import type {
   EvolutionCycle,
   EvolutionDailyRun,
@@ -1741,6 +1749,25 @@ export async function executeEvolutionPhase(
       `[Evolution Engine] Phase ${phase} completed with ${phaseResult.insights.length} insights`
     );
 
+    // PROMETHEUS-MIND: Notify Prometheus about phase completion
+    try {
+      const createdInsights = await storage.getEvolutionInsights(dailyRunId);
+      const phaseInsights = createdInsights.filter(i => i.phase === phase);
+      await onEvolutionPhaseComplete(dailyRun, phase, phaseInsights);
+      console.log(`[Evolution Engine] Prometheus notified about phase ${phase}`);
+
+      // If all phases complete, notify about daily run completion
+      if (currentPhasesCompleted.length === 7) {
+        const updatedRun = await storage.getEvolutionDailyRun(dailyRunId);
+        if (updatedRun) {
+          await onEvolutionDailyRunComplete(updatedRun);
+          console.log(`[Evolution Engine] Prometheus notified about daily run completion`);
+        }
+      }
+    } catch (prometheusError) {
+      console.error(`[Evolution Engine] Prometheus notification failed:`, prometheusError);
+    }
+
     return {
       success: phaseResult.success,
       insightsCreated: phaseResult.insights.length,
@@ -2595,6 +2622,14 @@ export async function startEvolutionCycle(
 
   console.log(`[Evolution Engine] Created new cycle ${cycle.id}`);
 
+  // PROMETHEUS-MIND: Notify Prometheus about new cycle
+  try {
+    await onEvolutionCycleStart(cycle);
+    console.log(`[Evolution Engine] Prometheus notified about cycle ${cycle.id}`);
+  } catch (prometheusError) {
+    console.error(`[Evolution Engine] Prometheus notification failed:`, prometheusError);
+  }
+
   const today = new Date().toISOString().split("T")[0];
   const dailyRun = await storage.createEvolutionDailyRun({
     cycleId: cycle.id,
@@ -2680,6 +2715,14 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
     }
 
     console.log(`[Evolution Engine] Saved top insights to accumulated_knowledge`);
+
+    // PROMETHEUS-MIND: Notify Prometheus about cycle completion
+    try {
+      await onEvolutionCycleComplete(oldCycle);
+      console.log(`[Evolution Engine] Prometheus notified about cycle ${cycleId} completion`);
+    } catch (prometheusError) {
+      console.error(`[Evolution Engine] Prometheus cycle completion notification failed:`, prometheusError);
+    }
 
     // Generate and send PDF reports via email
     await sendCycleCompletionEmail(cycleId, allInsightsFromCycle, oldCycle.diagnosisContext || "");

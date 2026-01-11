@@ -1,5 +1,6 @@
 import { runEvolutionTick, generateDailyReport, completeCycleAndStartNew } from "./evolutionCycleEngine";
 import { storage } from "./storage";
+import { runScheduledMaintenance as runPrometheusMaintenance } from "./prometheus";
 
 let schedulerInterval: NodeJS.Timeout | null = null;
 let isRunning = false;
@@ -63,6 +64,14 @@ async function runSchedulerTick(): Promise<void> {
     for (const cycle of activeCycles) {
       await checkAndGenerateDailyReports(cycle.id);
       await checkAndCompleteCycle(cycle.id, cycle.endDate);
+    }
+
+    // PROMETHEUS-MIND: Run scheduled maintenance
+    try {
+      await runPrometheusMaintenance();
+      console.log(`[Evolution Scheduler] Prometheus maintenance completed`);
+    } catch (prometheusError) {
+      console.error(`[Evolution Scheduler] Prometheus maintenance failed:`, prometheusError);
     }
 
     const duration = Date.now() - startTime;
