@@ -70,6 +70,46 @@ export {
   type SourceCredibility
 } from "./sourceVerification";
 
+// Pinecone Vector Database
+export {
+  initializePinecone,
+  isPineconeAvailable,
+  upsertVectors,
+  querySimilarVectors,
+  deleteVectors,
+  deleteNamespace,
+  syncMemoriesToPinecone,
+  syncKnowledgeNodesToPinecone,
+  fullSyncToPinecone,
+  hybridSemanticSearch,
+  getPineconeStats,
+  type VectorRecord,
+  type HybridSearchResult,
+  type PineconeStats
+} from "./vectorDB";
+
+// Notification System
+export {
+  createNotification,
+  getNotifications,
+  getUserNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  notifyBreakthroughDiscovery,
+  notifyNewTreatmentOption,
+  notifyClinicalTrialMatch,
+  notifyPredictionValidation,
+  notifyKnowledgeMilestone,
+  notifyVerificationComplete,
+  checkAndNotifyImportantDiscoveries,
+  generateDigest,
+  type PrometheusNotification,
+  type NotificationCategory,
+  type NotificationPriority,
+  type NotificationDigest
+} from "./notificationSystem";
+
 // ============================================================================
 // PHASE 2 ORCHESTRATION
 // ============================================================================
