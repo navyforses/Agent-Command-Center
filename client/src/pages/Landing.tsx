@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +15,6 @@ import {
   Star,
   Lightbulb,
   Sparkles,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -109,30 +106,8 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-function anonymizeText(text: string | null | undefined, language: string): string {
-  if (!text) return "";
-  
-  const georgianNamePattern = /([ა-ჰ]+\s+[ა-ჰ]+ის\s+)/gi;
-  const georgianNamePattern2 = /([ა-ჰ]+\s+[ა-ჰ]+ი\s+)/gi;
-  const englishNamePattern = /([A-Z][a-z]+\s+[A-Z][a-z]+'s\s+)/g;
-  const englishNamePattern2 = /([A-Z][a-z]+\s+[A-Z][a-z]+\s+)/g;
-  
-  let result = text;
-  
-  if (language === "ka") {
-    result = result.replace(georgianNamePattern, "ბავშვის ");
-    result = result.replace(georgianNamePattern2, "ბავშვის ");
-  } else {
-    result = result.replace(englishNamePattern, "Child's ");
-    result = result.replace(englishNamePattern2, "Child's ");
-  }
-  
-  return result;
-}
-
 export default function Landing() {
   const { language, t } = useLanguage();
-  const [expandedKnowledgeId, setExpandedKnowledgeId] = useState<number | null>(null);
   
   const { data: testimonials = [] } = useQuery<Testimonial[]>({
     queryKey: ['/api/testimonials'],
@@ -253,20 +228,17 @@ export default function Landing() {
                 <CardContent className="p-6 md:p-8">
                   {/* Narrative Discovery */}
                   {(() => {
-                    const rawNarrativeText = latestReport
+                    const narrativeText = latestReport
                       ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
                         : null;
 
-                    const rawNarrativeTitle = latestReport
+                    const narrativeTitle = latestReport
                       ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
                       : latestKnowledge
                         ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
                         : null;
-
-                    const narrativeText = anonymizeText(rawNarrativeText, language);
-                    const narrativeTitle = anonymizeText(rawNarrativeTitle, language);
 
                     const narrativeDate = latestReport?.reportDate
                       ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
@@ -329,7 +301,7 @@ export default function Landing() {
                   )}
 
                   {/* Recent Findings */}
-                  {accumulatedKnowledge && accumulatedKnowledge.length >= 1 && (
+                  {accumulatedKnowledge && accumulatedKnowledge.length > 1 && (
                     <div className="mt-6 pt-6 border-t">
                       <p className="text-sm font-medium mb-3">
                         {language === "en" ? "Recent Findings" : "ბოლო აღმოჩენები"}
@@ -339,43 +311,19 @@ export default function Landing() {
                           .filter(k => k.status === "active" || k.status === "validated")
                           .slice(0, 3)
                           .map((knowledge) => {
-                            const rawTitle = language === "ka" && knowledge.titleKa
+                            const title = language === "ka" && knowledge.titleKa
                               ? knowledge.titleKa
                               : knowledge.titleEn;
-                            const title = anonymizeText(rawTitle, language);
-                            const rawContent = language === "ka" && knowledge.contentKa
-                              ? knowledge.contentKa
-                              : knowledge.contentEn;
-                            const content = anonymizeText(rawContent, language);
-                            const isExpanded = expandedKnowledgeId === knowledge.id;
                             return (
                               <div
                                 key={knowledge.id}
-                                className="bg-background/50 rounded-md border"
+                                className="flex items-center gap-2 p-2 bg-background/50 rounded-md"
                               >
-                                <button
-                                  onClick={() => setExpandedKnowledgeId(isExpanded ? null : knowledge.id)}
-                                  className="w-full flex items-center gap-2 p-3 text-left cursor-pointer transition-colors hover:bg-muted/50"
-                                  data-testid={`button-expand-finding-${knowledge.id}`}
-                                >
-                                  <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
-                                  <span className={`text-sm flex-1 ${isExpanded ? '' : 'truncate'}`}>{title}</span>
-                                  <Badge variant="outline" className="text-xs shrink-0">
-                                    {knowledge.confidence ?? 50}%
-                                  </Badge>
-                                  {isExpanded ? (
-                                    <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  ) : (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  )}
-                                </button>
-                                {isExpanded && (
-                                  <div className="px-3 pb-3 pt-1 border-t bg-muted/30">
-                                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                                      {content}
-                                    </p>
-                                  </div>
-                                )}
+                                <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
+                                <span className="text-sm truncate">{title}</span>
+                                <Badge variant="outline" className="ml-auto text-xs shrink-0">
+                                  {knowledge.confidence ?? 50}%
+                                </Badge>
                               </div>
                             );
                           })}
