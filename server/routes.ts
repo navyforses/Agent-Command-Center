@@ -3336,5 +3336,653 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
+  // ============================================================================
+  // PROMETHEUS-MIND PHASE 2 API ROUTES
+  // ============================================================================
+
+  // Get Prometheus status for a child
+  app.get("/api/prometheus/status/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      if (isNaN(childId)) {
+        return res.status(400).json({ message: "Invalid child ID" });
+      }
+
+      // Verify child belongs to user
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.json({
+          initialized: false,
+          message: "Prometheus not initialized for this child"
+        });
+      }
+
+      res.json({
+        initialized: true,
+        prometheusId: prometheusState.id,
+        status: prometheusState.status,
+        totalKnowledgeNodes: prometheusState.totalKnowledgeNodes,
+        totalMemoryItems: prometheusState.totalMemoryItems,
+        avgConfidence: prometheusState.avgConfidence,
+        lastConsolidationAt: prometheusState.lastConsolidationAt
+      });
+    } catch (error) {
+      console.error("Error fetching Prometheus status:", error);
+      res.status(500).json({ message: "Failed to fetch Prometheus status" });
+    }
+  });
+
+  // Semantic search across knowledge
+  app.post("/api/prometheus/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { childId, query: searchQuery, options } = req.body;
+
+      if (!childId || !searchQuery) {
+        return res.status(400).json({ message: "childId and query are required" });
+      }
+
+      // Verify child belongs to user
+      const child = await storage.getChild(parseInt(childId, 10), userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, parseInt(childId, 10))
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized for this child" });
+      }
+
+      const { semanticSearch } = await import("./prometheus/phase2");
+      const results = await semanticSearch(prometheusState.id, searchQuery, options || {});
+
+      res.json({ results });
+    } catch (error) {
+      console.error("Error in semantic search:", error);
+      res.status(500).json({ message: "Failed to perform semantic search" });
+    }
+  });
+
+  // Get predictions for a child
+  app.get("/api/prometheus/predictions/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { status } = req.query;
+
+      // Verify child belongs to user
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const {
+        getPendingPredictions,
+        getValidatedPredictions,
+        getPredictionStats
+      } = await import("./prometheus/phase2");
+
+      let predictions;
+      if (status === "pending") {
+        predictions = await getPendingPredictions(prometheusState.id);
+      } else if (status === "validated") {
+        predictions = await getValidatedPredictions(prometheusState.id);
+      } else {
+        predictions = [
+          ...(await getPendingPredictions(prometheusState.id)),
+          ...(await getValidatedPredictions(prometheusState.id))
+        ];
+      }
+
+      const stats = await getPredictionStats(prometheusState.id);
+
+      res.json({ predictions, stats });
+    } catch (error) {
+      console.error("Error fetching predictions:", error);
+      res.status(500).json({ message: "Failed to fetch predictions" });
+    }
+  });
+
+  // Validate a prediction
+  app.post("/api/prometheus/predictions/:predictionId/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const predictionId = parseInt(req.params.predictionId, 10);
+      const { actualOutcome, wasCorrect, deviationScore, notes } = req.body;
+
+      if (!actualOutcome || typeof wasCorrect !== "boolean") {
+        return res.status(400).json({
+          message: "actualOutcome and wasCorrect are required"
+        });
+      }
+
+      const { validatePrediction } = await import("./prometheus/phase2");
+
+      const result = await validatePrediction(predictionId, {
+        actualOutcome,
+        wasCorrect,
+        deviationScore,
+        notes
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating prediction:", error);
+      res.status(500).json({ message: "Failed to validate prediction" });
+    }
+  });
+
+  // Get cross-child insights
+  app.get("/api/prometheus/insights", isAuthenticated, async (req: any, res) => {
+    try {
+      const { childId } = req.query;
+
+      const { generateCrossChildInsights, findRelevantInsightsForChild } =
+        await import("./prometheus/phase2");
+
+      if (childId) {
+        const prometheusState = await db.query.prometheusState.findFirst({
+          where: eq(schema.prometheusState.childId, parseInt(childId as string, 10))
+        });
+
+        if (prometheusState) {
+          const insights = await findRelevantInsightsForChild(prometheusState.id, 10);
+          return res.json({ insights, personalized: true });
+        }
+      }
+
+      // General insights (not personalized)
+      const insights = await generateCrossChildInsights(3);
+      res.json({ insights, personalized: false });
+    } catch (error) {
+      console.error("Error fetching insights:", error);
+      res.status(500).json({ message: "Failed to fetch insights" });
+    }
+  });
+
+  // Verify a knowledge node
+  app.post("/api/prometheus/verify/:nodeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const nodeId = parseInt(req.params.nodeId, 10);
+
+      const node = await db.query.prometheusKnowledgeNodes.findFirst({
+        where: eq(schema.prometheusKnowledgeNodes.id, nodeId)
+      });
+
+      if (!node) {
+        return res.status(404).json({ message: "Knowledge node not found" });
+      }
+
+      const { runFullVerification } = await import("./prometheus/phase2");
+      const result = await runFullVerification(node.prometheusId, nodeId);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error verifying node:", error);
+      res.status(500).json({ message: "Failed to verify knowledge node" });
+    }
+  });
+
+  // Run Phase 2 maintenance
+  app.post("/api/prometheus/maintenance/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      // Verify child belongs to user
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const { runPhase2Maintenance } = await import("./prometheus/phase2");
+      const result = await runPhase2Maintenance(prometheusState.id);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error running Phase 2 maintenance:", error);
+      res.status(500).json({ message: "Failed to run maintenance" });
+    }
+  });
+
+  // ============================================================================
+  // PROMETHEUS Vector DB Routes
+  // ============================================================================
+
+  // Get Pinecone stats
+  app.get("/api/prometheus/vectordb/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const { getPineconeStats } = await import("./prometheus/phase2");
+      const stats = await getPineconeStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting Pinecone stats:", error);
+      res.status(500).json({ message: "Failed to get Pinecone stats" });
+    }
+  });
+
+  // Sync to Pinecone
+  app.post("/api/prometheus/vectordb/sync/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const { fullSyncToPinecone } = await import("./prometheus/phase2");
+      const result = await fullSyncToPinecone(prometheusState.id);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing to Pinecone:", error);
+      res.status(500).json({ message: "Failed to sync to Pinecone" });
+    }
+  });
+
+  // Hybrid semantic search
+  app.post("/api/prometheus/vectordb/search/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { query, topK, searchMemories, searchNodes, minScore } = req.body;
+
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const { hybridSemanticSearch } = await import("./prometheus/phase2");
+      const results = await hybridSemanticSearch(prometheusState.id, query, {
+        topK: topK || 10,
+        searchMemories: searchMemories !== false,
+        searchNodes: searchNodes !== false,
+        minScore: minScore || 0.7
+      });
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error performing hybrid search:", error);
+      res.status(500).json({ message: "Failed to perform search" });
+    }
+  });
+
+  // ============================================================================
+  // PROMETHEUS Notification Routes
+  // ============================================================================
+
+  // Get user notifications
+  app.get("/api/prometheus/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { unreadOnly, limit } = req.query;
+
+      const { getUserNotifications } = await import("./prometheus/phase2");
+      const notifications = await getUserNotifications(userId, {
+        unreadOnly: unreadOnly === "true",
+        limit: limit ? parseInt(limit as string, 10) : 50
+      });
+
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error getting notifications:", error);
+      res.status(500).json({ message: "Failed to get notifications" });
+    }
+  });
+
+  // Get notifications for specific child
+  app.get("/api/prometheus/notifications/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { unreadOnly, limit } = req.query;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const { getNotifications } = await import("./prometheus/phase2");
+      const notifications = await getNotifications(prometheusState.id, {
+        unreadOnly: unreadOnly === "true",
+        limit: limit ? parseInt(limit as string, 10) : 50
+      });
+
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error getting notifications:", error);
+      res.status(500).json({ message: "Failed to get notifications" });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/prometheus/notifications/:notificationId/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notificationId = parseInt(req.params.notificationId, 10);
+
+      const { markNotificationRead } = await import("./prometheus/phase2");
+      const notification = await markNotificationRead(notificationId, userId);
+
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/prometheus/notifications/mark-all-read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { prometheusId } = req.body;
+
+      const { markAllNotificationsRead } = await import("./prometheus/phase2");
+      const count = await markAllNotificationsRead(
+        prometheusId ? parseInt(prometheusId, 10) : undefined,
+        userId
+      );
+
+      res.json({ marked: count });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark notifications as read" });
+    }
+  });
+
+  // Delete notification
+  app.delete("/api/prometheus/notifications/:notificationId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notificationId = parseInt(req.params.notificationId, 10);
+
+      const { deleteNotification } = await import("./prometheus/phase2");
+      const deleted = await deleteNotification(notificationId, userId);
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      res.json({ message: "Notification deleted" });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
+  // Generate notification digest
+  app.get("/api/prometheus/notifications/digest/:period", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const period = req.params.period as "daily" | "weekly";
+
+      if (period !== "daily" && period !== "weekly") {
+        return res.status(400).json({ message: "Period must be 'daily' or 'weekly'" });
+      }
+
+      const { generateDigest } = await import("./prometheus/phase2");
+      const digest = await generateDigest(userId, period);
+
+      res.json(digest);
+    } catch (error) {
+      console.error("Error generating digest:", error);
+      res.status(500).json({ message: "Failed to generate digest" });
+    }
+  });
+
+  // Check and notify important discoveries
+  app.post("/api/prometheus/notifications/check/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      const { checkAndNotifyImportantDiscoveries } = await import("./prometheus/phase2");
+      const notifications = await checkAndNotifyImportantDiscoveries(prometheusState.id);
+
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error checking for discoveries:", error);
+      res.status(500).json({ message: "Failed to check for discoveries" });
+    }
+  });
+
+  // ============================================================================
+  // PROMETHEUS Knowledge Graph API
+  // ============================================================================
+
+  // Get full knowledge graph for visualization
+  app.get("/api/prometheus/knowledge-graph/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      // Get all knowledge nodes
+      const nodes = await db.query.prometheusKnowledgeNodes.findMany({
+        where: eq(schema.prometheusKnowledgeNodes.prometheusId, prometheusState.id)
+      });
+
+      // Get all edges
+      const edges = await db.query.prometheusKnowledgeEdges.findMany({
+        where: eq(schema.prometheusKnowledgeEdges.prometheusId, prometheusState.id)
+      });
+
+      // Transform for visualization
+      const graphNodes = nodes.map(node => ({
+        id: node.id.toString(),
+        label: node.label,
+        type: node.nodeType,
+        group: node.nodeType,
+        certainty: node.certaintyLevel,
+        confidence: node.confidence,
+        description: node.description,
+        metadata: node.metadata,
+        size: Math.max(20, Math.min(50, node.confidence * 50))
+      }));
+
+      const graphEdges = edges.map(edge => ({
+        id: edge.id.toString(),
+        source: edge.sourceNodeId.toString(),
+        target: edge.targetNodeId.toString(),
+        label: edge.relationshipType,
+        strength: edge.strength,
+        width: Math.max(1, edge.strength * 5)
+      }));
+
+      res.json({
+        nodes: graphNodes,
+        edges: graphEdges,
+        stats: {
+          totalNodes: nodes.length,
+          totalEdges: edges.length,
+          nodeTypes: [...new Set(nodes.map(n => n.nodeType))],
+          averageConfidence: nodes.length > 0
+            ? nodes.reduce((sum, n) => sum + n.confidence, 0) / nodes.length
+            : 0
+        }
+      });
+    } catch (error) {
+      console.error("Error getting knowledge graph:", error);
+      res.status(500).json({ message: "Failed to get knowledge graph" });
+    }
+  });
+
+  // Get node details with related nodes
+  app.get("/api/prometheus/knowledge-graph/:childId/node/:nodeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const nodeId = parseInt(req.params.nodeId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const prometheusState = await db.query.prometheusState.findFirst({
+        where: eq(schema.prometheusState.childId, childId)
+      });
+
+      if (!prometheusState) {
+        return res.status(404).json({ message: "Prometheus not initialized" });
+      }
+
+      // Get the node
+      const node = await db.query.prometheusKnowledgeNodes.findFirst({
+        where: and(
+          eq(schema.prometheusKnowledgeNodes.id, nodeId),
+          eq(schema.prometheusKnowledgeNodes.prometheusId, prometheusState.id)
+        )
+      });
+
+      if (!node) {
+        return res.status(404).json({ message: "Node not found" });
+      }
+
+      // Get related edges
+      const outgoingEdges = await db.query.prometheusKnowledgeEdges.findMany({
+        where: and(
+          eq(schema.prometheusKnowledgeEdges.sourceNodeId, nodeId),
+          eq(schema.prometheusKnowledgeEdges.prometheusId, prometheusState.id)
+        )
+      });
+
+      const incomingEdges = await db.query.prometheusKnowledgeEdges.findMany({
+        where: and(
+          eq(schema.prometheusKnowledgeEdges.targetNodeId, nodeId),
+          eq(schema.prometheusKnowledgeEdges.prometheusId, prometheusState.id)
+        )
+      });
+
+      // Get related node details
+      const relatedNodeIds = new Set([
+        ...outgoingEdges.map(e => e.targetNodeId),
+        ...incomingEdges.map(e => e.sourceNodeId)
+      ]);
+
+      const relatedNodes = await db.query.prometheusKnowledgeNodes.findMany({
+        where: and(
+          eq(schema.prometheusKnowledgeNodes.prometheusId, prometheusState.id),
+          sql`${schema.prometheusKnowledgeNodes.id} IN (${[...relatedNodeIds].join(",")})`
+        )
+      });
+
+      // Get memories related to this concept
+      const { findSimilarKnowledgeNodes } = await import("./prometheus/phase2");
+      const relatedMemories = await db.query.prometheusMemory.findMany({
+        where: and(
+          eq(schema.prometheusMemory.prometheusId, prometheusState.id),
+          sql`${schema.prometheusMemory.content} ILIKE ${'%' + node.label + '%'}`
+        ),
+        limit: 10
+      });
+
+      res.json({
+        node,
+        relationships: {
+          outgoing: outgoingEdges.map(e => ({
+            ...e,
+            targetNode: relatedNodes.find(n => n.id === e.targetNodeId)
+          })),
+          incoming: incomingEdges.map(e => ({
+            ...e,
+            sourceNode: relatedNodes.find(n => n.id === e.sourceNodeId)
+          }))
+        },
+        relatedMemories
+      });
+    } catch (error) {
+      console.error("Error getting node details:", error);
+      res.status(500).json({ message: "Failed to get node details" });
+    }
+  });
+
   return httpServer;
 }

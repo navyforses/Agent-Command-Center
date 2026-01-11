@@ -1333,3 +1333,53 @@ export const insertPrometheusExpertDebateSchema = createInsertSchema(prometheusE
 
 export type InsertPrometheusExpertDebate = z.infer<typeof insertPrometheusExpertDebateSchema>;
 export type PrometheusExpertDebate = typeof prometheusExpertDebates.$inferSelect;
+
+// Prometheus Notifications - Important discovery alerts
+export const prometheusNotifications = pgTable("prometheus_notifications", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // breakthrough_discovery, new_treatment_option, clinical_trial_match, prediction_validation, knowledge_milestone, verification_complete, system_alert, weekly_digest
+  priority: varchar("priority", { length: 20 }).notNull().default("medium"), // critical, high, medium, low
+  title: text("title").notNull(),
+  titleKa: text("title_ka"),
+  message: text("message").notNull(),
+  messageKa: text("message_ka"),
+  metadata: jsonb("metadata"),
+  actionUrl: varchar("action_url", { length: 500 }),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const notificationCategoryEnum = z.enum([
+  "breakthrough_discovery",
+  "new_treatment_option",
+  "clinical_trial_match",
+  "prediction_validation",
+  "knowledge_milestone",
+  "verification_complete",
+  "system_alert",
+  "weekly_digest"
+]);
+export type NotificationCategory = z.infer<typeof notificationCategoryEnum>;
+
+export const notificationPriorityEnum = z.enum([
+  "critical",
+  "high",
+  "medium",
+  "low"
+]);
+export type NotificationPriority = z.infer<typeof notificationPriorityEnum>;
+
+export const insertPrometheusNotificationSchema = createInsertSchema(prometheusNotifications, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+});
+
+export type InsertPrometheusNotification = z.infer<typeof insertPrometheusNotificationSchema>;
+export type PrometheusNotification = typeof prometheusNotifications.$inferSelect;
