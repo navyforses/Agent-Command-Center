@@ -68,6 +68,9 @@ import {
   searchHIEMedications,
   getDrugInteractions,
 } from "./services/openfdaApi";
+import { db } from "./db";
+import { eq, and, sql } from "drizzle-orm";
+import * as schema from "@shared/schema";
 
 const diagnosisUpload = multer({
   storage: multer.memoryStorage(),
@@ -3864,16 +3867,16 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
         confidence: node.confidence,
         description: node.description,
         metadata: node.metadata,
-        size: Math.max(20, Math.min(50, node.confidence * 50))
+        size: Math.max(20, Math.min(50, (node.confidence ?? 0) * 50))
       }));
 
       const graphEdges = edges.map(edge => ({
         id: edge.id.toString(),
-        source: edge.sourceNodeId.toString(),
-        target: edge.targetNodeId.toString(),
-        label: edge.relationshipType,
-        strength: edge.strength,
-        width: Math.max(1, edge.strength * 5)
+        source: (edge.sourceNodeId ?? 0).toString(),
+        target: (edge.targetNodeId ?? 0).toString(),
+        label: edge.relationType,
+        strength: edge.strength ?? 0,
+        width: Math.max(1, (edge.strength ?? 0) * 5)
       }));
 
       res.json({
@@ -3882,9 +3885,9 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
         stats: {
           totalNodes: nodes.length,
           totalEdges: edges.length,
-          nodeTypes: [...new Set(nodes.map(n => n.nodeType))],
+          nodeTypes: Array.from(new Set(nodes.map(n => n.nodeType))),
           averageConfidence: nodes.length > 0
-            ? nodes.reduce((sum, n) => sum + n.confidence, 0) / nodes.length
+            ? nodes.reduce((sum, n) => sum + (n.confidence ?? 0), 0) / nodes.length
             : 0
         }
       });
@@ -3943,16 +3946,19 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
 
       // Get related node details
       const relatedNodeIds = new Set([
-        ...outgoingEdges.map(e => e.targetNodeId),
-        ...incomingEdges.map(e => e.sourceNodeId)
+        ...outgoingEdges.map(e => e.targetNodeId).filter((id): id is number => id !== null),
+        ...incomingEdges.map(e => e.sourceNodeId).filter((id): id is number => id !== null)
       ]);
 
-      const relatedNodes = await db.query.prometheusKnowledgeNodes.findMany({
-        where: and(
-          eq(schema.prometheusKnowledgeNodes.prometheusId, prometheusState.id),
-          sql`${schema.prometheusKnowledgeNodes.id} IN (${[...relatedNodeIds].join(",")})`
-        )
-      });
+      const relatedNodesArray = Array.from(relatedNodeIds);
+      const relatedNodes = relatedNodesArray.length > 0
+        ? await db.query.prometheusKnowledgeNodes.findMany({
+            where: and(
+              eq(schema.prometheusKnowledgeNodes.prometheusId, prometheusState.id),
+              sql`${schema.prometheusKnowledgeNodes.id} IN (${relatedNodesArray.join(",")})`
+            )
+          })
+        : [];
 
       // Get memories related to this concept
       const { findSimilarKnowledgeNodes } = await import("./prometheus/phase2");
