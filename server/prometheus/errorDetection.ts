@@ -19,6 +19,7 @@ import { eq, and, desc, sql, gte, lte, not } from "drizzle-orm";
 import {
   prometheusErrors,
   prometheusKnowledgeNodes,
+  prometheusKnowledgeEdges,
   prometheusMemory,
   prometheusLearningEvents,
   prometheusVerifications,
@@ -83,8 +84,8 @@ export async function detectContradictions(
   // Get all knowledge nodes with 'contradicts' relationships
   const contradictingEdges = await db.query.prometheusKnowledgeEdges.findMany({
     where: and(
-      eq(db.query.prometheusKnowledgeEdges.columns.prometheusId, prometheusId),
-      eq(db.query.prometheusKnowledgeEdges.columns.relationType, "contradicts")
+      eq(prometheusKnowledgeEdges.prometheusId, prometheusId),
+      eq(prometheusKnowledgeEdges.relationType, "contradicts")
     ),
   });
 

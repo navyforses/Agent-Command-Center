@@ -1383,3 +1383,606 @@ export const insertPrometheusNotificationSchema = createInsertSchema(prometheusN
 
 export type InsertPrometheusNotification = z.infer<typeof insertPrometheusNotificationSchema>;
 export type PrometheusNotification = typeof prometheusNotifications.$inferSelect;
+
+// ============================================================================
+// PROMETHEUS Phase 3: Collaborative Knowledge Tables
+// ============================================================================
+
+// Expert Credentials - Verified expert profiles
+export const prometheusExpertCredentials = pgTable("prometheus_expert_credentials", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  fullNameKa: varchar("full_name_ka", { length: 255 }),
+  title: varchar("title", { length: 100 }), // Dr., Prof., etc.
+  specialization: varchar("specialization", { length: 100 }).notNull(), // neurology, genetics, etc.
+  institution: varchar("institution", { length: 255 }),
+  institutionKa: varchar("institution_ka", { length: 255 }),
+  country: varchar("country", { length: 100 }),
+  credentials: jsonb("credentials"), // degrees, certifications
+  verificationStatus: varchar("verification_status", { length: 50 }).default("pending"), // pending, verified, rejected
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by", { length: 255 }),
+  expertiseAreas: text("expertise_areas").array(), // HIE, seizures, etc.
+  publicationsCount: integer("publications_count").default(0),
+  reviewCount: integer("review_count").default(0),
+  trustScore: real("trust_score").default(0.5), // 0-1 score based on review quality
+  isActive: boolean("is_active").default(true),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusExpertCredentialSchema = createInsertSchema(prometheusExpertCredentials, {
+  credentials: z.record(z.any()).nullable().optional(),
+  expertiseAreas: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusExpertCredential = z.infer<typeof insertPrometheusExpertCredentialSchema>;
+export type PrometheusExpertCredential = typeof prometheusExpertCredentials.$inferSelect;
+
+// Expert Reviews - Human expert verification of findings
+export const prometheusExpertReviews = pgTable("prometheus_expert_reviews", {
+  id: serial("id").primaryKey(),
+  expertId: integer("expert_id").references(() => prometheusExpertCredentials.id),
+  targetType: varchar("target_type", { length: 50 }).notNull(), // memory, knowledge_node, prediction, insight
+  targetId: integer("target_id").notNull(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  reviewType: varchar("review_type", { length: 50 }).notNull(), // verification, correction, enhancement, rejection
+  verdict: varchar("verdict", { length: 50 }).notNull(), // verified, partially_verified, needs_revision, rejected
+  confidenceAdjustment: real("confidence_adjustment"), // -1 to +1 adjustment to apply
+  originalContent: text("original_content"),
+  suggestedContent: text("suggested_content"),
+  suggestedContentKa: text("suggested_content_ka"),
+  reasoning: text("reasoning").notNull(),
+  reasoningKa: text("reasoning_ka"),
+  evidenceLinks: text("evidence_links").array(),
+  clinicalRelevance: varchar("clinical_relevance", { length: 50 }), // high, medium, low, none
+  safetyImplications: varchar("safety_implications", { length: 50 }), // critical, important, minor, none
+  isApplied: boolean("is_applied").default(false),
+  appliedAt: timestamp("applied_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusExpertReviewSchema = createInsertSchema(prometheusExpertReviews, {
+  evidenceLinks: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusExpertReview = z.infer<typeof insertPrometheusExpertReviewSchema>;
+export type PrometheusExpertReview = typeof prometheusExpertReviews.$inferSelect;
+
+// Shared Knowledge - Anonymized knowledge for community sharing
+export const prometheusSharedKnowledge = pgTable("prometheus_shared_knowledge", {
+  id: serial("id").primaryKey(),
+  sourcePrometheusId: integer("source_prometheus_id").references(() => prometheusState.id),
+  knowledgeType: varchar("knowledge_type", { length: 50 }).notNull(), // treatment_insight, research_finding, pattern, protocol
+  category: varchar("category", { length: 100 }).notNull(), // HIE, seizures, therapy, etc.
+  title: text("title").notNull(),
+  titleKa: text("title_ka"),
+  content: text("content").notNull(),
+  contentKa: text("content_ka"),
+  anonymizedContext: text("anonymized_context"), // Stripped of identifying info
+  confidenceLevel: real("confidence_level").notNull(),
+  verificationStatus: varchar("verification_status", { length: 50 }).default("unverified"), // unverified, community_verified, expert_verified
+  expertVerificationCount: integer("expert_verification_count").default(0),
+  communityVoteScore: integer("community_vote_score").default(0),
+  upvotes: integer("upvotes").default(0),
+  downvotes: integer("downvotes").default(0),
+  viewCount: integer("view_count").default(0),
+  citationCount: integer("citation_count").default(0),
+  sourceReferences: text("source_references").array(),
+  tags: text("tags").array(),
+  applicableConditions: text("applicable_conditions").array(), // HIE, cerebral palsy, etc.
+  ageRangeMin: integer("age_range_min"), // In months
+  ageRangeMax: integer("age_range_max"),
+  isPublic: boolean("is_public").default(false),
+  publishedAt: timestamp("published_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusSharedKnowledgeSchema = createInsertSchema(prometheusSharedKnowledge, {
+  sourceReferences: z.array(z.string()).nullable().optional(),
+  tags: z.array(z.string()).nullable().optional(),
+  applicableConditions: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusSharedKnowledge = z.infer<typeof insertPrometheusSharedKnowledgeSchema>;
+export type PrometheusSharedKnowledge = typeof prometheusSharedKnowledge.$inferSelect;
+
+// Knowledge Contributions - User contributions to shared knowledge
+export const prometheusKnowledgeContributions = pgTable("prometheus_knowledge_contributions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  sharedKnowledgeId: integer("shared_knowledge_id").references(() => prometheusSharedKnowledge.id),
+  contributionType: varchar("contribution_type", { length: 50 }).notNull(), // original, enhancement, correction, translation
+  content: text("content").notNull(),
+  contentKa: text("content_ka"),
+  language: varchar("language", { length: 10 }).default("en"),
+  status: varchar("status", { length: 50 }).default("pending"), // pending, approved, rejected
+  reviewedBy: integer("reviewed_by").references(() => prometheusExpertCredentials.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusKnowledgeContributionSchema = createInsertSchema(prometheusKnowledgeContributions, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusKnowledgeContribution = z.infer<typeof insertPrometheusKnowledgeContributionSchema>;
+export type PrometheusKnowledgeContribution = typeof prometheusKnowledgeContributions.$inferSelect;
+
+// Knowledge Votes - Community voting on shared knowledge
+export const prometheusKnowledgeVotes = pgTable("prometheus_knowledge_votes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  sharedKnowledgeId: integer("shared_knowledge_id").references(() => prometheusSharedKnowledge.id).notNull(),
+  voteType: varchar("vote_type", { length: 20 }).notNull(), // upvote, downvote
+  reason: varchar("reason", { length: 100 }), // helpful, accurate, outdated, incorrect
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusKnowledgeVoteSchema = createInsertSchema(prometheusKnowledgeVotes, {}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusKnowledgeVote = z.infer<typeof insertPrometheusKnowledgeVoteSchema>;
+export type PrometheusKnowledgeVote = typeof prometheusKnowledgeVotes.$inferSelect;
+
+// Translations - Multi-language support for knowledge
+export const prometheusTranslations = pgTable("prometheus_translations", {
+  id: serial("id").primaryKey(),
+  sourceType: varchar("source_type", { length: 50 }).notNull(), // memory, knowledge_node, shared_knowledge, insight
+  sourceId: integer("source_id").notNull(),
+  sourceLanguage: varchar("source_language", { length: 10 }).notNull().default("en"),
+  targetLanguage: varchar("target_language", { length: 10 }).notNull(),
+  originalText: text("original_text").notNull(),
+  translatedText: text("translated_text").notNull(),
+  translationMethod: varchar("translation_method", { length: 50 }).notNull(), // ai_auto, human, human_verified
+  translatedBy: varchar("translated_by", { length: 255 }), // userId or "system"
+  verifiedBy: varchar("verified_by", { length: 255 }),
+  verifiedAt: timestamp("verified_at"),
+  qualityScore: real("quality_score"), // 0-1 translation quality
+  medicalTermsVerified: boolean("medical_terms_verified").default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusTranslationSchema = createInsertSchema(prometheusTranslations, {
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusTranslation = z.infer<typeof insertPrometheusTranslationSchema>;
+export type PrometheusTranslation = typeof prometheusTranslations.$inferSelect;
+
+// Clinical Integrations - External clinical system integrations
+export const prometheusClinicalIntegrations = pgTable("prometheus_clinical_integrations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  childId: integer("child_id").references(() => children.id),
+  integrationType: varchar("integration_type", { length: 50 }).notNull(), // ehr, lab_results, imaging, pharmacy
+  providerName: varchar("provider_name", { length: 255 }).notNull(),
+  providerType: varchar("provider_type", { length: 100 }), // hospital, clinic, lab, pharmacy
+  connectionStatus: varchar("connection_status", { length: 50 }).default("pending"), // pending, active, paused, disconnected, error
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncStatus: varchar("last_sync_status", { length: 50 }),
+  syncFrequency: varchar("sync_frequency", { length: 50 }).default("daily"), // realtime, hourly, daily, weekly, manual
+  dataTypes: text("data_types").array(), // medications, diagnoses, lab_results, etc.
+  encryptionKey: text("encryption_key"), // For secure data transmission
+  apiEndpoint: varchar("api_endpoint", { length: 500 }),
+  credentials: jsonb("credentials"), // Encrypted credentials
+  consentGiven: boolean("consent_given").default(false),
+  consentGivenAt: timestamp("consent_given_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusClinicalIntegrationSchema = createInsertSchema(prometheusClinicalIntegrations, {
+  dataTypes: z.array(z.string()).nullable().optional(),
+  credentials: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusClinicalIntegration = z.infer<typeof insertPrometheusClinicalIntegrationSchema>;
+export type PrometheusClinicalIntegration = typeof prometheusClinicalIntegrations.$inferSelect;
+
+// Clinical Data Imports - Log of imported clinical data
+export const prometheusClinicalDataImports = pgTable("prometheus_clinical_data_imports", {
+  id: serial("id").primaryKey(),
+  integrationId: integer("integration_id").references(() => prometheusClinicalIntegrations.id),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  importType: varchar("import_type", { length: 50 }).notNull(), // full, incremental, manual
+  dataType: varchar("data_type", { length: 100 }).notNull(), // medication, lab_result, diagnosis, etc.
+  recordCount: integer("record_count").default(0),
+  processedCount: integer("processed_count").default(0),
+  errorCount: integer("error_count").default(0),
+  status: varchar("status", { length: 50 }).default("pending"), // pending, processing, completed, failed
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  errorLog: text("error_log"),
+  memoriesCreated: integer("memories_created").default(0),
+  knowledgeNodesCreated: integer("knowledge_nodes_created").default(0),
+  insights: jsonb("insights"), // AI-generated insights from imported data
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusClinicalDataImportSchema = createInsertSchema(prometheusClinicalDataImports, {
+  insights: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusClinicalDataImport = z.infer<typeof insertPrometheusClinicalDataImportSchema>;
+export type PrometheusClinicalDataImport = typeof prometheusClinicalDataImports.$inferSelect;
+
+// ============================================================================
+// PROMETHEUS Phase 4: Full Autonomy Tables
+// ============================================================================
+
+// Research Priorities - Self-directed research agenda
+export const prometheusResearchPriorities = pgTable("prometheus_research_priorities", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  topic: text("topic").notNull(),
+  topicKa: text("topic_ka"),
+  description: text("description"),
+  descriptionKa: text("description_ka"),
+  priorityScore: real("priority_score").notNull().default(0.5), // 0-1, auto-calculated
+  urgency: varchar("urgency", { length: 20 }).default("medium"), // critical, high, medium, low
+  relevanceToChild: real("relevance_to_child").default(0.5), // How relevant to this child's condition
+  potentialImpact: varchar("potential_impact", { length: 50 }), // breakthrough, significant, moderate, minor
+  researchType: varchar("research_type", { length: 50 }).notNull(), // treatment, mechanism, prevention, symptom_management, quality_of_life
+  keywords: text("keywords").array(),
+  relatedConditions: text("related_conditions").array(),
+  suggestedSources: text("suggested_sources").array(), // pubmed, clinicaltrials, etc.
+  estimatedResearchTime: integer("estimated_research_time"), // hours
+  status: varchar("status", { length: 50 }).default("pending"), // pending, in_progress, completed, paused, archived
+  completedAt: timestamp("completed_at"),
+  findings: text("findings"),
+  findingsKa: text("findings_ka"),
+  linkedHypotheses: integer("linked_hypotheses").array(), // IDs of generated hypotheses
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusResearchPrioritySchema = createInsertSchema(prometheusResearchPriorities, {
+  keywords: z.array(z.string()).nullable().optional(),
+  relatedConditions: z.array(z.string()).nullable().optional(),
+  suggestedSources: z.array(z.string()).nullable().optional(),
+  linkedHypotheses: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusResearchPriority = z.infer<typeof insertPrometheusResearchPrioritySchema>;
+export type PrometheusResearchPriority = typeof prometheusResearchPriorities.$inferSelect;
+
+// Hypotheses - Auto-generated research hypotheses
+export const prometheusHypotheses = pgTable("prometheus_hypotheses", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  title: text("title").notNull(),
+  titleKa: text("title_ka"),
+  hypothesis: text("hypothesis").notNull(),
+  hypothesisKa: text("hypothesis_ka"),
+  rationale: text("rationale").notNull(), // Why this hypothesis was generated
+  rationaleKa: text("rationale_ka"),
+  hypothesisType: varchar("hypothesis_type", { length: 50 }).notNull(), // treatment_effect, causal, correlational, mechanistic, predictive
+  confidence: real("confidence").notNull().default(0.5),
+  noveltyScore: real("novelty_score").default(0.5), // How new/unique is this hypothesis
+  testability: varchar("testability", { length: 50 }), // easily_testable, requires_study, theoretical
+  supportingEvidence: jsonb("supporting_evidence"), // Array of evidence items
+  contradictingEvidence: jsonb("contradicting_evidence"),
+  relatedMemories: integer("related_memories").array(),
+  relatedNodes: integer("related_nodes").array(),
+  status: varchar("status", { length: 50 }).default("generated"), // generated, under_review, validated, invalidated, testing
+  validationStatus: varchar("validation_status", { length: 50 }), // pending, supported, partially_supported, refuted
+  validationNotes: text("validation_notes"),
+  expertReviewId: integer("expert_review_id"),
+  parentHypothesisId: integer("parent_hypothesis_id"), // If refined from another hypothesis
+  childHypotheses: integer("child_hypotheses").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusHypothesisSchema = createInsertSchema(prometheusHypotheses, {
+  supportingEvidence: z.array(z.object({
+    source: z.string(),
+    content: z.string(),
+    strength: z.number(),
+  })).nullable().optional(),
+  contradictingEvidence: z.array(z.object({
+    source: z.string(),
+    content: z.string(),
+    strength: z.number(),
+  })).nullable().optional(),
+  relatedMemories: z.array(z.number()).nullable().optional(),
+  relatedNodes: z.array(z.number()).nullable().optional(),
+  childHypotheses: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusHypothesis = z.infer<typeof insertPrometheusHypothesisSchema>;
+export type PrometheusHypothesis = typeof prometheusHypotheses.$inferSelect;
+
+// Treatment Recommendations - AI-generated treatment suggestions
+export const prometheusTreatmentRecommendations = pgTable("prometheus_treatment_recommendations", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  childId: integer("child_id").references(() => children.id),
+  treatmentName: text("treatment_name").notNull(),
+  treatmentNameKa: text("treatment_name_ka"),
+  treatmentType: varchar("treatment_type", { length: 50 }).notNull(), // therapy, medication, intervention, lifestyle, supplement, device
+  description: text("description").notNull(),
+  descriptionKa: text("description_ka"),
+  rationale: text("rationale").notNull(), // Why this is recommended
+  rationaleKa: text("rationale_ka"),
+  expectedBenefits: text("expected_benefits").array(),
+  expectedBenefitsKa: text("expected_benefits_ka").array(),
+  potentialRisks: text("potential_risks").array(),
+  potentialRisksKa: text("potential_risks_ka").array(),
+  confidenceScore: real("confidence_score").notNull().default(0.5),
+  evidenceLevel: varchar("evidence_level", { length: 50 }), // strong, moderate, limited, theoretical, anecdotal
+  evidenceSources: jsonb("evidence_sources"), // Array of sources with links
+  applicabilityScore: real("applicability_score").default(0.5), // How applicable to this specific child
+  urgency: varchar("urgency", { length: 20 }).default("medium"),
+  timeframe: varchar("timeframe", { length: 50 }), // immediate, short_term, long_term, ongoing
+  prerequisites: text("prerequisites").array(), // What needs to happen first
+  contraindications: text("contraindications").array(),
+  interactionWarnings: text("interaction_warnings").array(), // Drug/therapy interactions
+  costEstimate: varchar("cost_estimate", { length: 50 }), // low, moderate, high, very_high
+  availability: varchar("availability", { length: 50 }), // widely_available, specialized, experimental, research_only
+  status: varchar("status", { length: 50 }).default("suggested"), // suggested, under_review, approved, rejected, implemented, completed
+  reviewedBy: varchar("reviewed_by", { length: 255 }), // User or expert who reviewed
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  implementedAt: timestamp("implemented_at"),
+  outcomeTrackingId: integer("outcome_tracking_id"),
+  relatedHypotheses: integer("related_hypotheses").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusTreatmentRecommendationSchema = createInsertSchema(prometheusTreatmentRecommendations, {
+  expectedBenefits: z.array(z.string()).nullable().optional(),
+  expectedBenefitsKa: z.array(z.string()).nullable().optional(),
+  potentialRisks: z.array(z.string()).nullable().optional(),
+  potentialRisksKa: z.array(z.string()).nullable().optional(),
+  evidenceSources: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    type: z.string(),
+    reliability: z.number(),
+  })).nullable().optional(),
+  prerequisites: z.array(z.string()).nullable().optional(),
+  contraindications: z.array(z.string()).nullable().optional(),
+  interactionWarnings: z.array(z.string()).nullable().optional(),
+  relatedHypotheses: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusTreatmentRecommendation = z.infer<typeof insertPrometheusTreatmentRecommendationSchema>;
+export type PrometheusTreatmentRecommendation = typeof prometheusTreatmentRecommendations.$inferSelect;
+
+// Outcome Tracking - Track results of recommendations
+export const prometheusOutcomeTracking = pgTable("prometheus_outcome_tracking", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  childId: integer("child_id").references(() => children.id),
+  recommendationId: integer("recommendation_id").references(() => prometheusTreatmentRecommendations.id),
+  trackingType: varchar("tracking_type", { length: 50 }).notNull(), // treatment, therapy, medication, milestone, symptom
+  targetOutcome: text("target_outcome").notNull(),
+  targetOutcomeKa: text("target_outcome_ka"),
+  baselineValue: text("baseline_value"), // Starting point measurement
+  targetValue: text("target_value"), // Goal to achieve
+  currentValue: text("current_value"), // Latest measurement
+  measurementUnit: varchar("measurement_unit", { length: 50 }),
+  measurementMethod: varchar("measurement_method", { length: 100 }), // How outcome is measured
+  frequency: varchar("frequency", { length: 50 }).default("weekly"), // daily, weekly, monthly
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  status: varchar("status", { length: 50 }).default("active"), // active, paused, completed, discontinued
+  overallProgress: varchar("overall_progress", { length: 50 }), // significant_improvement, moderate_improvement, minimal_change, decline
+  progressScore: real("progress_score"), // -1 to 1 (negative = decline)
+  sideEffects: text("side_effects").array(),
+  adjustmentsMade: jsonb("adjustments_made"), // History of changes
+  notes: text("notes"),
+  notesKa: text("notes_ka"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrometheusOutcomeTrackingSchema = createInsertSchema(prometheusOutcomeTracking, {
+  sideEffects: z.array(z.string()).nullable().optional(),
+  adjustmentsMade: z.array(z.object({
+    date: z.string(),
+    change: z.string(),
+    reason: z.string(),
+  })).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrometheusOutcomeTracking = z.infer<typeof insertPrometheusOutcomeTrackingSchema>;
+export type PrometheusOutcomeTracking = typeof prometheusOutcomeTracking.$inferSelect;
+
+// Outcome Measurements - Individual measurement records
+export const prometheusOutcomeMeasurements = pgTable("prometheus_outcome_measurements", {
+  id: serial("id").primaryKey(),
+  trackingId: integer("tracking_id").references(() => prometheusOutcomeTracking.id).notNull(),
+  value: text("value").notNull(),
+  numericValue: real("numeric_value"), // If applicable
+  measurementDate: timestamp("measurement_date").notNull(),
+  measuredBy: varchar("measured_by", { length: 255 }), // parent, therapist, doctor, self
+  context: text("context"), // Any relevant context
+  attachments: text("attachments").array(), // Links to files/images
+  verified: boolean("verified").default(false),
+  verifiedBy: varchar("verified_by", { length: 255 }),
+  notes: text("notes"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusOutcomeMeasurementSchema = createInsertSchema(prometheusOutcomeMeasurements, {
+  attachments: z.array(z.string()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusOutcomeMeasurement = z.infer<typeof insertPrometheusOutcomeMeasurementSchema>;
+export type PrometheusOutcomeMeasurement = typeof prometheusOutcomeMeasurements.$inferSelect;
+
+// Feedback Loops - Learning from outcomes
+export const prometheusFeedbackLoops = pgTable("prometheus_feedback_loops", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  sourceType: varchar("source_type", { length: 50 }).notNull(), // outcome, hypothesis, recommendation, prediction
+  sourceId: integer("source_id").notNull(),
+  feedbackType: varchar("feedback_type", { length: 50 }).notNull(), // validation, correction, reinforcement, contradiction
+  originalPrediction: text("original_prediction"),
+  actualOutcome: text("actual_outcome"),
+  accuracy: real("accuracy"), // 0-1 how accurate was the prediction
+  lesson: text("lesson").notNull(), // What was learned
+  lessonKa: text("lesson_ka"),
+  confidenceAdjustment: real("confidence_adjustment"), // How to adjust related confidence scores
+  affectedMemories: integer("affected_memories").array(),
+  affectedNodes: integer("affected_nodes").array(),
+  affectedHypotheses: integer("affected_hypotheses").array(),
+  actionTaken: varchar("action_taken", { length: 100 }), // updated_confidence, revised_hypothesis, new_insight, no_action
+  appliedAt: timestamp("applied_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusFeedbackLoopSchema = createInsertSchema(prometheusFeedbackLoops, {
+  affectedMemories: z.array(z.number()).nullable().optional(),
+  affectedNodes: z.array(z.number()).nullable().optional(),
+  affectedHypotheses: z.array(z.number()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusFeedbackLoop = z.infer<typeof insertPrometheusFeedbackLoopSchema>;
+export type PrometheusFeedbackLoop = typeof prometheusFeedbackLoops.$inferSelect;
+
+// Autonomous Actions Log - Track what Prometheus does autonomously
+export const prometheusAutonomousActions = pgTable("prometheus_autonomous_actions", {
+  id: serial("id").primaryKey(),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  actionType: varchar("action_type", { length: 50 }).notNull(), // research_initiated, hypothesis_generated, recommendation_created, confidence_updated, alert_sent
+  description: text("description").notNull(),
+  descriptionKa: text("description_ka"),
+  triggerReason: text("trigger_reason"), // What triggered this action
+  inputData: jsonb("input_data"), // What data was used
+  outputData: jsonb("output_data"), // What was produced
+  confidence: real("confidence"),
+  requiresReview: boolean("requires_review").default(false),
+  reviewedBy: varchar("reviewed_by", { length: 255 }),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewOutcome: varchar("review_outcome", { length: 50 }), // approved, modified, rejected
+  impactAssessment: varchar("impact_assessment", { length: 50 }), // high, medium, low
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusAutonomousActionSchema = createInsertSchema(prometheusAutonomousActions, {
+  inputData: z.record(z.any()).nullable().optional(),
+  outputData: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusAutonomousAction = z.infer<typeof insertPrometheusAutonomousActionSchema>;
+export type PrometheusAutonomousAction = typeof prometheusAutonomousActions.$inferSelect;
+
+// Phase 4: Predictions table for tracking and validating predictions
+export const prometheusPredictions = pgTable("prometheus_predictions", {
+  id: serial("id").primaryKey(),
+  childId: integer("child_id").notNull().references(() => children.id),
+  prometheusId: integer("prometheus_id").references(() => prometheusState.id),
+  predictionType: varchar("prediction_type", { length: 50 }).notNull(), // treatment_outcome, symptom_progression, intervention_success
+  prediction: jsonb("prediction").notNull(),
+  predictionKa: jsonb("prediction_ka"),
+  confidence: real("confidence").default(0.5),
+  predictionDate: timestamp("prediction_date").notNull(), // When the prediction should be evaluated
+  status: varchar("status", { length: 50 }).default("active"), // active, validated, invalidated
+  actualOutcome: text("actual_outcome"),
+  wasAccurate: boolean("was_accurate"),
+  validatedAt: timestamp("validated_at"),
+  relatedHypothesisId: integer("related_hypothesis_id").references(() => prometheusHypotheses.id),
+  relatedRecommendationId: integer("related_recommendation_id").references(() => prometheusTreatmentRecommendations.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPrometheusPredictionSchema = createInsertSchema(prometheusPredictions, {
+  prediction: z.record(z.any()).optional(),
+  predictionKa: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPrometheusPrediction = z.infer<typeof insertPrometheusPredictionSchema>;
+export type PrometheusPrediction = typeof prometheusPredictions.$inferSelect;

@@ -119,13 +119,13 @@ export async function extractAnonymousPatterns(
         description: `${treatment.label} shows effects on related conditions`,
         descriptionKa: treatment.labelKa ? `${treatment.labelKa} გავლენას ახდენს დაკავშირებულ მდგომარეობებზე` : undefined,
         frequency: 1,
-        confidence: treatment.confidence,
-        successRate: treatment.confidence / 100,
+        confidence: treatment.confidence ?? 50,
+        successRate: (treatment.confidence ?? 50) / 100,
         relevantDiagnoses: extractDiagnosesFromMetadata(treatment.metadata),
         metadata: {
           contributingCases: 1,
-          firstObserved: treatment.createdAt,
-          lastObserved: treatment.updatedAt,
+          firstObserved: treatment.createdAt ?? new Date(),
+          lastObserved: treatment.updatedAt ?? new Date(),
           validationCount: treatment.validationCount || 0
         }
       });
@@ -148,12 +148,12 @@ export async function extractAnonymousPatterns(
         patternType: "symptom_progression",
         description: `Symptom pattern: ${symptom.label}`,
         frequency: 1,
-        confidence: symptom.confidence,
+        confidence: symptom.confidence ?? 50,
         relevantDiagnoses: diagnosisNodes.map(d => d.label),
         metadata: {
           contributingCases: 1,
-          firstObserved: symptom.createdAt,
-          lastObserved: symptom.updatedAt,
+          firstObserved: symptom.createdAt ?? new Date(),
+          lastObserved: symptom.updatedAt ?? new Date(),
           validationCount: symptom.validationCount || 0
         }
       });
@@ -170,15 +170,15 @@ export async function extractAnonymousPatterns(
       patternId: `research_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       patternType: "research_insight",
       description: research.label,
-      descriptionKa: research.labelKa,
+      descriptionKa: research.labelKa ?? undefined,
       frequency: 1,
-      confidence: research.confidence,
+      confidence: research.confidence ?? 50,
       relevantDiagnoses: diagnosisNodes.map(d => d.label),
       embedding: research.embedding as number[] || undefined,
       metadata: {
         contributingCases: 1,
-        firstObserved: research.createdAt,
-        lastObserved: research.updatedAt,
+        firstObserved: research.createdAt ?? new Date(),
+        lastObserved: research.updatedAt ?? new Date(),
         validationCount: research.validationCount || 0
       }
     });
@@ -209,7 +209,7 @@ function extractDiagnosesFromMetadata(metadata: any): string[] {
     diagnoses.push(`HIE Grade ${metadata.hieGrade}`);
   }
 
-  return [...new Set(diagnoses)]; // Remove duplicates
+  return Array.from(new Set(diagnoses)); // Remove duplicates
 }
 
 // ============================================================================
@@ -297,10 +297,10 @@ async function aggregateSimilarPatterns(
         frequency: totalCases,
         confidence: avgConfidence,
         successRate: pattern.successRate,
-        relevantDiagnoses: [...new Set([
+        relevantDiagnoses: Array.from(new Set([
           ...pattern.relevantDiagnoses,
           ...similar.flatMap(s => s.relevantDiagnoses)
-        ])],
+        ])),
         embedding: pattern.embedding,
         metadata: {
           contributingCases: totalCases,

@@ -136,7 +136,7 @@ export async function updateMemoryEmbedding(memoryId: number): Promise<void> {
 
   await db.update(prometheusMemory)
     .set({
-      contentEmbedding: embedding,
+      embedding: embedding,
       updatedAt: new Date()
     })
     .where(eq(prometheusMemory.id, memoryId));
@@ -154,7 +154,7 @@ export async function updateMissingMemoryEmbeddings(
   const memoriesWithoutEmbeddings = await db.query.prometheusMemory.findMany({
     where: and(
       eq(prometheusMemory.prometheusId, prometheusId),
-      sql`${prometheusMemory.contentEmbedding} IS NULL`
+      sql`${prometheusMemory.embedding} IS NULL`
     ),
     limit: batchSize
   });
@@ -169,7 +169,7 @@ export async function updateMissingMemoryEmbeddings(
   for (let i = 0; i < memoriesWithoutEmbeddings.length; i++) {
     await db.update(prometheusMemory)
       .set({
-        contentEmbedding: embeddings[i],
+        embedding: embeddings[i],
         updatedAt: new Date()
       })
       .where(eq(prometheusMemory.id, memoriesWithoutEmbeddings[i].id));
@@ -198,7 +198,7 @@ export async function findSimilarMemories(
   const memories = await db.query.prometheusMemory.findMany({
     where: and(
       eq(prometheusMemory.prometheusId, prometheusId),
-      isNotNull(prometheusMemory.contentEmbedding)
+      isNotNull(prometheusMemory.embedding)
     )
   });
 
@@ -206,7 +206,7 @@ export async function findSimilarMemories(
   const results = memories
     .map(memory => ({
       memory,
-      similarity: cosineSimilarity(queryEmbedding, memory.contentEmbedding as number[])
+      similarity: cosineSimilarity(queryEmbedding, memory.embedding as number[])
     }))
     .filter(result => result.similarity >= threshold)
     .sort((a, b) => b.similarity - a.similarity)
@@ -503,7 +503,7 @@ export async function findPotentialDuplicates(
   const memories = await db.query.prometheusMemory.findMany({
     where: and(
       eq(prometheusMemory.prometheusId, prometheusId),
-      isNotNull(prometheusMemory.contentEmbedding)
+      isNotNull(prometheusMemory.embedding)
     )
   });
 
@@ -511,8 +511,8 @@ export async function findPotentialDuplicates(
   for (let i = 0; i < memories.length; i++) {
     for (let j = i + 1; j < memories.length; j++) {
       const similarity = cosineSimilarity(
-        memories[i].contentEmbedding as number[],
-        memories[j].contentEmbedding as number[]
+        memories[i].embedding as number[],
+        memories[j].embedding as number[]
       );
 
       if (similarity >= similarityThreshold) {

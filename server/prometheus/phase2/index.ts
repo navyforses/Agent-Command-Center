@@ -206,7 +206,7 @@ export async function getPhase2Status(
   const memoriesWithEmbed = await db.query.prometheusMemory.findMany({
     where: and(
       eq(prometheusMemory.prometheusId, prometheusId),
-      isNotNull(prometheusMemory.contentEmbedding)
+      isNotNull(prometheusMemory.embedding)
     )
   });
 

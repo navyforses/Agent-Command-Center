@@ -2585,12 +2585,60 @@ function determineKnowledgeType(insight: EvolutionInsight): string {
 
 function extractTitleFromContent(content: string): string {
   const firstSentence = content.split(/[.!?\n]/)[0]?.trim() || "";
-  
+
   if (firstSentence.length <= 100) {
     return firstSentence;
   }
-  
+
   return firstSentence.substring(0, 97) + "...";
+}
+
+/**
+ * Categorize an insight into knowledge type based on content analysis
+ */
+function categorizeInsight(insight: EvolutionInsight): AccumulatedKnowledgeType {
+  const content = (insight.contentEn || "").toLowerCase();
+  const phase = insight.phase || "";
+
+  // Check for hypothesis indicators
+  if (content.includes("hypothesis") || content.includes("theory") ||
+      content.includes("proposed") || content.includes("suggests that")) {
+    return "hypothesis";
+  }
+
+  // Check for treatment insights
+  if (content.includes("treatment") || content.includes("therapy") ||
+      content.includes("intervention") || content.includes("medication") ||
+      phase === "integrate") {
+    return "treatment_insight";
+  }
+
+  // Check for mechanism understanding
+  if (content.includes("mechanism") || content.includes("pathway") ||
+      content.includes("process") || content.includes("how")) {
+    return "mechanism";
+  }
+
+  // Check for pattern recognition
+  if (content.includes("pattern") || content.includes("correlation") ||
+      content.includes("trend") || content.includes("association")) {
+    return "pattern";
+  }
+
+  // Check for cross-disciplinary connections
+  if (content.includes("connection") || content.includes("link") ||
+      content.includes("relationship") || phase === "synthesize") {
+    return "connection";
+  }
+
+  // Check for predictions
+  if (content.includes("predict") || content.includes("expect") ||
+      content.includes("forecast") || content.includes("outcome")) {
+    return "prediction";
+  }
+
+  // Default to discovery for observe/analyze phases
+  return "discovery";
 }
 
 export async function startEvolutionCycle(
@@ -2701,12 +2749,15 @@ export async function completeCycleAndStartNew(cycleId: number): Promise<Evoluti
             contentEn: insight.contentEn,
             contentKa: insight.contentKa || null,
             confidence: insight.confidence || 70,
-            sourceCycleId: cycleId,
-            sourcePhase: insight.phase || "observe",
-            validatedCount: 0,
-            contradictedCount: 0,
-            isActive: true,
-            metadata: insight.metadata || {},
+            originCycleId: cycleId,
+            originInsightId: insight.id,
+            validationCount: 0,
+            contradictionCount: 0,
+            status: 'active',
+            metadata: {
+              ...((insight.metadata as Record<string, unknown>) || {}),
+              sourcePhase: insight.phase || "observe",
+            },
           });
         }
       } catch (error) {
