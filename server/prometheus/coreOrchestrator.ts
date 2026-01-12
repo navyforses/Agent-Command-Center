@@ -18,6 +18,7 @@ import {
   prometheusState,
   prometheusMemory,
   prometheusKnowledgeNodes,
+  prometheusKnowledgeEdges,
   prometheusLearningEvents,
   evolutionCycles,
   evolutionDailyRuns,
@@ -428,7 +429,7 @@ export async function getKnowledgeGraph(
 
   const dbNodes = await getKnowledgeNodes(prometheus.id, { limit: 200 });
   const dbEdges = await db.query.prometheusKnowledgeEdges.findMany({
-    where: eq(db.query.prometheusKnowledgeEdges.columns.prometheusId, prometheus.id),
+    where: eq(prometheusKnowledgeEdges.prometheusId, prometheus.id),
   });
 
   return {
