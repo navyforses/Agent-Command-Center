@@ -4530,5 +4530,510 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
+  // ============================================================================
+  // PROMETHEUS Phase 4: Full Autonomy API
+  // ============================================================================
+
+  // --- Research Priorities ---
+
+  // Get knowledge gaps for a child
+  app.get("/api/prometheus/:childId/research/gaps", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { researchPriorities } = await import("./prometheus/phase4");
+      const gaps = await researchPriorities.analyzeKnowledgeGaps(childId);
+
+      res.json(gaps);
+    } catch (error) {
+      console.error("Error analyzing knowledge gaps:", error);
+      res.status(500).json({ message: "Failed to analyze knowledge gaps" });
+    }
+  });
+
+  // Get research priorities
+  app.get("/api/prometheus/:childId/research/priorities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { researchPriorities } = await import("./prometheus/phase4");
+      const priorities = await researchPriorities.getResearchPriorities(childId);
+
+      res.json(priorities);
+    } catch (error) {
+      console.error("Error getting research priorities:", error);
+      res.status(500).json({ message: "Failed to get research priorities" });
+    }
+  });
+
+  // Create research priority from gap
+  app.post("/api/prometheus/:childId/research/priorities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { gap } = req.body;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { researchPriorities } = await import("./prometheus/phase4");
+      const priority = await researchPriorities.createResearchPriority(childId, gap);
+
+      res.json(priority);
+    } catch (error) {
+      console.error("Error creating research priority:", error);
+      res.status(500).json({ message: "Failed to create research priority" });
+    }
+  });
+
+  // Execute research for a priority
+  app.post("/api/prometheus/research/priorities/:priorityId/execute", isAuthenticated, async (req: any, res) => {
+    try {
+      const priorityId = parseInt(req.params.priorityId, 10);
+
+      const { researchPriorities } = await import("./prometheus/phase4");
+      const result = await researchPriorities.executeResearch(priorityId);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing research:", error);
+      res.status(500).json({ message: "Failed to execute research" });
+    }
+  });
+
+  // --- Hypothesis Generation ---
+
+  // Detect patterns for a child
+  app.get("/api/prometheus/:childId/hypotheses/patterns", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { hypothesisGenerator } = await import("./prometheus/phase4");
+      const patterns = await hypothesisGenerator.detectPatterns(childId);
+
+      res.json(patterns);
+    } catch (error) {
+      console.error("Error detecting patterns:", error);
+      res.status(500).json({ message: "Failed to detect patterns" });
+    }
+  });
+
+  // Get hypotheses for a child
+  app.get("/api/prometheus/:childId/hypotheses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const status = req.query.status as string | undefined;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { hypothesisGenerator } = await import("./prometheus/phase4");
+      const hypotheses = await hypothesisGenerator.getHypotheses(childId, status);
+
+      res.json(hypotheses);
+    } catch (error) {
+      console.error("Error getting hypotheses:", error);
+      res.status(500).json({ message: "Failed to get hypotheses" });
+    }
+  });
+
+  // Generate hypothesis
+  app.post("/api/prometheus/:childId/hypotheses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { observedPatterns, contextualFactors, existingKnowledge } = req.body;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { hypothesisGenerator } = await import("./prometheus/phase4");
+      const hypothesis = await hypothesisGenerator.generateHypothesis({
+        childId,
+        observedPatterns: observedPatterns || [],
+        contextualFactors: contextualFactors || [],
+        existingKnowledge: existingKnowledge || []
+      });
+
+      res.json(hypothesis);
+    } catch (error) {
+      console.error("Error generating hypothesis:", error);
+      res.status(500).json({ message: "Failed to generate hypothesis" });
+    }
+  });
+
+  // Validate hypothesis
+  app.post("/api/prometheus/hypotheses/:hypothesisId/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const hypothesisId = parseInt(req.params.hypothesisId, 10);
+      const { evidence } = req.body;
+
+      const { hypothesisGenerator } = await import("./prometheus/phase4");
+      const result = await hypothesisGenerator.validateHypothesis(hypothesisId, evidence || []);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating hypothesis:", error);
+      res.status(500).json({ message: "Failed to validate hypothesis" });
+    }
+  });
+
+  // --- Treatment Recommendations ---
+
+  // Get treatment recommendations for a child
+  app.get("/api/prometheus/:childId/treatments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const status = req.query.status as string | undefined;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { treatmentEngine } = await import("./prometheus/phase4");
+      const recommendations = await treatmentEngine.getRecommendations(childId, status);
+
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error getting treatment recommendations:", error);
+      res.status(500).json({ message: "Failed to get treatment recommendations" });
+    }
+  });
+
+  // Generate treatment recommendation
+  app.post("/api/prometheus/:childId/treatments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const { targetSymptoms, constraints, preferences } = req.body;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      // Get child data for context
+      const childData = await storage.getChild(childId, userId);
+      const recentObservations = await db.select()
+        .from(schema.prometheusMemory)
+        .where(and(
+          eq(schema.prometheusMemory.childId, childId),
+          eq(schema.prometheusMemory.memoryType, 'observation')
+        ))
+        .orderBy(desc(schema.prometheusMemory.createdAt))
+        .limit(20);
+
+      const { treatmentEngine } = await import("./prometheus/phase4");
+      const recommendation = await treatmentEngine.generateRecommendation({
+        childId,
+        childProfile: {
+          age: childData?.age || 0,
+          diagnoses: childData?.diagnoses || [],
+          currentTreatments: [],
+          sensitivities: [],
+          preferences: preferences || []
+        },
+        targetSymptoms: targetSymptoms || [],
+        constraints: constraints || [],
+        recentObservations: recentObservations.map(o => o.content || ''),
+        existingHypotheses: []
+      });
+
+      res.json(recommendation);
+    } catch (error) {
+      console.error("Error generating treatment recommendation:", error);
+      res.status(500).json({ message: "Failed to generate treatment recommendation" });
+    }
+  });
+
+  // Get treatment protocol
+  app.get("/api/prometheus/treatments/:recommendationId/protocol", isAuthenticated, async (req: any, res) => {
+    try {
+      const recommendationId = parseInt(req.params.recommendationId, 10);
+
+      const { treatmentEngine } = await import("./prometheus/phase4");
+      const protocol = await treatmentEngine.getProtocol(recommendationId);
+
+      res.json(protocol);
+    } catch (error) {
+      console.error("Error getting treatment protocol:", error);
+      res.status(500).json({ message: "Failed to get treatment protocol" });
+    }
+  });
+
+  // Start treatment with outcome tracking
+  app.post("/api/prometheus/treatments/:recommendationId/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const recommendationId = parseInt(req.params.recommendationId, 10);
+
+      const { treatmentEngine } = await import("./prometheus/phase4");
+      const result = await treatmentEngine.startTreatmentWithTracking(recommendationId);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error starting treatment:", error);
+      res.status(500).json({ message: "Failed to start treatment" });
+    }
+  });
+
+  // Update recommendation status
+  app.patch("/api/prometheus/treatments/:recommendationId", isAuthenticated, async (req: any, res) => {
+    try {
+      const recommendationId = parseInt(req.params.recommendationId, 10);
+      const { status, feedback } = req.body;
+
+      const { treatmentEngine } = await import("./prometheus/phase4");
+      const updated = await treatmentEngine.updateRecommendationStatus(recommendationId, status, feedback);
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating recommendation:", error);
+      res.status(500).json({ message: "Failed to update recommendation" });
+    }
+  });
+
+  // --- Outcome Tracking ---
+
+  // Initialize outcome tracking
+  app.post("/api/prometheus/:childId/outcomes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+      const config = req.body;
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { outcomeTracking } = await import("./prometheus/phase4");
+      const result = await outcomeTracking.initializeTracking({
+        childId,
+        ...config,
+        startDate: new Date(config.startDate || Date.now())
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error initializing outcome tracking:", error);
+      res.status(500).json({ message: "Failed to initialize outcome tracking" });
+    }
+  });
+
+  // Record measurement
+  app.post("/api/prometheus/outcomes/:trackingId/measurements", isAuthenticated, async (req: any, res) => {
+    try {
+      const trackingId = parseInt(req.params.trackingId, 10);
+      const { measurementType, value, unit, notes, measuredBy, confidence } = req.body;
+
+      const { outcomeTracking } = await import("./prometheus/phase4");
+      const result = await outcomeTracking.recordMeasurement({
+        trackingId,
+        measurementType,
+        value,
+        unit,
+        notes,
+        measuredBy: measuredBy || 'parent',
+        confidence: confidence || 0.8
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error recording measurement:", error);
+      res.status(500).json({ message: "Failed to record measurement" });
+    }
+  });
+
+  // Analyze outcomes
+  app.get("/api/prometheus/outcomes/:trackingId/analysis", isAuthenticated, async (req: any, res) => {
+    try {
+      const trackingId = parseInt(req.params.trackingId, 10);
+
+      const { outcomeTracking } = await import("./prometheus/phase4");
+      const analysis = await outcomeTracking.analyzeOutcomes(trackingId);
+
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error analyzing outcomes:", error);
+      res.status(500).json({ message: "Failed to analyze outcomes" });
+    }
+  });
+
+  // Complete tracking
+  app.post("/api/prometheus/outcomes/:trackingId/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const trackingId = parseInt(req.params.trackingId, 10);
+      const { reason } = req.body;
+
+      const { outcomeTracking } = await import("./prometheus/phase4");
+      const result = await outcomeTracking.completeTracking(trackingId, reason || 'completed');
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error completing tracking:", error);
+      res.status(500).json({ message: "Failed to complete tracking" });
+    }
+  });
+
+  // --- Feedback Loops ---
+
+  // Process pending feedback loops
+  app.post("/api/prometheus/feedback/process", isAuthenticated, async (req: any, res) => {
+    try {
+      const { feedbackProcessor } = await import("./prometheus/phase4");
+      const result = await feedbackProcessor.processPendingLoops();
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error processing feedback loops:", error);
+      res.status(500).json({ message: "Failed to process feedback loops" });
+    }
+  });
+
+  // Validate predictions
+  app.post("/api/prometheus/feedback/validate-predictions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { feedbackProcessor } = await import("./prometheus/phase4");
+      const result = await feedbackProcessor.validatePredictions();
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating predictions:", error);
+      res.status(500).json({ message: "Failed to validate predictions" });
+    }
+  });
+
+  // --- Autonomous Actions ---
+
+  // Get action statistics
+  app.get("/api/prometheus/actions/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const { autonomousActions } = await import("./prometheus/phase4");
+      const stats = await autonomousActions.getActionStatistics();
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting action statistics:", error);
+      res.status(500).json({ message: "Failed to get action statistics" });
+    }
+  });
+
+  // Execute pending actions
+  app.post("/api/prometheus/actions/execute", isAuthenticated, async (req: any, res) => {
+    try {
+      const { autonomousActions } = await import("./prometheus/phase4");
+      const result = await autonomousActions.executePendingActions();
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing actions:", error);
+      res.status(500).json({ message: "Failed to execute actions" });
+    }
+  });
+
+  // Approve action
+  app.post("/api/prometheus/actions/:actionId/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const actionId = parseInt(req.params.actionId, 10);
+
+      const { autonomousActions } = await import("./prometheus/phase4");
+      const success = await autonomousActions.approveAction(actionId, userId);
+
+      if (!success) {
+        return res.status(404).json({ message: "Action not found or not pending approval" });
+      }
+
+      res.json({ message: "Action approved" });
+    } catch (error) {
+      console.error("Error approving action:", error);
+      res.status(500).json({ message: "Failed to approve action" });
+    }
+  });
+
+  // Reject action
+  app.post("/api/prometheus/actions/:actionId/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const actionId = parseInt(req.params.actionId, 10);
+      const { reason } = req.body;
+
+      const { autonomousActions } = await import("./prometheus/phase4");
+      const success = await autonomousActions.rejectAction(actionId, userId, reason || 'Rejected by user');
+
+      if (!success) {
+        return res.status(404).json({ message: "Action not found or not pending approval" });
+      }
+
+      res.json({ message: "Action rejected" });
+    } catch (error) {
+      console.error("Error rejecting action:", error);
+      res.status(500).json({ message: "Failed to reject action" });
+    }
+  });
+
+  // --- Autonomous Cycle ---
+
+  // Run full autonomous cycle
+  app.post("/api/prometheus/:childId/autonomous-cycle", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const childId = parseInt(req.params.childId, 10);
+
+      const child = await storage.getChild(childId, userId);
+      if (!child) {
+        return res.status(404).json({ message: "Child not found" });
+      }
+
+      const { phase4Orchestrator } = await import("./prometheus/phase4");
+      const result = await phase4Orchestrator.runAutonomousCycle(childId);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error running autonomous cycle:", error);
+      res.status(500).json({ message: "Failed to run autonomous cycle" });
+    }
+  });
+
+  // Get system health
+  app.get("/api/prometheus/system-health", isAuthenticated, async (req: any, res) => {
+    try {
+      const { phase4Orchestrator } = await import("./prometheus/phase4");
+      const health = await phase4Orchestrator.getSystemHealth();
+
+      res.json(health);
+    } catch (error) {
+      console.error("Error getting system health:", error);
+      res.status(500).json({ message: "Failed to get system health" });
+    }
+  });
+
   return httpServer;
 }
