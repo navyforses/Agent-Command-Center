@@ -226,7 +226,7 @@ export async function syncMemoriesToPinecone(
 
   for (const memory of memories) {
     try {
-      let embedding = memory.contentEmbedding as number[] | null;
+      let embedding = memory.embedding as number[] | null;
 
       // Generate embedding if not exists
       if (!embedding) {
@@ -234,7 +234,7 @@ export async function syncMemoriesToPinecone(
 
         // Update in database
         await db.update(prometheusMemory)
-          .set({ contentEmbedding: embedding, updatedAt: new Date() })
+          .set({ embedding: embedding, updatedAt: new Date() })
           .where(eq(prometheusMemory.id, memory.id));
       }
 
@@ -242,14 +242,14 @@ export async function syncMemoriesToPinecone(
         id: `memory_${memory.id}`,
         values: embedding,
         metadata: {
-          prometheusId: memory.prometheusId,
+          prometheusId: memory.prometheusId ?? 0,
           type: "memory",
           sourceId: memory.id,
           content: memory.content.slice(0, 1000), // Limit metadata size
-          certaintyLevel: memory.certaintyLevel,
-          confidence: memory.confidence,
+          certaintyLevel: memory.certaintyLevel ?? 'hypothesis',
+          confidence: memory.confidence ?? 50,
           tags: memory.tags as string[] || [],
-          createdAt: memory.createdAt.toISOString()
+          createdAt: (memory.createdAt ?? new Date()).toISOString()
         }
       });
     } catch (error) {
@@ -299,14 +299,14 @@ export async function syncKnowledgeNodesToPinecone(
         id: `node_${node.id}`,
         values: embedding,
         metadata: {
-          prometheusId: node.prometheusId,
+          prometheusId: node.prometheusId ?? 0,
           type: "knowledge_node",
           sourceId: node.id,
           content: `${node.label}: ${node.description || ""}`.slice(0, 1000),
-          certaintyLevel: node.certaintyLevel,
-          confidence: node.confidence,
+          certaintyLevel: node.certaintyLevel ?? 'hypothesis',
+          confidence: node.confidence ?? 50,
           tags: [node.nodeType],
-          createdAt: node.createdAt.toISOString()
+          createdAt: (node.createdAt ?? new Date()).toISOString()
         }
       });
     } catch (error) {

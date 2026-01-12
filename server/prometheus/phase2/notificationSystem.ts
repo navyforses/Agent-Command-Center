@@ -379,7 +379,7 @@ export async function notifyBreakthroughDiscovery(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -427,7 +427,7 @@ export async function notifyNewTreatmentOption(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -471,7 +471,7 @@ export async function notifyClinicalTrialMatch(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -515,7 +515,7 @@ export async function notifyPredictionValidation(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -559,7 +559,7 @@ export async function notifyKnowledgeMilestone(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -599,7 +599,7 @@ export async function notifyErrorDetected(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -646,7 +646,7 @@ export async function notifyCrossChildInsight(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
@@ -688,7 +688,7 @@ export async function notifyVerificationComplete(
     where: eq(prometheusState.id, prometheusId)
   });
 
-  if (!prometheus) return null;
+  if (!prometheus || !prometheus.childId) return null;
 
   const child = await db.query.children.findFirst({
     where: eq(children.id, prometheus.childId)
