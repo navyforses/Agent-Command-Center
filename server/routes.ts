@@ -85,6 +85,53 @@ const diagnosisUpload = multer({
   },
 });
 
+// Helper function for evolution diagnostics
+function generateDiagnosticRecommendations(
+  activeCycle: any,
+  stuckRuns: any[],
+  aiConfig: Record<string, boolean>,
+  schedulerRunning: boolean
+): string[] {
+  const recommendations: string[] = [];
+
+  if (!schedulerRunning) {
+    recommendations.push("⚠️ Scheduler is NOT running. Server may have restarted. The scheduler should auto-start when server starts.");
+  }
+
+  if (!activeCycle) {
+    recommendations.push("📋 No active evolution cycle. Start a new cycle by uploading a diagnosis document in the Evolution page.");
+  } else {
+    if (activeCycle.status !== "active") {
+      recommendations.push(`📋 Cycle ${activeCycle.id} has status "${activeCycle.status}". May need to start a new cycle.`);
+    }
+
+    if (activeCycle.endDate && new Date(activeCycle.endDate) < new Date()) {
+      recommendations.push(`⏰ Cycle ${activeCycle.id} has expired (end date: ${activeCycle.endDate}). A new cycle should have been auto-started.`);
+    }
+  }
+
+  if (stuckRuns.length > 0) {
+    recommendations.push(`🔧 Found ${stuckRuns.length} stuck run(s). Use POST /api/evolution/fix-stuck to reset them.`);
+  }
+
+  const configuredApis = Object.entries(aiConfig).filter(([_, v]) => v).map(([k]) => k);
+  const missingApis = Object.entries(aiConfig).filter(([_, v]) => !v).map(([k]) => k);
+
+  if (missingApis.length > 0) {
+    recommendations.push(`🔑 Missing API keys: ${missingApis.join(", ")}. Some AI features may be limited.`);
+  }
+
+  if (configuredApis.length === 0) {
+    recommendations.push("❌ CRITICAL: No AI API keys configured. Evolution cannot generate insights!");
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push("✅ System appears healthy. If issues persist, try triggering a manual tick via POST /api/evolution/tick");
+  }
+
+  return recommendations;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -2710,6 +2757,124 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     } catch (error) {
       console.error("Error running evolution tick:", error);
       res.status(500).json({ message: "Failed to run evolution tick" });
+    }
+  });
+
+  // Diagnostic endpoint for evolution system status
+  app.get("/api/evolution/diagnostics", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { isSchedulerRunning } = await import("./evolutionScheduler");
+
+      // Get user's active cycle
+      const activeCycle = await storage.getActiveEvolutionCycle(userId);
+
+      // Get all active cycles in system
+      const allActiveCycles = await storage.getAllActiveEvolutionCycles();
+
+      // Get recent daily runs if user has active cycle
+      let recentRuns: any[] = [];
+      let runningRuns: any[] = [];
+      let stuckRuns: any[] = [];
+
+      if (activeCycle) {
+        const runs = await storage.getEvolutionDailyRuns(activeCycle.id);
+        recentRuns = runs.slice(0, 5);
+        runningRuns = runs.filter(r => r.status === "running");
+
+        // Check for stuck runs (running for more than 2 hours)
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        stuckRuns = runningRuns.filter(r => {
+          const startedAt = r.phaseStartedAt || r.createdAt;
+          return startedAt && new Date(startedAt) < twoHoursAgo;
+        });
+      }
+
+      // Check AI API configuration
+      const aiConfig = {
+        openai: !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        gemini: !!process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        anthropic: !!process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+        grok: !!process.env.XAI_API_KEY,
+      };
+
+      res.json({
+        schedulerRunning: isSchedulerRunning(),
+        serverTime: new Date().toISOString(),
+        userActiveCycle: activeCycle ? {
+          id: activeCycle.id,
+          status: activeCycle.status,
+          startDate: activeCycle.startDate,
+          endDate: activeCycle.endDate,
+          createdAt: activeCycle.createdAt,
+        } : null,
+        totalActiveCyclesInSystem: allActiveCycles.length,
+        recentRuns: recentRuns.map(r => ({
+          id: r.id,
+          runDate: r.runDate,
+          status: r.status,
+          currentPhase: r.currentPhase,
+          phasesCompleted: r.phasesCompleted,
+          phaseStartedAt: r.phaseStartedAt,
+        })),
+        runningRunsCount: runningRuns.length,
+        stuckRunsCount: stuckRuns.length,
+        stuckRuns: stuckRuns.map(r => ({
+          id: r.id,
+          runDate: r.runDate,
+          currentPhase: r.currentPhase,
+          phaseStartedAt: r.phaseStartedAt,
+        })),
+        aiConfigured: aiConfig,
+        recommendations: generateDiagnosticRecommendations(activeCycle, stuckRuns, aiConfig, isSchedulerRunning()),
+      });
+    } catch (error) {
+      console.error("Error running diagnostics:", error);
+      res.status(500).json({ message: "Failed to run diagnostics" });
+    }
+  });
+
+  // Fix stuck evolution runs
+  app.post("/api/evolution/fix-stuck", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const activeCycle = await storage.getActiveEvolutionCycle(userId);
+
+      if (!activeCycle) {
+        return res.status(404).json({ message: "No active cycle found" });
+      }
+
+      const runs = await storage.getEvolutionDailyRuns(activeCycle.id);
+      const runningRuns = runs.filter(r => r.status === "running");
+
+      let fixed = 0;
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+      for (const run of runningRuns) {
+        const startedAt = run.phaseStartedAt || run.createdAt;
+        if (startedAt && new Date(startedAt) < twoHoursAgo) {
+          // Mark stuck run as completed
+          await storage.updateEvolutionDailyRun(run.id, {
+            status: "completed",
+            completedAt: new Date(),
+          });
+          console.log(`[Evolution Fix] Fixed stuck run ${run.id} from ${run.runDate}`);
+          fixed++;
+        }
+      }
+
+      // Trigger a fresh tick
+      const { triggerManualTick } = await import("./evolutionScheduler");
+      const tickResult = await triggerManualTick();
+
+      res.json({
+        stuckRunsFixed: fixed,
+        tickResult,
+        message: fixed > 0 ? `Fixed ${fixed} stuck runs and triggered new tick` : "No stuck runs found, triggered tick anyway",
+      });
+    } catch (error) {
+      console.error("Error fixing stuck runs:", error);
+      res.status(500).json({ message: "Failed to fix stuck runs" });
     }
   });
 
