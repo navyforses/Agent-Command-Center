@@ -1776,9 +1776,21 @@ export async function executeEvolutionPhase(
   } catch (error) {
     console.error(`[Evolution Engine] Phase ${phase} failed:`, error);
 
-    await storage.updateEvolutionDailyRun(dailyRunId, {
-      status: "failed",
-    });
+    // Don't mark the entire run as failed - allow other phases to continue
+    // Instead, log the error and let the scheduler retry on next tick
+    const currentPhasesCompleted = dailyRun.phasesCompleted || [];
+
+    // Only mark as failed if this is a critical phase (observe) and it's the first attempt
+    // Otherwise, keep running to allow other phases to execute
+    if (phase === "observe" && currentPhasesCompleted.length === 0) {
+      console.log(`[Evolution Engine] Critical observe phase failed with no completed phases - marking run as failed`);
+      await storage.updateEvolutionDailyRun(dailyRunId, {
+        status: "failed",
+      });
+    } else {
+      console.log(`[Evolution Engine] Phase ${phase} failed but run continues with ${currentPhasesCompleted.length} completed phases`);
+      // Keep status as "running" so other phases can execute
+    }
 
     return {
       success: false,
@@ -1931,8 +1943,22 @@ export async function runEvolutionTick(): Promise<{
         console.log(`[Evolution Engine] Created new daily run ${dailyRun.id} for cycle ${cycle.id}`);
       }
 
-      if (dailyRun.status === "completed" || dailyRun.status === "failed") {
+      if (dailyRun.status === "completed") {
         continue;
+      }
+
+      // Recover failed runs that have partial progress - give them another chance
+      if (dailyRun.status === "failed") {
+        const completedPhaseCount = (dailyRun.phasesCompleted || []).length;
+        if (completedPhaseCount > 0) {
+          console.log(`[Evolution Engine] Recovering failed run ${dailyRun.id} with ${completedPhaseCount} completed phases`);
+          await storage.updateEvolutionDailyRun(dailyRun.id, {
+            status: "running",
+          });
+        } else {
+          // Completely failed run with no progress - skip and let scheduler generate placeholder report
+          continue;
+        }
       }
 
       const completedPhases = dailyRun.phasesCompleted || [];
