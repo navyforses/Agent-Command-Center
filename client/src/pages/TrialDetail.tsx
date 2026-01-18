@@ -84,7 +84,8 @@ export default function TrialDetail() {
 
   const translateMutation = useMutation({
     mutationFn: async (targetLang: string) => {
-      const res = await apiRequest("POST", `/api/trials/${trial?.id}/translate`, {
+      const translateId = trial?.id || trialId;
+      const res = await apiRequest("POST", `/api/trials/${translateId}/translate`, {
         language: targetLang,
       });
       return res.json();
@@ -96,7 +97,7 @@ export default function TrialDetail() {
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang);
-    if (lang !== "en" && trial?.id) {
+    if (lang !== "en" && (trial?.id || trialId)) {
       translateMutation.mutate(lang);
     }
   };
