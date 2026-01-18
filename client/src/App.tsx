@@ -35,6 +35,10 @@ const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const Evolution = lazy(() => import("@/pages/Evolution"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
+// Trial Navigator pages
+const TrialSearch = lazy(() => import("@/pages/TrialSearch"));
+const TrialDetail = lazy(() => import("@/pages/TrialDetail"));
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -52,6 +56,8 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/search" component={TrialSearch} />
+        <Route path="/trial/:id" component={TrialDetail} />
         <Route path="/child-profile" component={ChildrenList} />
         <Route path="/child/:id" component={ChildProfile} />
         <Route path="/documents" component={Documents} />

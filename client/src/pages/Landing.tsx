@@ -1,476 +1,398 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
-  Heart,
-  FileText,
-  Brain,
-  FlaskConical,
-  Mail,
-  Calendar,
-  Shield,
+  Search,
   Globe,
+  Languages,
+  Database,
+  Brain,
+  Shield,
   ArrowRight,
-  CheckCircle,
-  Star,
-  Lightbulb,
   Sparkles,
+  FlaskConical,
+  Users,
+  BarChart3,
+  Zap,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
-import { useQuery } from "@tanstack/react-query";
-import type { Testimonial, EvolutionReport, AccumulatedKnowledge } from "@shared/schema";
-import { format, parseISO } from "date-fns";
+import { useLocation } from "wouter";
+
+const registries = [
+  { name: "ClinicalTrials.gov", country: "USA", trials: "450K+" },
+  { name: "EU Clinical Trials Register", country: "Europe", trials: "45K+" },
+  { name: "WHO ICTRP", country: "Global", trials: "800K+" },
+  { name: "ISRCTN", country: "UK", trials: "25K+" },
+  { name: "ANZCTR", country: "Australia", trials: "20K+" },
+  { name: "Chinese CTR", country: "China", trials: "120K+" },
+  { name: "JPRN", country: "Japan", trials: "35K+" },
+  { name: "CTRI", country: "India", trials: "50K+" },
+  { name: "DRKS", country: "Germany", trials: "15K+" },
+  { name: "IRCT", country: "Iran", trials: "65K+" },
+];
 
 const features = [
   {
-    icon: FileText,
-    title: "Smart Document Management",
-    titleKa: "დოკუმენტების მართვა",
-    description: "Upload and organize medical records with automatic OCR text extraction",
-    descriptionKa: "სამედიცინო დოკუმენტების ატვირთვა და ორგანიზება OCR ტექნოლოგიით",
+    icon: Database,
+    title: "10+ International Registries",
+    titleKa: "10+ საერთაშორისო რეესტრი",
+    description: "Search across ClinicalTrials.gov, EU CTR, WHO ICTRP, and more from one unified platform",
+    descriptionKa: "მოძებნეთ ClinicalTrials.gov, EU CTR, WHO ICTRP და სხვა პლატფორმებზე ერთი ინტერფეისით",
+  },
+  {
+    icon: Languages,
+    title: "40+ Language Translations",
+    titleKa: "40+ ენაზე თარგმანი",
+    description: "AI-powered translations including Georgian, Ukrainian, and other underserved languages",
+    descriptionKa: "AI თარგმანები ქართულ, უკრაინულ და სხვა ენებზე",
   },
   {
     icon: Brain,
-    title: "AI-Powered Analysis",
-    titleKa: "AI ანალიზი",
-    description: "Get instant summaries of complex medical reports in plain language",
-    descriptionKa: "მიიღეთ რთული სამედიცინო დოკუმენტების მარტივი შეჯამება",
+    title: "Intelligent Matching",
+    titleKa: "ინტელექტუალური შესაბამება",
+    description: "PROMETHEUS AI analyzes your criteria and matches you with relevant trials worldwide",
+    descriptionKa: "PROMETHEUS AI აანალიზებს თქვენს კრიტერიუმებს და პოულობს შესაბამის კვლევებს",
   },
   {
-    icon: FlaskConical,
-    title: "Clinical Trial Matching",
-    titleKa: "კლინიკური კვლევები",
-    description: "Find and track clinical trials that match your child's condition",
-    descriptionKa: "იპოვეთ შესაბამისი კლინიკური კვლევები თქვენი შვილისთვის",
+    icon: BarChart3,
+    title: "Real-time Data",
+    titleKa: "რეალ-დროის მონაცემები",
+    description: "Live synchronization with global registries ensures you see the latest trials",
+    descriptionKa: "სინქრონიზაცია გლობალურ რეესტრებთან უზრუნველყოფს უახლეს მონაცემებს",
   },
   {
-    icon: Mail,
-    title: "Email Drafting",
-    titleKa: "ელ.ფოსტის შეტყობინებები",
-    description: "AI-assisted professional emails to healthcare providers",
-    descriptionKa: "AI-ით დაწერილი პროფესიონალური წერილები ექიმებისთვის",
+    icon: Shield,
+    title: "Trusted Sources",
+    titleKa: "სანდო წყაროები",
+    description: "All data comes directly from official government and institutional registries",
+    descriptionKa: "ყველა მონაცემი მოდის ოფიციალური სამთავრობო და ინსტიტუციური რეესტრებიდან",
   },
   {
-    icon: Calendar,
-    title: "Appointment Tracking",
-    titleKa: "ვიზიტების თვალყურის დევნება",
-    description: "Never miss a therapy session or medical appointment",
-    descriptionKa: "არასდროს გამოტოვოთ თერაპია ან სამედიცინო ვიზიტი",
-  },
-  {
-    icon: Globe,
-    title: "Multilingual Support",
-    titleKa: "მრავალენოვანი",
-    description: "Full support for English and Georgian languages",
-    descriptionKa: "სრული მხარდაჭერა ინგლისური და ქართული ენებისთვის",
+    icon: Users,
+    title: "Patient-Centric",
+    titleKa: "პაციენტზე ორიენტირებული",
+    description: "Designed for patients and caregivers seeking clinical trial opportunities",
+    descriptionKa: "შექმნილია პაციენტებისა და მზრუნველებისთვის, რომლებიც ეძებენ კლინიკურ კვლევებს",
   },
 ];
 
-const fallbackTestimonials = [
-  {
-    id: 0,
-    content: "This platform helped us understand our son's MRI results and find the right therapies.",
-    contentKa: "ეს პლატფორმა დაგვეხმარა გვესმოდა ჩვენი შვილის MRI შედეგები.",
-    authorName: "Nino M.",
-    authorRole: "Parent of 2-year-old with HIE",
-    authorRoleKa: "2 წლის HIE-ით დაავადებული ბავშვის დედა",
-    rating: 5,
-  },
-  {
-    id: 1,
-    content: "The AI assistant saved us hours of research and helped us communicate with specialists abroad.",
-    contentKa: "AI ასისტენტმა დაგვიზოგა საათობით კვლევა და დაგვეხმარა უცხოელ სპეციალისტებთან კომუნიკაციაში.",
-    authorName: "Giorgi K.",
-    authorRole: "Father of twins with HIE",
-    authorRoleKa: "HIE-ით დაავადებული ტყუპების მამა",
-    rating: 5,
-  },
+const stats = [
+  { value: "1M+", label: "Clinical Trials", labelKa: "კლინიკური კვლევა" },
+  { value: "190+", label: "Countries", labelKa: "ქვეყანა" },
+  { value: "40+", label: "Languages", labelKa: "ენა" },
+  { value: "10+", label: "Registries", labelKa: "რეესტრი" },
 ];
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5" data-testid="star-rating">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={`h-4 w-4 ${
-            star <= rating
-              ? "fill-yellow-400 text-yellow-400"
-              : "text-muted-foreground/30"
-          }`}
-        />
-      ))}
-    </div>
-  );
-}
 
 export default function Landing() {
   const { language, t } = useLanguage();
+  const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Helper function to parse JSON content if stored as string
-  const parseContent = (text: string | null | undefined): string | null => {
-    if (!text) return null;
-    // Check if text looks like JSON
-    if (text.trim().startsWith('{') || text.trim().startsWith('```json')) {
-      try {
-        // Remove markdown code block if present
-        const cleanJson = text.replace(/```json\s*|\s*```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
-        // Try to extract meaningful content from parsed JSON
-        return parsed.executiveSummary || parsed.summary || parsed.content || text;
-      } catch {
-        return text;
-      }
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setLocation(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
-    return text;
   };
-
-  // Helper function to clean title (remove personal info like child names)
-  const cleanTitle = (title: string | null | undefined): string | null => {
-    if (!title) return null;
-    // Remove patterns like "Child's", names, and personal references
-    let cleaned = title
-      .replace(/Child's\s+Child's\s+Report\s*-?\s*/gi, '')
-      .replace(/Child's\s+Report\s*-?\s*/gi, '')
-      .replace(/Child's\s*/gi, 'patient ')
-      .replace(/Hypoxic-Child's/gi, 'Hypoxic-Ischemic')
-      .replace(/\bChild's\b/gi, "patient's")
-      .replace(/^[\s-]+|[\s-]+$/g, '')
-      .trim();
-    // If title becomes empty or too short, return a generic title
-    if (!cleaned || cleaned.length < 5) {
-      return 'HIE Research Report';
-    }
-    return cleaned;
-  };
-
-  const { data: testimonials = [] } = useQuery<Testimonial[]>({
-    queryKey: ['/api/testimonials'],
-  });
-
-  // Evolution research data - PUBLIC endpoints (no auth required)
-  const { data: evolutionReports } = useQuery<EvolutionReport[]>({
-    queryKey: ["/api/public/evolution/reports"],
-  });
-
-  const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
-    queryKey: ["/api/public/evolution/knowledge"],
-  });
-
-  const displayTestimonials = testimonials.length > 0 ? testimonials : fallbackTestimonials;
-
-  // Get latest research discovery for narrative display
-  const latestReport = evolutionReports?.[0];
-  const latestKnowledge = accumulatedKnowledge?.find(k => k.status === "active" || k.status === "validated");
-  const hasResearchData = (evolutionReports && evolutionReports.length > 0) || (accumulatedKnowledge && accumulatedKnowledge.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-primary rounded-md">
-              <Heart className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold">HIE Command Center</span>
+            <FlaskConical className="h-8 w-8 text-primary" />
+            <span className="text-xl font-bold">Trial Navigator</span>
           </div>
+          <nav className="hidden md:flex items-center gap-6">
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              {language === "ka" ? "ფუნქციები" : "Features"}
+            </a>
+            <a href="#registries" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              {language === "ka" ? "რეესტრები" : "Registries"}
+            </a>
+            <a href="/evolution" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              PROMETHEUS
+            </a>
+          </nav>
           <div className="flex items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
-            <a href="/api/login">
-              <Button data-testid="button-login">{t("login")}</Button>
-            </a>
+            <Button variant="default" onClick={() => setLocation("/dashboard")} data-testid="button-dashboard">
+              {language === "ka" ? "პანელი" : "Dashboard"}
+            </Button>
           </div>
         </div>
       </header>
 
-      <main>
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-4xl text-center">
-            <Badge variant="secondary" className="mb-4">
-              <Shield className="h-3 w-3 mr-1" />
-              {language === "en" ? "Secure & Private" : "უსაფრთხო და კონფიდენციალური"}
-            </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-              {language === "en"
-                ? "Empower Your Child's Medical Journey"
-                : "მართეთ თქვენი შვილის სამედიცინო გზა"}
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              {language === "en"
-                ? "A comprehensive AI-powered platform designed for parents of children with Hypoxic-Ischemic Encephalopathy (HIE)"
-                : "AI-ზე დაფუძნებული პლატფორმა HIE-ით დაავადებული ბავშვების მშობლებისთვის"}
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <a href="/api/login">
-                <Button size="lg" className="gap-2" data-testid="button-get-started">
-                  {t("getStarted")}
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </a>
-              <Button size="lg" variant="outline" data-testid="button-learn-more">
-                {t("learnMore")}
+      <section className="relative overflow-hidden py-20 md:py-32">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="container relative mx-auto px-4 text-center">
+          <Badge variant="secondary" className="mb-6">
+            <Sparkles className="mr-1 h-3 w-3" />
+            {language === "ka" ? "AI-ით გაძლიერებული კვლევა" : "AI-Powered Research"}
+          </Badge>
+          <h1 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            {language === "ka" ? (
+              <>
+                იპოვეთ კლინიკური კვლევები
+                <br />
+                <span className="text-primary">მსოფლიოს მასშტაბით</span>
+              </>
+            ) : (
+              <>
+                Find Clinical Trials
+                <br />
+                <span className="text-primary">Across the Globe</span>
+              </>
+            )}
+          </h1>
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
+            {language === "ka"
+              ? "მოძებნეთ 1 მილიონზე მეტ კლინიკურ კვლევაზე 10+ საერთაშორისო რეესტრიდან. AI თარგმანი 40+ ენაზე, მათ შორის ქართულზე."
+              : "Search over 1 million clinical trials from 10+ international registries. AI translation in 40+ languages, including Georgian and other underserved languages."}
+          </p>
+
+          <form onSubmit={handleSearch} className="mx-auto mb-8 flex max-w-xl flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder={language === "ka" ? "მოძებნეთ დაავადება, მკურნალობა, მდებარეობა..." : "Search condition, treatment, location..."}
+                className="h-12 pl-10 text-base"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search"
+              />
+            </div>
+            <Button type="submit" size="lg" className="h-12" data-testid="button-search">
+              {language === "ka" ? "ძიება" : "Search Trials"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </form>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+            <span>{language === "ka" ? "პოპულარული:" : "Popular:"}</span>
+            {["Alzheimer's", "Cancer", "Diabetes", "Heart Disease", "COVID-19"].map((term) => (
+              <Button
+                key={term}
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => {
+                  setSearchQuery(term);
+                  setLocation(`/search?q=${encodeURIComponent(term)}`);
+                }}
+                data-testid={`button-popular-${term.toLowerCase().replace(/[^a-z0-9]/g, '')}`}
+              >
+                {term}
               </Button>
-            </div>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="py-16 px-4 bg-accent/30">
-          <div className="container mx-auto max-w-6xl">
-            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-              {language === "en" ? "Everything You Need in One Place" : "ყველაფერი ერთ ადგილას"}
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {features.map((feature, i) => (
-                <Card key={i} className="hover-elevate" data-testid={`feature-card-${i}`}>
-                  <CardContent className="p-6">
-                    <div className="p-3 bg-primary/10 rounded-md w-fit mb-4">
-                      <feature.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">
-                      {language === "en" ? feature.title : feature.titleKa}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "en" ? feature.description : feature.descriptionKa}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Research Results Section - Visible to Everyone */}
-        {hasResearchData && (
-          <section className="py-16 px-4">
-            <div className="container mx-auto max-w-4xl">
-              <div className="text-center mb-8">
-                <Badge variant="secondary" className="mb-4">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  {language === "en" ? "Live Research" : "მიმდინარე კვლევა"}
-                </Badge>
-                <h2 className="text-2xl md:text-3xl font-bold mb-4">
-                  {language === "en" ? "Today's Discovery" : "დღის აღმოჩენა"}
-                </h2>
-                <p className="text-muted-foreground max-w-2xl mx-auto">
-                  {language === "en"
-                    ? "Our AI continuously researches the latest developments in HIE treatment and therapy"
-                    : "ჩვენი AI მუდმივად იკვლევს HIE მკურნალობის უახლეს მიღწევებს"}
-                </p>
+      <section className="border-y bg-muted/30 py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-3xl font-bold text-primary md:text-4xl">{stat.value}</div>
+                <div className="text-sm text-muted-foreground">
+                  {language === "ka" ? stat.labelKa : stat.label}
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
-                <CardContent className="p-6 md:p-8">
-                  {/* Narrative Discovery */}
-                  {(() => {
-                    const rawText = latestReport
-                      ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
-                      : latestKnowledge
-                        ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
-                        : null;
-                    // Parse JSON content if needed
-                    const narrativeText = parseContent(rawText);
-
-                    const rawTitle = latestReport
-                      ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
-                      : latestKnowledge
-                        ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
-                        : null;
-                    // Clean title from personal info
-                    const narrativeTitle = cleanTitle(rawTitle);
-
-                    const narrativeDate = latestReport?.reportDate
-                      ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
-                      : latestKnowledge?.createdAt
-                        ? format(new Date(latestKnowledge.createdAt), "d MMM, yyyy")
-                        : null;
-
-                    if (!narrativeText) return null;
-
-                    return (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-primary/10 rounded-lg">
-                            <Brain className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            {narrativeTitle && (
-                              <h3 className="font-semibold text-lg">{narrativeTitle}</h3>
-                            )}
-                            {narrativeDate && (
-                              <p className="text-sm text-muted-foreground">{narrativeDate}</p>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-muted-foreground leading-relaxed">
-                          {narrativeText}
-                        </p>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Knowledge Stats */}
-                  {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
-                    <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-primary">
-                          {accumulatedKnowledge.filter(k => k.status === "validated").length}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {language === "en" ? "Validated" : "დადასტურებული"}
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">
-                          {accumulatedKnowledge.filter(k => k.status === "active").length}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {language === "en" ? "Active" : "აქტიური"}
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">
-                          {accumulatedKnowledge.length}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {language === "en" ? "Total Discoveries" : "სულ აღმოჩენები"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recent Findings */}
-                  {accumulatedKnowledge && accumulatedKnowledge.length > 1 && (
-                    <div className="mt-6 pt-6 border-t">
-                      <p className="text-sm font-medium mb-3">
-                        {language === "en" ? "Recent Findings" : "ბოლო აღმოჩენები"}
-                      </p>
-                      <div className="space-y-2">
-                        {accumulatedKnowledge
-                          .filter(k => k.status === "active" || k.status === "validated")
-                          .slice(0, 3)
-                          .map((knowledge) => {
-                            const rawTitle = language === "ka" && knowledge.titleKa
-                              ? knowledge.titleKa
-                              : knowledge.titleEn;
-                            // Clean personal info from findings titles
-                            const title = cleanTitle(rawTitle) || rawTitle;
-                            return (
-                              <div
-                                key={knowledge.id}
-                                className="flex items-center gap-2 p-2 bg-background/50 rounded-md"
-                              >
-                                <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0" />
-                                <span className="text-sm truncate">{title}</span>
-                                <Badge variant="outline" className="ml-auto text-xs shrink-0">
-                                  {knowledge.confidence ?? 50}%
-                                </Badge>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-6 text-center">
-                    <a href="/api/login">
-                      <Button variant="outline" className="gap-2">
-                        {language === "en" ? "View Full Research" : "სრული კვლევის ნახვა"}
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </a>
-                  </div>
+      <section id="features" className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">
+              {language === "ka" ? "რატომ Trial Navigator?" : "Why Trial Navigator?"}
+            </h2>
+            <p className="mx-auto max-w-2xl text-muted-foreground">
+              {language === "ka"
+                ? "ერთიანი პლატფორმა კლინიკური კვლევების მოსაძებნად მსოფლიოს ყველა კუთხიდან"
+                : "One unified platform to search clinical trials from every corner of the world"}
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature) => (
+              <Card key={feature.title} className="hover-elevate">
+                <CardContent className="p-6">
+                  <feature.icon className="mb-4 h-10 w-10 text-primary" />
+                  <h3 className="mb-2 text-lg font-semibold">
+                    {language === "ka" ? feature.titleKa : feature.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "ka" ? feature.descriptionKa : feature.description}
+                  </p>
                 </CardContent>
               </Card>
-            </div>
-          </section>
-        )}
-
-        <section className="py-16 px-4">
-          <div className="container mx-auto max-w-4xl">
-            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-              {language === "en" ? "Trusted by Families" : "ოჯახების ნდობა"}
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {displayTestimonials.map((testimonial, i) => (
-                <Card key={testimonial.id} data-testid={`testimonial-card-${testimonial.id}`}>
-                  <CardContent className="p-6">
-                    <div className="mb-3">
-                      <StarRating rating={testimonial.rating} />
-                    </div>
-                    <p className="text-muted-foreground mb-4 italic">
-                      "{language === "en" ? testimonial.content : (testimonial.contentKa || testimonial.content)}"
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-primary">
-                          {testimonial.authorName[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{testimonial.authorName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {language === "en" ? testimonial.authorRole : (testimonial.authorRoleKa || testimonial.authorRole)}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="py-16 px-4 bg-primary text-primary-foreground">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-6">
-              {language === "en"
-                ? "Start Managing Your Child's Care Today"
-                : "დაიწყეთ თქვენი შვილის მოვლის მართვა დღესვე"}
-            </h2>
-            <p className="text-lg mb-8 opacity-90">
-              {language === "en"
-                ? "Join hundreds of families who trust HIE Command Center"
-                : "შეუერთდით ასობით ოჯახს, რომლებიც ენდობიან HIE Command Center-ს"}
-            </p>
-            <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {[
-                language === "en" ? "Free to start" : "უფასოდ დაწყება",
-                language === "en" ? "No credit card required" : "საკრედიტო ბარათი არ სჭირდება",
-                language === "en" ? "HIPAA compliant" : "HIPAA შესაბამისი",
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm">{item}</span>
+      <section className="border-y bg-primary/5 py-20">
+        <div className="container mx-auto px-4">
+          <div className="grid gap-8 md:grid-cols-2 md:items-center">
+            <div>
+              <Badge variant="outline" className="mb-4">
+                <Languages className="mr-1 h-3 w-3" />
+                {language === "ka" ? "მრავალენოვანი" : "Multilingual"}
+              </Badge>
+              <h2 className="mb-4 text-3xl font-bold">
+                {language === "ka"
+                  ? "კლინიკური კვლევები თქვენს ენაზე"
+                  : "Clinical Trials in Your Language"}
+              </h2>
+              <p className="mb-6 text-muted-foreground">
+                {language === "ka"
+                  ? "ჩვენი AI თარგმანი აქცევს რთულ სამედიცინო ინფორმაციას გასაგებ ენაზე. მხარდაჭერილია 40+ ენა, მათ შორის ქართული, უკრაინული, და სხვა იშვიათი ენები."
+                  : "Our AI translation makes complex medical information accessible in your language. Support for 40+ languages including Georgian, Ukrainian, and other underserved languages."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["ქართული", "English", "Español", "Français", "Deutsch", "日本語", "中文", "العربية", "हिन्दी", "Português"].map((lang) => (
+                  <Badge key={lang} variant="secondary">{lang}</Badge>
+                ))}
+                <Badge variant="outline">+30 more</Badge>
+              </div>
+            </div>
+            <div className="relative">
+              <Card className="p-6">
+                <div className="mb-4 flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-primary" />
+                  <span className="font-medium">
+                    {language === "ka" ? "თარგმანის მაგალითი" : "Translation Example"}
+                  </span>
                 </div>
-              ))}
+                <div className="space-y-4">
+                  <div className="rounded-md bg-muted p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Original (English)</div>
+                    <p className="text-sm">
+                      A randomized, double-blind, placebo-controlled study to evaluate the efficacy and safety of drug X in patients with type 2 diabetes.
+                    </p>
+                  </div>
+                  <div className="flex justify-center">
+                    <Zap className="h-4 w-4 text-primary animate-pulse" />
+                  </div>
+                  <div className="rounded-md bg-primary/10 p-3 border border-primary/20">
+                    <div className="text-xs text-muted-foreground mb-1">ქართული (Georgian)</div>
+                    <p className="text-sm">
+                      რანდომიზებული, ორმაგი ბრმა, პლაცებო-კონტროლირებადი კვლევა მე-2 ტიპის დიაბეტის მქონე პაციენტებში X პრეპარატის ეფექტურობისა და უსაფრთხოების შესაფასებლად.
+                    </p>
+                  </div>
+                </div>
+              </Card>
             </div>
-            <a href="/api/login">
-              <Button size="lg" variant="secondary" className="gap-2" data-testid="button-cta-get-started">
-                {t("getStarted")}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
 
-      <footer className="py-8 px-4 border-t">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Heart className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">
-                HIE Parent Command Center
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {language === "en"
-                ? "Made with care for HIE families worldwide"
-                : "შექმნილია სიყვარულით HIE ოჯახებისთვის მთელ მსოფლიოში"}
+      <section id="registries" className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">
+              {language === "ka" ? "საერთაშორისო რეესტრები" : "International Registries"}
+            </h2>
+            <p className="mx-auto max-w-2xl text-muted-foreground">
+              {language === "ka"
+                ? "მოძებნეთ ყველა ძირითად კლინიკური კვლევების რეესტრში ერთდროულად"
+                : "Search all major clinical trial registries simultaneously"}
             </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            {registries.map((registry) => (
+              <Card key={registry.name} className="text-center hover-elevate">
+                <CardContent className="p-4">
+                  <Database className="mx-auto mb-2 h-8 w-8 text-primary/60" />
+                  <div className="font-medium text-sm">{registry.name}</div>
+                  <div className="text-xs text-muted-foreground">{registry.country}</div>
+                  <Badge variant="secondary" className="mt-2 text-xs">
+                    {registry.trials} trials
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t bg-muted/30 py-20">
+        <div className="container mx-auto px-4 text-center">
+          <div className="mx-auto max-w-2xl">
+            <Brain className="mx-auto mb-6 h-16 w-16 text-primary" />
+            <h2 className="mb-4 text-3xl font-bold">
+              {language === "ka" ? "PROMETHEUS-MIND" : "PROMETHEUS-MIND"}
+            </h2>
+            <p className="mb-6 text-muted-foreground">
+              {language === "ka"
+                ? "ჩვენი კოგნიტური ევოლუციის სისტემა სწავლობს და იხვეწება თქვენს საჭიროებებზე. PROMETHEUS აანალიზებს კლინიკური კვლევების მონაცემებს და გაძლევთ პერსონალიზებულ შეხედულებებს."
+                : "Our cognitive evolution system learns and improves based on your needs. PROMETHEUS analyzes clinical trial data and provides personalized insights."}
+            </p>
+            <Button onClick={() => setLocation("/evolution")} variant="outline" data-testid="button-prometheus">
+              {language === "ka" ? "გაიგეთ მეტი" : "Learn More"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="mb-4 text-3xl font-bold">
+            {language === "ka" ? "მზად ხართ დასაწყებად?" : "Ready to Get Started?"}
+          </h2>
+          <p className="mx-auto mb-8 max-w-xl text-muted-foreground">
+            {language === "ka"
+              ? "დაიწყეთ კლინიკური კვლევების ძიება უფასოდ. რეგისტრაცია არ არის საჭირო."
+              : "Start searching clinical trials for free. No registration required."}
+          </p>
+          <form onSubmit={handleSearch} className="mx-auto flex max-w-md flex-col gap-2 sm:flex-row">
+            <Input
+              type="text"
+              placeholder={language === "ka" ? "შეიყვანეთ დაავადება ან მკურნალობა" : "Enter a condition or treatment"}
+              className="h-12"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-search-bottom"
+            />
+            <Button type="submit" size="lg" className="h-12" data-testid="button-search-bottom">
+              <Search className="mr-2 h-4 w-4" />
+              {language === "ka" ? "ძიება" : "Search"}
+            </Button>
+          </form>
+        </div>
+      </section>
+
+      <footer className="border-t py-8">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 md:flex-row">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-primary" />
+            <span className="font-semibold">Trial Navigator</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {language === "ka"
+              ? "© 2026 Trial Navigator. ყველა უფლება დაცულია."
+              : "© 2026 Trial Navigator. All rights reserved."}
+          </p>
+          <div className="flex gap-4">
+            <a href="/evolution" className="text-sm text-muted-foreground hover:text-foreground">
+              PROMETHEUS
+            </a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
+              {language === "ka" ? "კონფიდენციალურობა" : "Privacy"}
+            </a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
+              {language === "ka" ? "პირობები" : "Terms"}
+            </a>
           </div>
         </div>
       </footer>
