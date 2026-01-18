@@ -77,7 +77,7 @@ export async function searchTrials(
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [trials, countResult] = await Promise.all([
+  let [trials, countResult] = await Promise.all([
     db
       .select()
       .from(clinicalTrials)
@@ -90,6 +90,52 @@ export async function searchTrials(
       .from(clinicalTrials)
       .where(whereClause),
   ]);
+
+  if (query && trials.length === 0 && page === 1) {
+    console.log(`[Trial Aggregator] No local results, fetching from ClinicalTrials.gov...`);
+    
+    try {
+      const apiResult = await clinicalTrialsGov.searchTrials(query, {
+        pageSize: Math.min(pageSize, 50),
+        status: params.status,
+      });
+
+      for (const study of apiResult.trials) {
+        try {
+          const trialData = clinicalTrialsGov.transformToDBFormat(study);
+          const existing = await db
+            .select()
+            .from(clinicalTrials)
+            .where(eq(clinicalTrials.nctNumber, trialData.nctNumber!))
+            .limit(1);
+
+          if (existing.length === 0) {
+            await db.insert(clinicalTrials).values(trialData as any);
+          }
+        } catch (err) {
+          console.error(`[Trial Aggregator] Error saving trial from API:`, err);
+        }
+      }
+
+      [trials, countResult] = await Promise.all([
+        db
+          .select()
+          .from(clinicalTrials)
+          .where(whereClause)
+          .orderBy(desc(clinicalTrials.relevanceScore), desc(clinicalTrials.updatedAt))
+          .limit(pageSize)
+          .offset(offset),
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(clinicalTrials)
+          .where(whereClause),
+      ]);
+
+      console.log(`[Trial Aggregator] Fetched ${apiResult.trials.length} trials from API, now have ${trials.length} local results`);
+    } catch (apiError) {
+      console.error(`[Trial Aggregator] API fetch error:`, apiError);
+    }
+  }
 
   const trialsWithTranslations = await Promise.all(
     trials.map(async (trial) => {
