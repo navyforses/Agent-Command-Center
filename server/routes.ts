@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import trialRoutes from "./trialRoutes";
 import {
   insertChildSchema,
   insertDocumentSchema,
@@ -90,6 +91,9 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
+
+  // Trial Navigator routes
+  app.use("/api", trialRoutes);
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
