@@ -3,18 +3,14 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
-  Baby,
-  Stethoscope,
-  Calendar,
-  Bot,
+  Search,
+  Bookmark,
+  Brain,
   Plus,
   X,
-  Zap,
-  Upload,
-  MessageSquare,
-  FileText,
-  Bell,
-  Search,
+  FlaskConical,
+  Globe,
+  Languages,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -23,7 +19,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
 
@@ -53,69 +48,43 @@ export const MobileBottomNav = memo(function MobileBottomNav() {
       href: "/",
     },
     {
-      icon: Baby,
-      label: language === "ka" ? "შვილი" : "Child",
-      href: "/child-profile",
+      icon: Search,
+      label: language === "ka" ? "ძიება" : "Search",
+      href: "/search",
     },
     {
-      icon: Stethoscope,
-      label: language === "ka" ? "თერაპია" : "Therapy",
-      href: "/therapy",
+      icon: Bookmark,
+      label: language === "ka" ? "შენახული" : "Saved",
+      href: "/saved",
     },
     {
-      icon: Calendar,
-      label: language === "ka" ? "განრიგი" : "Schedule",
-      href: "/calendar",
-    },
-    {
-      icon: Bot,
+      icon: Brain,
       label: "AI",
-      href: "/assistant",
+      href: "/evolution",
     },
   ];
 
   const quickActions: QuickAction[] = [
     {
-      icon: Zap,
-      label: language === "ka" ? "სწრაფი ჩანაწერი" : "Quick Log",
-      href: "/therapy",
-      color: "text-green-600",
-      bgColor: "bg-green-500/10",
-    },
-    {
-      icon: Calendar,
-      label: language === "ka" ? "ახალი ვიზიტი" : "New Appointment",
-      href: "/calendar",
+      icon: FlaskConical,
+      label: language === "ka" ? "ახალი ძიება" : "New Search",
+      href: "/search",
       color: "text-blue-600",
       bgColor: "bg-blue-500/10",
     },
     {
-      icon: Upload,
-      label: language === "ka" ? "დოკუმენტი" : "Upload Doc",
-      href: "/documents",
+      icon: Globe,
+      label: language === "ka" ? "რეესტრები" : "Registries",
+      href: "/registry/ctgov",
+      color: "text-green-600",
+      bgColor: "bg-green-500/10",
+    },
+    {
+      icon: Languages,
+      label: language === "ka" ? "თარგმანები" : "Translations",
+      href: "/glossary",
       color: "text-purple-600",
       bgColor: "bg-purple-500/10",
-    },
-    {
-      icon: MessageSquare,
-      label: language === "ka" ? "AI ჩატი" : "AI Chat",
-      href: "/assistant",
-      color: "text-orange-600",
-      bgColor: "bg-orange-500/10",
-    },
-    {
-      icon: Search,
-      label: language === "ka" ? "კვლევა" : "Research",
-      href: "/research",
-      color: "text-cyan-600",
-      bgColor: "bg-cyan-500/10",
-    },
-    {
-      icon: FileText,
-      label: language === "ka" ? "დოკუმენტები" : "Documents",
-      href: "/documents",
-      color: "text-amber-600",
-      bgColor: "bg-amber-500/10",
     },
   ];
 
@@ -131,183 +100,81 @@ export const MobileBottomNav = memo(function MobileBottomNav() {
 
   return (
     <>
-      {/* Backdrop overlay when sheet is open */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-40 md:hidden"
-            onClick={() => setIsOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t md:hidden"
-        role="navigation"
-        aria-label="Mobile navigation"
-      >
-        <div className="flex items-center justify-around h-16 px-1">
-          {/* Left nav items */}
-          {navItems.slice(0, 2).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "relative flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
-                isActive(item.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              )}
-              data-testid={`mobile-nav-${item.href.replace("/", "") || "home"}`}
-            >
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                className="relative"
-              >
-                <item.icon className={cn(
-                  "h-5 w-5 transition-all",
-                  isActive(item.href) && "h-6 w-6"
-                )} />
-                {/* Active indicator dot */}
-                {isActive(item.href) && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
+      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+        <div className="bg-background/95 backdrop-blur-lg border-t shadow-lg">
+          <nav className="flex items-center justify-around h-16 px-2">
+            {navItems.slice(0, 2).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-colors min-w-[60px]",
+                  isActive(item.href)
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
-              </motion.div>
-              <span className={cn(
-                "text-[10px] font-medium transition-all",
-                isActive(item.href) && "text-xs font-semibold"
-              )}>
-                {item.label}
-              </span>
-            </Link>
-          ))}
-
-          {/* Center Quick Action Button */}
-          <div className="flex items-center justify-center flex-1">
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger asChild>
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  className={cn(
-                    "flex items-center justify-center w-14 h-14 -mt-5 rounded-full shadow-lg transition-all duration-200",
-                    isOpen
-                      ? "bg-muted text-muted-foreground rotate-45"
-                      : "bg-primary text-primary-foreground"
-                  )}
-                  aria-label={language === "ka" ? "სწრაფი მოქმედება" : "Quick action"}
-                  data-testid="mobile-nav-quick-action"
-                >
-                  <Plus className="h-7 w-7 transition-transform duration-200" />
-                </motion.button>
-              </SheetTrigger>
-              <SheetContent
-                side="bottom"
-                className="rounded-t-3xl px-4 pb-8"
+                data-testid={`mobile-nav-${item.href.replace(/\//g, "-").slice(1) || "home"}`}
               >
-                <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-4" />
-                <SheetHeader className="mb-4">
-                  <SheetTitle className="text-center text-lg">
-                    {language === "ka" ? "სწრაფი მოქმედებები" : "Quick Actions"}
-                  </SheetTitle>
-                </SheetHeader>
+                <item.icon className={cn("h-5 w-5", isActive(item.href) && "text-primary")} />
+                <span className="text-xs font-medium">{item.label}</span>
+              </Link>
+            ))}
 
-                <div className="grid grid-cols-3 gap-3">
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={action.href + action.label}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => handleQuickAction(action.href)}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95",
-                        "hover:border-primary/30",
-                        action.bgColor
-                      )}
-                    >
-                      <div className={cn(
-                        "p-3 rounded-xl",
-                        action.bgColor,
-                        action.color
-                      )}>
-                        <action.icon className="h-6 w-6" />
-                      </div>
-                      <span className="text-xs font-medium text-center leading-tight">
-                        {action.label}
-                      </span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                {/* Cancel button */}
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  onClick={() => setIsOpen(false)}
-                  className="w-full mt-4 py-3 text-muted-foreground text-sm font-medium hover:text-foreground transition-colors"
-                >
-                  {language === "ka" ? "გაუქმება" : "Cancel"}
-                </motion.button>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Right nav items */}
-          {navItems.slice(2).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "relative flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
-                isActive(item.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              )}
-              data-testid={`mobile-nav-${item.href.replace("/", "")}`}
+            <button
+              onClick={() => setIsOpen(true)}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg -mt-6"
+              data-testid="mobile-nav-quick-actions"
             >
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                className="relative"
-              >
-                <item.icon className={cn(
-                  "h-5 w-5 transition-all",
-                  isActive(item.href) && "h-6 w-6"
-                )} />
-                {/* Active indicator dot */}
-                {isActive(item.href) && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg">
+                <Plus className="h-6 w-6" />
+              </div>
+            </button>
+
+            {navItems.slice(2).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-colors min-w-[60px]",
+                  isActive(item.href)
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
-              </motion.div>
-              <span className={cn(
-                "text-[10px] font-medium transition-all",
-                isActive(item.href) && "text-xs font-semibold"
-              )}>
-                {item.label}
-              </span>
-            </Link>
-          ))}
+                data-testid={`mobile-nav-${item.href.replace(/\//g, "-").slice(1) || "home"}`}
+              >
+                <item.icon className={cn("h-5 w-5", isActive(item.href) && "text-primary")} />
+                <span className="text-xs font-medium">{item.label}</span>
+              </Link>
+            ))}
+          </nav>
         </div>
+      </div>
 
-        {/* Safe area padding for devices with home indicator */}
-        <div className="h-safe-area-inset-bottom bg-background" />
-      </nav>
-
-      {/* Bottom padding spacer to prevent content from being hidden */}
-      <div className="h-20 md:hidden" />
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent side="bottom" className="h-auto rounded-t-3xl">
+          <SheetHeader className="text-left pb-4">
+            <SheetTitle>
+              {language === "ka" ? "სწრაფი მოქმედებები" : "Quick Actions"}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="grid grid-cols-3 gap-4 pb-6">
+            {quickActions.map((action) => (
+              <SheetClose asChild key={action.href}>
+                <button
+                  onClick={() => handleQuickAction(action.href)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl hover:bg-muted transition-colors"
+                  data-testid={`quick-action-${action.href.replace(/\//g, "-").slice(1)}`}
+                >
+                  <div className={cn("p-3 rounded-full", action.bgColor)}>
+                    <action.icon className={cn("h-6 w-6", action.color)} />
+                  </div>
+                  <span className="text-xs font-medium text-center">{action.label}</span>
+                </button>
+              </SheetClose>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 });
