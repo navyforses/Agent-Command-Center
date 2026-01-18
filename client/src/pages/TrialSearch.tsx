@@ -73,7 +73,7 @@ export default function TrialSearch() {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data, isLoading, isFetching } = useQuery<TrialSearchResponse>({
-    queryKey: ["/api/trials/search", activeQuery, page, filters],
+    queryKey: ["/api/trials/search", activeQuery, page, JSON.stringify(filters)],
     queryFn: async () => {
       const params = new URLSearchParams({
         q: activeQuery,
@@ -88,7 +88,6 @@ export default function TrialSearch() {
       if (!res.ok) throw new Error("Search failed");
       return res.json();
     },
-    enabled: !!activeQuery,
   });
 
   const handleSearch = (e: React.FormEvent) => {

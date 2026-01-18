@@ -79,14 +79,13 @@ export default function TrialDetail() {
 
   const translateMutation = useMutation({
     mutationFn: async (targetLang: string) => {
-      const res = await apiRequest("POST", "/api/translate", {
-        trialId: trial?.id,
-        targetLanguage: targetLang,
+      const res = await apiRequest("POST", `/api/trials/${trial?.id}/translate`, {
+        language: targetLang,
       });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trials", trialId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trials", trialId, selectedLanguage] });
     },
   });
 
