@@ -1,12 +1,20 @@
-# HIE Parent Command Center
+# Trial Navigator
 
 ## Overview
 
-The HIE Parent Command Center is a comprehensive medical management web application designed for parents of children with Hypoxic-Ischemic Encephalopathy (HIE). The platform provides AI-powered document analysis, therapy tracking, clinical trial matching, email communication assistance, and appointment scheduling - all within a bilingual (English/Georgian) interface. The application emphasizes trust, clarity, and accessibility while managing complex medical information in an empathetic, parent-friendly manner.
+Trial Navigator is a unified clinical trial search platform that aggregates data from international registries, provides AI-powered translation to 40+ languages (with focus on Georgian and other underserved languages), and offers intelligent trial matching. The platform transforms complex clinical trial information into accessible, multilingual content.
+
+**Key Features**:
+- Search across clinical trials from ClinicalTrials.gov (and architecture for 10+ registries)
+- AI-powered translation to Georgian and 40+ languages
+- PROMETHEUS-MIND cognitive evolution system for advanced insights
+- Public access to search and trial details (no login required)
+- Saved trials and preferences for authenticated users
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Primary languages: Georgian (ქართული) and English.
 
 ## System Architecture
 
@@ -14,7 +22,6 @@ Preferred communication style: Simple, everyday language.
 
 **Framework**: React with TypeScript using Wouter for client-side routing
 - Component library based on shadcn/ui (Radix UI primitives with Tailwind CSS)
-- Material Design 3 principles adapted for healthcare applications
 - Responsive design with mobile-first approach (768px breakpoint)
 - Theme system supporting light/dark modes with CSS variables
 - Bilingual support (English/Georgian) via React Context
@@ -24,124 +31,105 @@ Preferred communication style: Simple, everyday language.
 - React Context for global state (theme, language preferences)
 - Local component state for UI interactions
 
-**Styling System**:
-- Tailwind CSS with custom design tokens
-- Typography: Inter for UI, JetBrains Mono for medical data
-- Spacing primitives based on Tailwind's 8px grid system
-- Custom CSS variables for theme colors and shadows
-- Hover and active elevation effects for interactive elements
+**Trial Navigator Pages**:
+- `/` - Landing page with search hero
+- `/search?q={query}` - Trial search results with filters (public)
+- `/trial/:id` - Trial detail with translations (public, supports NCT numbers)
+- `/prometheus` - PROMETHEUS-MIND cognitive system (authenticated)
+- `/dashboard` - User dashboard with saved trials (authenticated)
 
 ### Backend Architecture
 
 **Server Framework**: Express.js with TypeScript
 - Node.js HTTP server with Vite middleware in development
 - RESTful API architecture (routes prefixed with `/api`)
-- Session-based architecture support via express-session
+- Session-based authentication via Replit Auth
 - Static file serving for production builds
 
-**Build System**:
-- Vite for frontend bundling and development server
-- esbuild for server-side bundling with selective dependency bundling
-- Hot Module Replacement (HMR) in development
-- TypeScript compilation with path aliases (`@/`, `@shared/`, `@assets/`)
-
-**Storage Layer**:
-- Interface-based storage abstraction (`IStorage`)
-- In-memory storage implementation for development (`MemStorage`)
-- Designed to swap with database implementations (Drizzle ORM integration planned)
+**Trial API Endpoints**:
+- `GET /api/trials/search?q={query}&phase={phase}&status={status}` - Search trials
+- `GET /api/trials/:id` - Get trial by numeric ID
+- `GET /api/trials/nct/:nctNumber` - Get trial by NCT number
+- `POST /api/trials/:id/translate` - Translate trial to target language
 
 ### Data Storage
 
-**Database**: PostgreSQL (configured but not yet fully integrated)
-- Drizzle ORM for type-safe database queries
-- Schema defined in `shared/schema.ts` with Zod validation
-- Migration system via drizzle-kit
-- Connection pooling with node-postgres
+**Database**: PostgreSQL with Drizzle ORM
+- Clinical trials table with JSONB for locations and eligibility
+- Translations table for caching AI translations
+- Trial sources for registry tracking
+- Saved trials for user bookmarks
 
-**Current Schema**:
-- Users table with UUID primary keys
-- Schema designed to be extended for child profiles, documents, therapies, appointments
+**Clinical Trial Schema**:
+```typescript
+clinicalTrials: {
+  id: serial primary key,
+  nctNumber: varchar unique,
+  titleEn: text,
+  briefSummaryEn: text,
+  phase: varchar,
+  status: varchar,
+  sponsorName: varchar,
+  locations: jsonb,
+  eligibilityCriteria: jsonb,
+  gender: varchar,
+  minimumAge: varchar,
+  maximumAge: varchar,
+  startDate: date,
+  completionDate: date,
+}
+```
 
-**Future Storage Needs**:
-- Document metadata and file references (likely cloud storage like Cloudinary)
-- Medical records with OCR-extracted text
-- Therapy session logs and progress notes
-- Clinical trial bookmarks and eligibility matches
-- Email drafts and communication history
-- Calendar events and appointments
+### Trial Aggregation Service
 
-### External Dependencies
+**Location**: `server/services/trialAggregator.ts`
+- Fetches from ClinicalTrials.gov API v2 when local database is empty
+- Deduplication by NCT number
+- Caching with configurable TTL
+- Architecture prepared for additional registries (EU CTR, WHO ICTRP)
 
-**UI Components**: shadcn/ui component library
-- Radix UI primitives for accessible components
-- Custom variants via class-variance-authority
-- Full suite of form controls, dialogs, cards, navigation
+### Translation Service
 
-**Design System**:
-- Tailwind CSS for utility-first styling
-- Custom color system with HSL values for theme support
-- Google Fonts: Inter (primary), JetBrains Mono (monospace)
-
-**Planned AI Integration** (architecture prepared but not implemented):
-- OpenAI API for document analysis and chat assistance
-- Medical document OCR (Tesseract.js client-side)
-- PDF processing (pdf-parse)
-- Image processing (Sharp)
-
-**Planned External APIs** (routes prepared but not implemented):
-- ClinicalTrials.gov API for trial matching
-- PubMed E-utilities for medical research
-- Google Gmail API for email management
-- Google Calendar API for appointment scheduling
-- SendGrid for email delivery fallback
-
-**Development Tools**:
-- Replit-specific plugins (cartographer, dev-banner, runtime-error-modal)
-- TypeScript for type safety across full stack
-- ESM module system throughout
-
-### Authentication & Authorization
-
-**Current State**: Basic user schema defined but authentication not implemented
-- User model with username/password fields
-- Session storage configured via connect-pg-simple
-- Passport.js and passport-local dependencies installed
-
-**Design Intent**:
-- Session-based authentication (not JWT)
-- User accounts tied to parent/guardian profiles
-- Multi-child support per account
-- Role-based access if needed for healthcare provider collaboration
+**Location**: `server/services/trialTranslator.ts`
+- AI-powered translation using OpenAI GPT-4o
+- Medical terminology preservation
+- Translation caching in database
+- Supports 40+ languages with Georgian focus
 
 ### Key Architectural Decisions
 
 **Monorepo Structure**: Single repository with shared types
 - `/client` - React frontend with pages, components, contexts
-- `/server` - Express backend with routes, storage, database
+- `/server` - Express backend with routes, storage, services
 - `/shared` - Database schema and shared TypeScript types
-- Enables type safety across API boundaries
 
 **Component Organization**:
 - `/components/ui` - Base shadcn/ui components
-- `/components/dashboard` - Business logic components (cards, chat panels)
 - `/components/shared` - App-wide shared components (sidebar, theme toggle)
-- `/components/examples` - Isolated component examples for development
+- `/pages` - Route components (Landing, TrialSearch, TrialDetail)
 
-**Medical Data Focus**: Design patterns optimized for healthcare
-- Progressive disclosure of complex medical information
-- Sensitive handling of emotional medical contexts
-- Professional aesthetic with approachable language
-- Bilingual support for Georgian-speaking families
+**Public vs Authenticated Routes**:
+- Public: `/`, `/search`, `/trial/:id` - No login required
+- Authenticated: `/dashboard`, `/prometheus`, `/saved-trials`
 
-**AI-First Design**: Every major module includes AI assistance
-- Document upload with automatic analysis
-- Clinical trial eligibility matching
-- Email drafting assistance
-- Therapy recommendation insights
-- Natural language query interface
+### External Dependencies
 
-**Accessibility Considerations**:
-- Radix UI components provide ARIA attributes
-- Keyboard navigation support
-- Screen reader friendly component structure
-- High contrast theme support
+**API Integrations**:
+- ClinicalTrials.gov API v2 - Trial data source
+- OpenAI API - Translation and PROMETHEUS insights
+- Anthropic API - Multi-AI consensus (PROMETHEUS)
+- Google Gemini API - Multi-AI consensus (PROMETHEUS)
+
+**UI Components**: shadcn/ui component library
+- Radix UI primitives for accessible components
+- Lucide React for icons
+- TailwindCSS for styling
+
+### Recent Changes (January 2026)
+
+- Transformed from HIE Parent Command Center to Trial Navigator
+- Added public routing for search and trial detail pages
+- Implemented ClinicalTrials.gov API auto-fetch when database empty
+- NCT number detection for proper API routing in trial detail
+- PROMETHEUS-MIND system retained and integrated
+- Updated navigation with Trial Navigator branding
