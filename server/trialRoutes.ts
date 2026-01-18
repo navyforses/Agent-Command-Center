@@ -121,8 +121,30 @@ router.post("/trials/:id/translate", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { language = "ka", forceRefresh = false } = req.body;
 
+    let trialId: number;
+    
+    // Check if id is an NCT number (starts with NCT)
+    if (id.startsWith("NCT")) {
+      // Look up the trial by NCT number to get the numeric id
+      const trial = await db
+        .select({ id: clinicalTrials.id })
+        .from(clinicalTrials)
+        .where(eq(clinicalTrials.nctNumber, id))
+        .limit(1);
+      
+      if (!trial.length) {
+        return res.status(404).json({ error: "Trial not found" });
+      }
+      trialId = trial[0].id;
+    } else {
+      trialId = parseInt(id);
+      if (isNaN(trialId)) {
+        return res.status(400).json({ error: "Invalid trial ID" });
+      }
+    }
+
     const translation = await trialTranslator.translateTrial(
-      parseInt(id),
+      trialId,
       language,
       forceRefresh
     );

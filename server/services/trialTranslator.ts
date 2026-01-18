@@ -14,7 +14,10 @@ import {
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
-const anthropic = new Anthropic();
+const anthropic = new Anthropic({
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+});
 
 const LANGUAGE_NAMES: Record<string, string> = {
   ka: "Georgian (ქართული)",
@@ -121,7 +124,7 @@ Please provide the translation in this exact JSON format:
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     });
