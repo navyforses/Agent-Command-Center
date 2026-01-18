@@ -51,9 +51,10 @@ const phaseOptions = [
 
 interface TrialSearchResponse {
   trials: ClinicalTrial[];
-  total: number;
+  totalCount: number;
   page: number;
   pageSize: number;
+  sources: string[];
 }
 
 export default function TrialSearch() {
@@ -119,7 +120,7 @@ export default function TrialSearch() {
     setPage(1);
   };
 
-  const totalPages = data ? Math.ceil(data.total / 20) : 0;
+  const totalPages = data ? Math.ceil(data.totalCount / 20) : 0;
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {
@@ -258,21 +259,7 @@ export default function TrialSearch() {
           </aside>
 
           <main className="flex-1">
-            {!activeQuery ? (
-              <Card>
-                <CardContent className="py-16 text-center">
-                  <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <h2 className="mb-2 text-xl font-semibold">
-                    {language === "ka" ? "მოძებნეთ კლინიკური კვლევები" : "Search Clinical Trials"}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    {language === "ka"
-                      ? "შეიყვანეთ დაავადება, მკურნალობა ან საკვანძო სიტყვა"
-                      : "Enter a condition, treatment, or keyword"}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : isLoading ? (
+            {isLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <Card key={i}>
@@ -294,8 +281,8 @@ export default function TrialSearch() {
                   <p className="text-sm text-muted-foreground">
                     {isFetching && <Loader2 className="inline mr-2 h-4 w-4 animate-spin" />}
                     {language === "ka"
-                      ? `ნაპოვნია ${data.total} კვლევა`
-                      : `Found ${data.total} trials`}
+                      ? `ნაპოვნია ${data.totalCount} კვლევა`
+                      : `Found ${data.totalCount} trials`}
                   </p>
                 </div>
 
@@ -390,16 +377,24 @@ export default function TrialSearch() {
                 <CardContent className="py-16 text-center">
                   <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
                   <h2 className="mb-2 text-xl font-semibold">
-                    {language === "ka" ? "კვლევები ვერ მოიძებნა" : "No Trials Found"}
+                    {activeQuery
+                      ? (language === "ka" ? "კვლევები ვერ მოიძებნა" : "No Trials Found")
+                      : (language === "ka" ? "დაიწყეთ ძიება" : "Start Your Search")}
                   </h2>
                   <p className="text-muted-foreground mb-4">
-                    {language === "ka"
-                      ? `"${activeQuery}" - ამ ძიებით კვლევები ვერ მოიძებნა`
-                      : `No trials match "${activeQuery}"`}
+                    {activeQuery
+                      ? (language === "ka"
+                          ? `"${activeQuery}" - ამ ძიებით კვლევები ვერ მოიძებნა`
+                          : `No trials match "${activeQuery}"`)
+                      : (language === "ka"
+                          ? "შეიყვანეთ დაავადება, მკურნალობა ან საკვანძო სიტყვა"
+                          : "Enter a condition, treatment, or keyword to find clinical trials")}
                   </p>
-                  <Button variant="outline" onClick={() => setLocation("/")}>
-                    {language === "ka" ? "სცადეთ სხვა ძიება" : "Try a Different Search"}
-                  </Button>
+                  {activeQuery && (
+                    <Button variant="outline" onClick={() => { setSearchQuery(""); setActiveQuery(""); }}>
+                      {language === "ka" ? "ფილტრების გასუფთავება" : "Clear Search"}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}

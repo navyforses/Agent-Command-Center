@@ -151,6 +151,19 @@ function AppContent() {
   );
 }
 
+function PublicRouter() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/search" component={TrialSearch} />
+        <Route path="/trial/:id" component={TrialDetail} />
+        <Route component={Landing} />
+      </Switch>
+    </Suspense>
+  );
+}
+
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -163,7 +176,7 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <Landing />;
+    return <PublicRouter />;
   }
 
   return <AppContent />;
