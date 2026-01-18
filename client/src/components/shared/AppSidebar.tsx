@@ -2,24 +2,19 @@ import { memo, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  User,
-  FileText,
-  Activity,
   FlaskConical,
-  Mail,
-  Calendar,
-  Bot,
   Settings,
   LogOut,
-  Heart,
   Dna,
   BookOpen,
-  Pill,
   ChevronDown,
-  Baby,
-  Stethoscope,
   Search,
-  MessageSquare,
+  Globe,
+  Languages,
+  Bookmark,
+  Brain,
+  History,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -67,71 +62,90 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
   const [location] = useLocation();
   const { t, language } = useLanguage();
 
-  // Check if any sub-item in a section is active
   const isSectionActive = (items: MenuItem[]) =>
     items.some(item => location === item.url || location.startsWith(item.url + "/"));
 
-  // 6 Section Navigation Structure
   const navigationSections = useMemo(() => ({
-    // Section 1: Dashboard (standalone)
     dashboard: {
-      title: t("dashboard") || "Dashboard",
+      title: language === "ka" ? "მთავარი" : "Dashboard",
       icon: LayoutDashboard,
       url: "/",
     },
 
-    // Section 2: My Child (ჩემი შვილი)
-    child: {
-      title: language === "ka" ? "ჩემი შვილი" : "My Child",
-      icon: Baby,
+    trials: {
+      title: language === "ka" ? "კლინიკური კვლევები" : "Clinical Trials",
+      icon: FlaskConical,
       items: [
-        { title: t("childProfile") || "Child Profile", icon: User, url: "/child-profile" },
-        { title: t("documents") || "Documents", icon: FileText, url: "/documents" },
+        { 
+          title: language === "ka" ? "ძიება" : "Search", 
+          icon: Search, 
+          url: "/search" 
+        },
+        { 
+          title: language === "ka" ? "შენახული" : "Saved Trials", 
+          icon: Bookmark, 
+          url: "/saved" 
+        },
+        { 
+          title: language === "ka" ? "ისტორია" : "History", 
+          icon: History, 
+          url: "/history" 
+        },
       ],
     } as MenuSection,
 
-    // Section 3: Therapy & Treatment (თერაპია & მკურნალობა)
-    therapy: {
-      title: language === "ka" ? "თერაპია & მკურნალობა" : "Therapy & Treatment",
-      icon: Stethoscope,
+    registries: {
+      title: language === "ka" ? "რეესტრები" : "Registries",
+      icon: Globe,
       items: [
-        { title: t("therapyRecommendations") || "Therapy", icon: Activity, url: "/therapy" },
-        { title: t("medications") || "Medications", icon: Pill, url: "/medications" },
+        { 
+          title: "ClinicalTrials.gov", 
+          icon: Globe, 
+          url: "/registry/ctgov" 
+        },
+        { 
+          title: "EU Clinical Trials", 
+          icon: Globe, 
+          url: "/registry/euctr" 
+        },
+        { 
+          title: "WHO ICTRP", 
+          icon: Globe, 
+          url: "/registry/who" 
+        },
       ],
     } as MenuSection,
 
-    // Section 4: Research & Resources (კვლევა & რესურსები)
-    research: {
-      title: language === "ka" ? "კვლევა & რესურსები" : "Research & Resources",
-      icon: Search,
-      items: [
-        { title: t("research") || "Research", icon: BookOpen, url: "/research" },
-        { title: t("clinicalTrials") || "Clinical Trials", icon: FlaskConical, url: "/trials" },
-      ],
-    } as MenuSection,
-
-    // Section 5: Schedule & Communication (განრიგი & კომუნიკაცია)
-    schedule: {
-      title: language === "ka" ? "განრიგი & კომუნიკაცია" : "Schedule & Communication",
-      icon: MessageSquare,
-      items: [
-        { title: t("calendar") || "Calendar", icon: Calendar, url: "/calendar" },
-        { title: t("emailHub") || "Email Hub", icon: Mail, url: "/email" },
-      ],
-    } as MenuSection,
-
-    // Section 6: AI Assistant (AI ასისტენტი)
     ai: {
-      title: language === "ka" ? "AI ასისტენტი" : "AI Assistant",
-      icon: Bot,
+      title: language === "ka" ? "AI ინსაითები" : "AI Insights",
+      icon: Brain,
       items: [
-        { title: t("aiAssistant") || "AI Chat", icon: Bot, url: "/assistant" },
-        { title: t("evolutionCycles") || "Evolution", icon: Dna, url: "/evolution" },
+        { 
+          title: language === "ka" ? "ტრენდები" : "Trial Trends", 
+          icon: TrendingUp, 
+          url: "/trends" 
+        },
+        { 
+          title: "PROMETHEUS", 
+          icon: Dna, 
+          url: "/evolution" 
+        },
       ],
     } as MenuSection,
-  }), [t, language]);
 
-  // Collapsible section state - open sections that have active items
+    translation: {
+      title: language === "ka" ? "თარგმანები" : "Translations",
+      icon: Languages,
+      items: [
+        { 
+          title: language === "ka" ? "გლოსარი" : "Glossary", 
+          icon: BookOpen, 
+          url: "/glossary" 
+        },
+      ],
+    } as MenuSection,
+  }), [language]);
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     Object.entries(navigationSections).forEach(([key, section]) => {
@@ -163,7 +177,7 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
               <section.icon className="h-4 w-4" />
               <span>{section.title}</span>
             </span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${openSections[key] ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-4 w-4 transition-transform ${openSections[key] || isSectionActive(section.items) ? 'rotate-180' : ''}`} />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -174,7 +188,7 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
                   asChild
                   isActive={location === item.url || location.startsWith(item.url + "/")}
                 >
-                  <Link href={item.url} data-testid={`nav-${item.url.replace("/", "")}`}>
+                  <Link href={item.url} data-testid={`nav-${item.url.replace(/\//g, '-').slice(1) || 'home'}`}>
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
                   </Link>
@@ -189,16 +203,14 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="p-2 bg-primary rounded-md">
-            <Heart className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="font-semibold text-sm">HIE Command Center</h1>
-            <p className="text-xs text-muted-foreground">
-              {language === "ka" ? "მშობლის პორტალი" : "Parent Portal"}
-            </p>
+      <SidebarHeader className="border-b p-4">
+        <Link href="/" className="flex items-center gap-2" data-testid="nav-logo">
+          <FlaskConical className="h-8 w-8 text-primary" />
+          <div className="flex flex-col">
+            <span className="text-lg font-bold">Trial Navigator</span>
+            <span className="text-xs text-muted-foreground">
+              {language === "ka" ? "კლინიკური კვლევების პლატფორმა" : "Clinical Trial Platform"}
+            </span>
           </div>
         </Link>
       </SidebarHeader>
@@ -207,64 +219,69 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* Dashboard - Standalone */}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={location === "/"}
-                  data-testid="nav-dashboard"
+                  isActive={location === navigationSections.dashboard.url}
                 >
-                  <Link href="/">
-                    <LayoutDashboard className="h-4 w-4" />
+                  <Link href={navigationSections.dashboard.url} data-testid="nav-dashboard">
+                    <navigationSections.dashboard.icon className="h-4 w-4" />
                     <span>{navigationSections.dashboard.title}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Collapsible Sections */}
-              {renderCollapsibleSection("child", navigationSections.child)}
-              {renderCollapsibleSection("therapy", navigationSections.therapy)}
-              {renderCollapsibleSection("research", navigationSections.research)}
-              {renderCollapsibleSection("schedule", navigationSections.schedule)}
+              {renderCollapsibleSection("trials", navigationSections.trials)}
+              {renderCollapsibleSection("registries", navigationSections.registries)}
               {renderCollapsibleSection("ai", navigationSections.ai)}
+              {renderCollapsibleSection("translation", navigationSections.translation)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 space-y-2">
+      <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               isActive={location === "/settings"}
-              data-testid="nav-settings"
             >
-              <Link href="/settings">
+              <Link href="/settings" data-testid="nav-settings">
                 <Settings className="h-4 w-4" />
-                <span>{t("settings") || "Settings"}</span>
+                <span>{language === "ka" ? "პარამეტრები" : "Settings"}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
 
-        {user && (
-          <div className="flex items-center gap-3 p-2 rounded-md bg-sidebar-accent">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user.profileImageUrl} alt={user.name} className="object-cover" />
-              <AvatarFallback className="text-xs">
-                {user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-            </div>
-            <a href="/api/logout" data-testid="button-logout">
-              <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-            </a>
-          </div>
-        )}
+          {user && (
+            <SidebarMenuItem>
+              <SidebarMenuButton className="w-full justify-start gap-2 p-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user.profileImageUrl} alt={user.name} />
+                  <AvatarFallback>
+                    {user.name?.slice(0, 2).toUpperCase() || "TN"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-medium">{user.name}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                    {user.email}
+                  </span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <a href="/api/logout" data-testid="nav-logout">
+                <LogOut className="h-4 w-4" />
+                <span>{language === "ka" ? "გასვლა" : "Log out"}</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
