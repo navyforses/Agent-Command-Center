@@ -67,10 +67,15 @@ export default function TrialDetail() {
   const [selectedLanguage, setSelectedLanguage] = useState(language === "ka" ? "ka" : "en");
   const [activeTab, setActiveTab] = useState("overview");
 
+  const isNctNumber = trialId?.startsWith("NCT");
+  
   const { data: trial, isLoading } = useQuery<TrialWithTranslation>({
     queryKey: ["/api/trials", trialId, selectedLanguage],
     queryFn: async () => {
-      const res = await fetch(`/api/trials/${trialId}?lang=${selectedLanguage}`);
+      const endpoint = isNctNumber 
+        ? `/api/trials/nct/${trialId}?language=${selectedLanguage}`
+        : `/api/trials/${trialId}?lang=${selectedLanguage}`;
+      const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to fetch trial");
       return res.json();
     },
