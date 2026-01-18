@@ -88,15 +88,17 @@ async function checkAndGenerateDailyReports(cycleId: number): Promise<void> {
     const dailyRuns = await storage.getEvolutionDailyRuns(cycleId);
 
     for (const run of dailyRuns) {
-      if (run.status === "completed") {
+      // Generate reports for both completed AND failed runs
+      // Failed runs may still have partial insights worth reporting
+      if (run.status === "completed" || run.status === "failed") {
         const existingReport = await storage.getEvolutionReportByDailyRun(run.id);
 
         if (!existingReport) {
-          console.log(`[Evolution Scheduler] Generating report for completed daily run ${run.id}`);
+          console.log(`[Evolution Scheduler] Generating report for ${run.status} daily run ${run.id}`);
           const report = await generateDailyReport(run.id);
 
           if (report) {
-            console.log(`[Evolution Scheduler] Report ${report.id} generated successfully`);
+            console.log(`[Evolution Scheduler] Report ${report.id} generated successfully for ${run.status} run`);
           } else {
             console.log(`[Evolution Scheduler] Failed to generate report for run ${run.id}`);
           }
