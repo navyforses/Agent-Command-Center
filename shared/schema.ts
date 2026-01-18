@@ -1986,3 +1986,245 @@ export const insertPrometheusPredictionSchema = createInsertSchema(prometheusPre
 
 export type InsertPrometheusPrediction = z.infer<typeof insertPrometheusPredictionSchema>;
 export type PrometheusPrediction = typeof prometheusPredictions.$inferSelect;
+
+// ============================================================================
+// TRIAL NAVIGATOR - Clinical Trial Search Platform
+// ============================================================================
+
+// Supported Languages
+export const languages = pgTable("languages", {
+  code: varchar("code", { length: 10 }).primaryKey(), // 'ka', 'hy', 'az', 'en'
+  nameNative: varchar("name_native", { length: 100 }).notNull(), // 'ქართული'
+  nameEnglish: varchar("name_english", { length: 100 }).notNull(), // 'Georgian'
+  direction: varchar("direction", { length: 3 }).default("ltr"), // 'ltr' or 'rtl'
+  tier: integer("tier").default(2), // 1=pre-cached, 2=on-demand
+  isActive: boolean("is_active").default(true),
+  speakersMillions: real("speakers_millions"),
+  diasporaMillions: real("diaspora_millions"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLanguageSchema = createInsertSchema(languages).omit({
+  createdAt: true,
+});
+export type InsertLanguage = z.infer<typeof insertLanguageSchema>;
+export type Language = typeof languages.$inferSelect;
+
+// Clinical Trials (aggregated from multiple sources)
+export const clinicalTrials = pgTable("clinical_trials", {
+  id: serial("id").primaryKey(),
+  // Primary identifiers
+  nctNumber: varchar("nct_number", { length: 20 }).unique(), // NCT12345678
+  eudraCTNumber: varchar("eudract_number", { length: 30 }), // 2023-001234-12
+  whoId: varchar("who_id", { length: 50 }), // WHO ICTRP ID
+  isrctnNumber: varchar("isrctn_number", { length: 30 }), // ISRCTN12345678
+  
+  // Core trial info
+  titleEn: text("title_en").notNull(),
+  briefSummaryEn: text("brief_summary_en"),
+  detailedDescriptionEn: text("detailed_description_en"),
+  
+  // Status and phase
+  status: varchar("status", { length: 50 }), // Recruiting, Active, Completed, etc.
+  phase: varchar("phase", { length: 20 }), // Phase I, II, III, IV
+  studyType: varchar("study_type", { length: 50 }), // Interventional, Observational
+  
+  // Eligibility
+  eligibilityCriteriaEn: text("eligibility_criteria_en"),
+  minAge: varchar("min_age", { length: 20 }),
+  maxAge: varchar("max_age", { length: 20 }),
+  gender: varchar("gender", { length: 20 }), // All, Male, Female
+  healthyVolunteers: boolean("healthy_volunteers").default(false),
+  
+  // Conditions and interventions (JSON arrays)
+  conditions: jsonb("conditions").$type<string[]>(), // ['HIE', 'Neonatal Encephalopathy']
+  interventions: jsonb("interventions").$type<{type: string, name: string}[]>(),
+  
+  // Locations
+  locations: jsonb("locations").$type<{
+    facility: string;
+    city: string;
+    country: string;
+    countryCode: string;
+    status?: string;
+  }[]>(),
+  
+  // Contacts
+  contacts: jsonb("contacts").$type<{
+    name: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+  }[]>(),
+  
+  // Sponsor
+  sponsorName: varchar("sponsor_name", { length: 255 }),
+  sponsorType: varchar("sponsor_type", { length: 50 }), // Industry, NIH, Other
+  
+  // Dates
+  startDate: date("start_date"),
+  completionDate: date("completion_date"),
+  lastUpdateDate: timestamp("last_update_date"),
+  
+  // Aggregation metadata
+  sources: jsonb("sources").$type<string[]>(), // ['clinicaltrials.gov', 'eu_ctr']
+  relevanceScore: real("relevance_score"), // AI-calculated 0-100
+  qualityScore: real("quality_score"), // Data completeness score
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_trials_nct").on(table.nctNumber),
+  index("idx_trials_status").on(table.status),
+  index("idx_trials_phase").on(table.phase),
+]);
+
+export const insertClinicalTrialSchema = createInsertSchema(clinicalTrials, {
+  conditions: z.array(z.string()).nullable().optional(),
+  interventions: z.array(z.object({ type: z.string(), name: z.string() })).nullable().optional(),
+  locations: z.array(z.object({
+    facility: z.string(),
+    city: z.string(),
+    country: z.string(),
+    countryCode: z.string(),
+    status: z.string().optional(),
+  })).nullable().optional(),
+  contacts: z.array(z.object({
+    name: z.string(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+    role: z.string().optional(),
+  })).nullable().optional(),
+  sources: z.array(z.string()).nullable().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClinicalTrial = z.infer<typeof insertClinicalTrialSchema>;
+export type ClinicalTrial = typeof clinicalTrials.$inferSelect;
+
+// Trial Translations Cache
+export const trialTranslations = pgTable("trial_translations", {
+  id: serial("id").primaryKey(),
+  trialId: integer("trial_id").references(() => clinicalTrials.id).notNull(),
+  languageCode: varchar("language_code", { length: 10 }).references(() => languages.code).notNull(),
+  
+  // Translated fields
+  titleTranslated: text("title_translated"),
+  summaryTranslated: text("summary_translated"),
+  eligibilityTranslated: text("eligibility_translated"),
+  
+  // AI-generated simplified summary (plain language)
+  simplifiedSummary: text("simplified_summary"),
+  
+  // Translation metadata
+  translationQuality: real("translation_quality"), // 0.00-1.00
+  humanReviewed: boolean("human_reviewed").default(false),
+  translatedAt: timestamp("translated_at").defaultNow(),
+  translatedBy: varchar("translated_by", { length: 50 }).default("ai"), // 'ai', 'human', 'community'
+}, (table) => [
+  index("idx_translations_trial_lang").on(table.trialId, table.languageCode),
+]);
+
+export const insertTrialTranslationSchema = createInsertSchema(trialTranslations).omit({
+  id: true,
+  translatedAt: true,
+});
+export type InsertTrialTranslation = z.infer<typeof insertTrialTranslationSchema>;
+export type TrialTranslation = typeof trialTranslations.$inferSelect;
+
+// Medical Glossary (multilingual medical terms)
+export const medicalGlossary = pgTable("medical_glossary", {
+  id: serial("id").primaryKey(),
+  termEnglish: varchar("term_english", { length: 255 }).notNull(),
+  languageCode: varchar("language_code", { length: 10 }).references(() => languages.code).notNull(),
+  termTranslated: varchar("term_translated", { length: 255 }).notNull(),
+  definitionTranslated: text("definition_translated"),
+  category: varchar("category", { length: 50 }), // 'disease', 'treatment', 'anatomy', 'procedure'
+  verified: boolean("verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_glossary_term_lang").on(table.termEnglish, table.languageCode),
+]);
+
+export const insertMedicalGlossarySchema = createInsertSchema(medicalGlossary).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMedicalGlossary = z.infer<typeof insertMedicalGlossarySchema>;
+export type MedicalGlossary = typeof medicalGlossary.$inferSelect;
+
+// User Saved Trials
+export const userSavedTrials = pgTable("user_saved_trials", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  trialId: integer("trial_id").references(() => clinicalTrials.id).notNull(),
+  notes: text("notes"),
+  notificationEnabled: boolean("notification_enabled").default(true),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_trials_user").on(table.userId),
+]);
+
+export const insertUserSavedTrialSchema = createInsertSchema(userSavedTrials).omit({
+  id: true,
+  savedAt: true,
+});
+export type InsertUserSavedTrial = z.infer<typeof insertUserSavedTrialSchema>;
+export type UserSavedTrial = typeof userSavedTrials.$inferSelect;
+
+// Trial Search History
+export const trialSearchHistory = pgTable("trial_search_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  searchQuery: text("search_query").notNull(),
+  filters: jsonb("filters").$type<{
+    conditions?: string[];
+    locations?: string[];
+    phase?: string[];
+    status?: string[];
+    ageRange?: { min?: string; max?: string };
+  }>(),
+  resultsCount: integer("results_count"),
+  languageCode: varchar("language_code", { length: 10 }).default("ka"),
+  searchedAt: timestamp("searched_at").defaultNow(),
+});
+
+export const insertTrialSearchHistorySchema = createInsertSchema(trialSearchHistory, {
+  filters: z.object({
+    conditions: z.array(z.string()).optional(),
+    locations: z.array(z.string()).optional(),
+    phase: z.array(z.string()).optional(),
+    status: z.array(z.string()).optional(),
+    ageRange: z.object({ min: z.string().optional(), max: z.string().optional() }).optional(),
+  }).nullable().optional(),
+}).omit({
+  id: true,
+  searchedAt: true,
+});
+export type InsertTrialSearchHistory = z.infer<typeof insertTrialSearchHistorySchema>;
+export type TrialSearchHistory = typeof trialSearchHistory.$inferSelect;
+
+// Data Source Status (track registry sync status)
+export const dataSourceStatus = pgTable("data_source_status", {
+  id: serial("id").primaryKey(),
+  sourceName: varchar("source_name", { length: 50 }).unique().notNull(), // 'clinicaltrials_gov', 'eu_ctr', etc.
+  sourceDisplayName: varchar("source_display_name", { length: 100 }),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncStatus: varchar("last_sync_status", { length: 20 }), // 'success', 'failed', 'partial'
+  recordsCount: integer("records_count").default(0),
+  errorMessage: text("error_message"),
+  isActive: boolean("is_active").default(true),
+  syncIntervalHours: integer("sync_interval_hours").default(24),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDataSourceStatusSchema = createInsertSchema(dataSourceStatus).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDataSourceStatus = z.infer<typeof insertDataSourceStatusSchema>;
+export type DataSourceStatus = typeof dataSourceStatus.$inferSelect;
