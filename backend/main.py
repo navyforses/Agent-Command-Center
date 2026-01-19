@@ -11,6 +11,7 @@ from api.routes_search import router as search_router
 from api.routes_users import router as users_router
 from api.routes_languages import router as languages_router
 from api.routes_webhooks import router as webhooks_router
+from api.routes_feed import router as feed_router
 
 
 @asynccontextmanager
@@ -61,6 +62,7 @@ app.include_router(search_router, prefix="/api/search", tags=["search"])
 app.include_router(users_router, prefix="/api/users", tags=["users"])
 app.include_router(languages_router, prefix="/api/languages", tags=["languages"])
 app.include_router(webhooks_router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(feed_router, tags=["feed", "profile"])
 
 
 @app.get("/")
