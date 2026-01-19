@@ -21,7 +21,8 @@ class Settings(BaseSettings):
 
     # Email (Resend)
     resend_api_key: Optional[str] = None
-    from_email: str = "noreply@trialnavigator.com"
+    email_from: str = "Trial Navigator <noreply@trialnavigator.com>"
+    email_reply_to: str = "support@trialnavigator.com"
 
     # Stripe
     stripe_secret_key: Optional[str] = None

@@ -13,6 +13,8 @@ from api.routes_languages import router as languages_router
 from api.routes_webhooks import router as webhooks_router
 from api.routes_feed import router as feed_router
 from api.routes_payments import router as payments_router
+from api.routes_email import router as email_router
+from scheduler import digest_scheduler
 
 
 @asynccontextmanager
@@ -23,8 +25,17 @@ async def lifespan(app: FastAPI):
     if settings.database_url:
         await db.connect()
         print("Database connected")
+
+    # Start scheduler for email digests
+    digest_scheduler.start()
+    print("Email scheduler started")
+
     yield
+
     # Shutdown
+    digest_scheduler.stop()
+    print("Email scheduler stopped")
+
     if db.pool:
         await db.disconnect()
         print("Database disconnected")
@@ -65,6 +76,7 @@ app.include_router(languages_router, prefix="/api/languages", tags=["languages"]
 app.include_router(webhooks_router, prefix="/api/webhooks", tags=["webhooks"])
 app.include_router(feed_router, tags=["feed", "profile"])
 app.include_router(payments_router, tags=["payments", "subscription"])
+app.include_router(email_router, tags=["email", "digest"])
 
 
 @app.get("/")
