@@ -1,9 +1,9 @@
 # Trial Navigator - Python Backend Dependencies
 
 # Web Framework
-fastapi==0.109.0
+fastapi==0.115.0
 uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+python-multipart==0.0.18
 
 # Database
 asyncpg==0.29.0
@@ -15,7 +15,7 @@ pydantic-settings==2.1.0
 
 # HTTP Client
 httpx==0.26.0
-aiohttp==3.9.1
+aiohttp==3.11.11
 
 # AI/ML
 openai==1.10.0
@@ -33,7 +33,7 @@ stripe==7.10.0
 
 # Utilities
 python-dotenv==1.0.0
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
 
 # Data Processing
