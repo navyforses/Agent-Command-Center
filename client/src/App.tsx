@@ -38,6 +38,9 @@ const Settings = lazy(() => import("@/pages/Settings"));
 // Trial Navigator pages
 const TrialSearch = lazy(() => import("@/pages/TrialSearch"));
 const TrialDetail = lazy(() => import("@/pages/TrialDetail"));
+const PatientFeed = lazy(() => import("@/pages/PatientFeed"));
+const CreateProfile = lazy(() => import("@/pages/CreateProfile"));
+const Pricing = lazy(() => import("@/pages/Pricing"));
 
 // Loading fallback component
 function PageLoader() {
@@ -56,8 +59,11 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/feed" component={PatientFeed} />
+        <Route path="/create-profile" component={CreateProfile} />
         <Route path="/search" component={TrialSearch} />
         <Route path="/trial/:id" component={TrialDetail} />
+        <Route path="/pricing" component={Pricing} />
         <Route path="/child-profile" component={ChildrenList} />
         <Route path="/child/:id" component={ChildProfile} />
         <Route path="/documents" component={Documents} />
@@ -156,8 +162,11 @@ function PublicRouter() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/feed" component={PatientFeed} />
+        <Route path="/create-profile" component={CreateProfile} />
         <Route path="/search" component={TrialSearch} />
         <Route path="/trial/:id" component={TrialDetail} />
+        <Route path="/pricing" component={Pricing} />
         <Route component={Landing} />
       </Switch>
     </Suspense>
