@@ -2,10 +2,70 @@
 
 ## Quick Start Options
 
-### Option 1: Railway (Recommended - Easiest)
-### Option 2: Render
-### Option 3: Docker Compose (Self-hosted)
-### Option 4: Vercel + Railway
+### Option 1: Replit (Easiest - Already Configured!)
+### Option 2: Railway
+### Option 3: Render
+### Option 4: Docker Compose (Self-hosted)
+### Option 5: Vercel + Railway
+
+---
+
+## Option 1: Replit (Recommended)
+
+პროექტი უკვე კონფიგურირებულია Replit-ისთვის!
+
+### ნაბიჯი 1: Secrets-ის დამატება
+
+Replit-ის მარცხენა პანელში დააჭირეთ **Secrets** (🔒) და დაამატეთ:
+
+```
+DATABASE_URL = postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+SUPABASE_URL = https://[PROJECT].supabase.co
+SUPABASE_KEY = your-anon-key
+OPENAI_API_KEY = sk-...
+RESEND_API_KEY = re_...
+STRIPE_SECRET_KEY = sk_...
+STRIPE_WEBHOOK_SECRET = whsec_...
+SECRET_KEY = your-random-secret-key
+```
+
+### ნაბიჯი 2: მონაცემთა ბაზის შექმნა
+
+1. შედით [Supabase](https://supabase.com)-ში
+2. შექმენით ახალი პროექტი
+3. გადადით **SQL Editor**-ში
+4. ჩასვით `backend/schema.sql`-ის შიგთავსი
+5. დააჭირეთ **Run**
+
+### ნაბიჯი 3: გაშვება
+
+დააჭირეთ **Run** ღილაკს ან Shell-ში:
+
+```bash
+# Backend-ის გაშვება
+cd backend && pip install -r requirements.txt && python main.py
+
+# ახალ ტერმინალში - Frontend-ის გაშვება
+npm run dev
+```
+
+### ნაბიჯი 4: Deployment
+
+1. დააჭირეთ **Deploy** ღილაკს (მარჯვენა ზედა კუთხე)
+2. აირჩიეთ **Reserved VM** ან **Autoscale**
+3. დაადასტურეთ deployment
+
+### Replit URLs
+
+- **Frontend**: `https://your-repl-name.repl.co`
+- **Backend API**: `https://your-repl-name.repl.co:8000`
+- **API Docs**: `https://your-repl-name.repl.co:8000/docs`
+
+### Stripe Webhook (Replit)
+
+1. Stripe Dashboard > Webhooks
+2. Add endpoint: `https://your-repl-name.repl.co:8000/api/payments/webhook`
+3. აირჩიეთ events
 
 ---
 
