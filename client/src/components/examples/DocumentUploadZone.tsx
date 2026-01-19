@@ -4,7 +4,7 @@ export default function DocumentUploadZoneExample() {
   return (
     <div className="max-w-md p-4">
       <DocumentUploadZone
-        onFilesSelected={(files) => console.log("Files selected:", files)}
+        onUploadComplete={(docId) => console.log("Upload complete, document ID:", docId)}
       />
     </div>
   );

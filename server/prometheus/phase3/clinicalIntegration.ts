@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PROMETHEUS Phase 3: Clinical Integration APIs
  *

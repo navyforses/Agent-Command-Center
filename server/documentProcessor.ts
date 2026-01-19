@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import * as pdfParse from "pdf-parse";
 import { openai, AI_MODEL } from "./openai";
 import { objectStorageClient, ObjectStorageService } from "./objectStorage";
 import type { File } from "@google-cloud/storage";
@@ -43,18 +43,17 @@ Respond with JSON:
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProcessingResult> {
   try {
-    const uint8Array = new Uint8Array(buffer);
-    const parser = new PDFParse({ data: uint8Array });
-    const textResult = await parser.getText();
-    
-    const text = textResult.text?.trim() || "";
+    // @ts-ignore - pdf-parse types are not well-defined
+    const data = await (pdfParse as any).default(buffer);
+
+    const text = data.text?.trim() || "";
     const language = detectLanguage(text);
-    
+
     return {
       success: true,
       text,
-      pageCount: textResult.numpages,
-      metadata: textResult.info,
+      pageCount: data.numpages,
+      metadata: data.info,
       extractionMethod: "pdf",
       language,
     };

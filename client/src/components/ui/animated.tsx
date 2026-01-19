@@ -1,5 +1,5 @@
 import { memo, forwardRef, ReactNode, HTMLAttributes } from "react";
-import { motion, MotionProps, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   fadeInUp,
   staggerContainer,
@@ -17,12 +17,13 @@ import { Check, AlertCircle, Loader2 } from "lucide-react";
 // ANIMATED CONTAINERS
 // ============================================================================
 
-interface AnimatedPageProps extends HTMLAttributes<HTMLDivElement> {
+interface AnimatedPageProps {
   children: ReactNode;
+  className?: string;
 }
 
 export const AnimatedPage = memo(forwardRef<HTMLDivElement, AnimatedPageProps>(
-  function AnimatedPage({ children, className, ...props }, ref) {
+  function AnimatedPage({ children, className }, ref) {
     return (
       <motion.div
         ref={ref}
@@ -31,7 +32,6 @@ export const AnimatedPage = memo(forwardRef<HTMLDivElement, AnimatedPageProps>(
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
         className={className}
-        {...props}
       >
         {children}
       </motion.div>
@@ -39,13 +39,14 @@ export const AnimatedPage = memo(forwardRef<HTMLDivElement, AnimatedPageProps>(
   }
 ));
 
-interface AnimatedListProps extends HTMLAttributes<HTMLDivElement> {
+interface AnimatedListProps {
   children: ReactNode;
   staggerDelay?: number;
+  className?: string;
 }
 
 export const AnimatedList = memo(forwardRef<HTMLDivElement, AnimatedListProps>(
-  function AnimatedList({ children, className, staggerDelay = 0.05, ...props }, ref) {
+  function AnimatedList({ children, className, staggerDelay = 0.05 }, ref) {
     return (
       <motion.div
         ref={ref}
@@ -59,7 +60,6 @@ export const AnimatedList = memo(forwardRef<HTMLDivElement, AnimatedListProps>(
           },
         }}
         className={className}
-        {...props}
       >
         {children}
       </motion.div>
@@ -67,18 +67,18 @@ export const AnimatedList = memo(forwardRef<HTMLDivElement, AnimatedListProps>(
   }
 ));
 
-interface AnimatedItemProps extends HTMLAttributes<HTMLDivElement> {
+interface AnimatedItemProps {
   children: ReactNode;
+  className?: string;
 }
 
 export const AnimatedItem = memo(forwardRef<HTMLDivElement, AnimatedItemProps>(
-  function AnimatedItem({ children, className, ...props }, ref) {
+  function AnimatedItem({ children, className }, ref) {
     return (
       <motion.div
         ref={ref}
         variants={staggerItem}
         className={className}
-        {...props}
       >
         {children}
       </motion.div>
@@ -90,14 +90,15 @@ export const AnimatedItem = memo(forwardRef<HTMLDivElement, AnimatedItemProps>(
 // ANIMATED CARDS
 // ============================================================================
 
-interface AnimatedCardProps extends HTMLAttributes<HTMLDivElement> {
+interface AnimatedCardProps {
   children: ReactNode;
   hover?: boolean;
   float?: boolean;
+  className?: string;
 }
 
 export const AnimatedCard = memo(forwardRef<HTMLDivElement, AnimatedCardProps>(
-  function AnimatedCard({ children, className, hover = true, float = false, ...props }, ref) {
+  function AnimatedCard({ children, className, hover = true, float = false }, ref) {
     return (
       <motion.div
         ref={ref}
@@ -114,7 +115,6 @@ export const AnimatedCard = memo(forwardRef<HTMLDivElement, AnimatedCardProps>(
           "rounded-xl border bg-card transition-shadow",
           className
         )}
-        {...props}
       >
         {children}
       </motion.div>
@@ -126,14 +126,16 @@ export const AnimatedCard = memo(forwardRef<HTMLDivElement, AnimatedCardProps>(
 // ANIMATED BUTTONS
 // ============================================================================
 
-interface AnimatedButtonProps extends HTMLAttributes<HTMLButtonElement> {
+interface AnimatedButtonProps {
   children: ReactNode;
   disabled?: boolean;
   variant?: "scale" | "glow" | "bounce";
+  className?: string;
+  onClick?: () => void;
 }
 
 export const AnimatedButton = memo(forwardRef<HTMLButtonElement, AnimatedButtonProps>(
-  function AnimatedButton({ children, className, disabled, variant = "scale", ...props }, ref) {
+  function AnimatedButton({ children, className, disabled, variant = "scale", onClick }, ref) {
     const variants = {
       scale: {
         whileHover: { scale: 1.02 },
@@ -158,12 +160,12 @@ export const AnimatedButton = memo(forwardRef<HTMLButtonElement, AnimatedButtonP
         {...variants[variant]}
         transition={springPresets.snappy}
         disabled={disabled}
+        onClick={onClick}
         className={cn(
           "transition-colors",
           disabled && "opacity-50 cursor-not-allowed",
           className
         )}
-        {...props}
       >
         {children}
       </motion.button>

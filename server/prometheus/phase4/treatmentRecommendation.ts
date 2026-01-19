@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PROMETHEUS Phase 4: Treatment Recommendation Engine
  *

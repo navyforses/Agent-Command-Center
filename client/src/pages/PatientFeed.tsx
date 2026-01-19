@@ -6,7 +6,8 @@ import {
   AlertCircle,
   ChevronRight,
   User,
-  Calendar
+  Calendar,
+  Filter
 } from 'lucide-react';
 import { SmartCard, type FeedItemData, type ContentType } from '../components/feed/SmartCard';
 import { ContentFilters } from '../components/feed/ContentFilters';

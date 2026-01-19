@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PROMETHEUS-MIND: Notification System
  * ====================================

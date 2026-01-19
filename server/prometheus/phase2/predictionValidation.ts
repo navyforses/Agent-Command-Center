@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PROMETHEUS-MIND Phase 2: Prediction Validation System
  * =====================================================

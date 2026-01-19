@@ -332,7 +332,6 @@ export default function Therapy() {
         duration: data.duration ? parseInt(data.duration) : null,
         notes: data.notes || null,
         progressRating: sessionRating,
-        goalsWorkedOn: data.goalsWorkedOn ? data.goalsWorkedOn.split(',').map(g => g.trim()) : [],
       },
     });
   };

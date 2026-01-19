@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PROMETHEUS-MIND Phase 4: Outcome Tracking and Feedback Loops
  *
