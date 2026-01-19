@@ -32,11 +32,13 @@ class Database:
     @asynccontextmanager
     async def acquire(self):
         """Acquire a connection from the pool."""
+        if self.pool is None:
+            raise RuntimeError("Database pool not initialized. Call connect() first.")
         async with self.pool.acquire() as conn:
             yield conn
 
     # Trial operations
-    async def upsert_trial(self, trial: Dict[str, Any]) -> int:
+    async def upsert_trial(self, trial: Dict[str, Any]) -> Optional[int]:
         """Insert or update a trial record."""
         async with self.acquire() as conn:
             result = await conn.fetchrow("""
@@ -158,7 +160,7 @@ class Database:
 
             return [dict(row) for row in rows]
 
-    async def count_trials(self, query: str = None, filters: Dict = None) -> int:
+    async def count_trials(self, query: Optional[str] = None, filters: Optional[Dict[str, Any]] = None) -> int:
         """Count trials matching criteria."""
         async with self.acquire() as conn:
             where_clauses = []
@@ -254,7 +256,7 @@ class Database:
             return [dict(row) for row in rows]
 
     # Patient Profile operations
-    async def create_patient_profile(self, user_id: str, profile: Dict) -> int:
+    async def create_patient_profile(self, user_id: str, profile: Dict[str, Any]) -> Optional[int]:
         """Create a new patient profile."""
         async with self.acquire() as conn:
             result = await conn.fetchrow("""
@@ -319,13 +321,23 @@ class Database:
 
     async def update_patient_profile(self, profile_id: int, updates: Dict):
         """Update patient profile."""
+        ALLOWED_COLUMNS = {
+            'patient_name', 'date_of_birth', 'gender', 'country', 'city',
+            'willing_to_travel', 'travel_distance_km', 'primary_diagnosis',
+            'diagnosis_date', 'secondary_diagnoses', 'medical_history',
+            'current_treatments', 'past_treatments', 'allergies', 'form_100_text',
+            'ai_summary', 'extracted_conditions', 'extracted_keywords',
+            'age_category', 'preferred_language', 'notification_frequency',
+            'content_types'
+        }
+        
         async with self.acquire() as conn:
             set_clauses = []
             params = []
             param_idx = 1
 
             for key, value in updates.items():
-                if key not in ['id', 'user_id', 'created_at']:
+                if key in ALLOWED_COLUMNS:
                     set_clauses.append(f"{key} = ${param_idx}")
                     params.append(value)
                     param_idx += 1
