@@ -315,3 +315,172 @@ INSERT INTO data_source_status (source_name, display_name, is_active) VALUES
 ('orphanet', 'Orphanet', true),
 ('openfda', 'OpenFDA', true)
 ON CONFLICT (source_name) DO NOTHING;
+
+-- ================================
+-- Patient Profiles
+-- ================================
+CREATE TABLE IF NOT EXISTS patient_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Basic info
+    patient_name VARCHAR(200),
+    date_of_birth DATE,
+    gender VARCHAR(20),
+    country VARCHAR(100),
+    city VARCHAR(100),
+    willing_to_travel BOOLEAN DEFAULT true,
+    travel_distance_km INT,
+
+    -- Medical info
+    primary_diagnosis TEXT,
+    diagnosis_date DATE,
+    secondary_diagnoses TEXT[],
+    medical_history TEXT,
+    current_treatments TEXT[],
+    past_treatments TEXT[],
+    allergies TEXT[],
+
+    -- Form 100 / Document
+    form_100_text TEXT,
+    ai_summary TEXT,
+    extracted_conditions TEXT[],
+    extracted_keywords TEXT[],
+
+    -- Derived fields
+    age_category VARCHAR(20), -- neonatal, pediatric, adult, elderly
+
+    -- Preferences
+    preferred_language VARCHAR(5) REFERENCES languages(code) DEFAULT 'ka',
+    notification_frequency VARCHAR(20) DEFAULT 'weekly',
+    content_types TEXT[] DEFAULT ARRAY['clinical_trial', 'research_result'],
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_user ON patient_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_conditions ON patient_profiles USING GIN(extracted_conditions);
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_keywords ON patient_profiles USING GIN(extracted_keywords);
+
+-- ================================
+-- Notification Settings
+-- ================================
+CREATE TABLE IF NOT EXISTS notification_settings (
+    id SERIAL PRIMARY KEY,
+    profile_id INT REFERENCES patient_profiles(id) ON DELETE CASCADE UNIQUE,
+
+    -- Channels
+    email_enabled BOOLEAN DEFAULT true,
+    push_enabled BOOLEAN DEFAULT true,
+    sms_enabled BOOLEAN DEFAULT false,
+
+    -- Frequency
+    frequency VARCHAR(20) DEFAULT 'weekly', -- realtime, daily, weekly, monthly
+
+    -- Content types to notify
+    notify_trials BOOLEAN DEFAULT true,
+    notify_results BOOLEAN DEFAULT true,
+    notify_discoveries BOOLEAN DEFAULT true,
+    notify_news BOOLEAN DEFAULT false,
+
+    -- Thresholds
+    urgent_threshold DECIMAL(5,2) DEFAULT 90.0, -- relevance score above this is urgent
+
+    -- Email digest settings
+    email_digest_day VARCHAR(10) DEFAULT 'sunday',
+    email_digest_hour INT DEFAULT 9,
+
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_settings_profile ON notification_settings(profile_id);
+
+-- ================================
+-- Saved Feed Items
+-- ================================
+CREATE TABLE IF NOT EXISTS saved_feed_items (
+    id SERIAL PRIMARY KEY,
+    profile_id INT REFERENCES patient_profiles(id) ON DELETE CASCADE,
+    item_id VARCHAR(100) NOT NULL, -- trial nct_id or news id
+    item_type VARCHAR(50) DEFAULT 'clinical_trial',
+    notes TEXT,
+    saved_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(profile_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_feed_profile ON saved_feed_items(profile_id);
+CREATE INDEX IF NOT EXISTS idx_saved_feed_item ON saved_feed_items(item_id);
+
+-- ================================
+-- Feed Item History (for tracking what user has seen)
+-- ================================
+CREATE TABLE IF NOT EXISTS feed_item_history (
+    id SERIAL PRIMARY KEY,
+    profile_id INT REFERENCES patient_profiles(id) ON DELETE CASCADE,
+    item_id VARCHAR(100) NOT NULL,
+    item_type VARCHAR(50),
+
+    viewed_at TIMESTAMP,
+    clicked_at TIMESTAMP,
+    shared_at TIMESTAMP,
+    dismissed_at TIMESTAMP,
+
+    relevance_score DECIMAL(5,2),
+
+    UNIQUE(profile_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feed_history_profile ON feed_item_history(profile_id);
+CREATE INDEX IF NOT EXISTS idx_feed_history_date ON feed_item_history(viewed_at DESC);
+
+-- ================================
+-- Medical News Cache
+-- ================================
+CREATE TABLE IF NOT EXISTS medical_news (
+    id SERIAL PRIMARY KEY,
+    external_id VARCHAR(100) UNIQUE,
+
+    title TEXT NOT NULL,
+    summary TEXT,
+    content TEXT,
+
+    source VARCHAR(100), -- pubmed, biorxiv, fda, sciencedaily
+    source_url TEXT,
+
+    content_type VARCHAR(50), -- research_result, discovery, drug_approval, news
+
+    conditions TEXT[],
+    keywords TEXT[],
+
+    published_at TIMESTAMP,
+    fetched_at TIMESTAMP DEFAULT NOW(),
+
+    relevance_score DECIMAL(5,2) DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_medical_news_conditions ON medical_news USING GIN(conditions);
+CREATE INDEX IF NOT EXISTS idx_medical_news_keywords ON medical_news USING GIN(keywords);
+CREATE INDEX IF NOT EXISTS idx_medical_news_source ON medical_news(source);
+CREATE INDEX IF NOT EXISTS idx_medical_news_type ON medical_news(content_type);
+CREATE INDEX IF NOT EXISTS idx_medical_news_date ON medical_news(published_at DESC);
+
+-- ================================
+-- News Translations
+-- ================================
+CREATE TABLE IF NOT EXISTS news_translations (
+    id SERIAL PRIMARY KEY,
+    news_id INT REFERENCES medical_news(id) ON DELETE CASCADE,
+    language_code VARCHAR(5) REFERENCES languages(code),
+
+    title_translated TEXT,
+    summary_translated TEXT,
+
+    translated_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(news_id, language_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_translations_lang ON news_translations(language_code);
+CREATE INDEX IF NOT EXISTS idx_news_translations_news ON news_translations(news_id);

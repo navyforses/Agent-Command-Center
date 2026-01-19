@@ -253,6 +253,206 @@ class Database:
             """, limit)
             return [dict(row) for row in rows]
 
+    # Patient Profile operations
+    async def create_patient_profile(self, user_id: str, profile: Dict) -> int:
+        """Create a new patient profile."""
+        async with self.acquire() as conn:
+            result = await conn.fetchrow("""
+                INSERT INTO patient_profiles (
+                    user_id, patient_name, date_of_birth, gender,
+                    country, city, willing_to_travel, travel_distance_km,
+                    primary_diagnosis, diagnosis_date, secondary_diagnoses,
+                    medical_history, current_treatments, past_treatments, allergies,
+                    form_100_text, ai_summary, extracted_conditions, extracted_keywords,
+                    age_category, preferred_language, notification_frequency,
+                    content_types, created_at, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+                    $21, $22, $23, NOW(), NOW()
+                )
+                RETURNING id
+            """,
+                user_id,
+                profile.get('patient_name'),
+                profile.get('date_of_birth'),
+                profile.get('gender'),
+                profile.get('country'),
+                profile.get('city'),
+                profile.get('willing_to_travel', True),
+                profile.get('travel_distance_km'),
+                profile.get('primary_diagnosis'),
+                profile.get('diagnosis_date'),
+                profile.get('secondary_diagnoses', []),
+                profile.get('medical_history'),
+                profile.get('current_treatments', []),
+                profile.get('past_treatments', []),
+                profile.get('allergies', []),
+                profile.get('form_100_text'),
+                profile.get('ai_summary'),
+                profile.get('extracted_conditions', []),
+                profile.get('extracted_keywords', []),
+                profile.get('age_category'),
+                profile.get('preferred_language', 'ka'),
+                profile.get('notification_frequency', 'weekly'),
+                profile.get('content_types', ['clinical_trial', 'research_result'])
+            )
+            return result['id'] if result else None
+
+    async def get_patient_profile(self, profile_id: int) -> Optional[Dict]:
+        """Get patient profile by ID."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM patient_profiles WHERE id = $1",
+                profile_id
+            )
+            return dict(row) if row else None
+
+    async def get_user_profiles(self, user_id: str) -> List[Dict]:
+        """Get all profiles for a user."""
+        async with self.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM patient_profiles WHERE user_id = $1 ORDER BY created_at DESC",
+                user_id
+            )
+            return [dict(row) for row in rows]
+
+    async def update_patient_profile(self, profile_id: int, updates: Dict):
+        """Update patient profile."""
+        async with self.acquire() as conn:
+            set_clauses = []
+            params = []
+            param_idx = 1
+
+            for key, value in updates.items():
+                if key not in ['id', 'user_id', 'created_at']:
+                    set_clauses.append(f"{key} = ${param_idx}")
+                    params.append(value)
+                    param_idx += 1
+
+            if set_clauses:
+                set_clauses.append(f"updated_at = NOW()")
+                params.append(profile_id)
+
+                await conn.execute(f"""
+                    UPDATE patient_profiles
+                    SET {', '.join(set_clauses)}
+                    WHERE id = ${param_idx}
+                """, *params)
+
+    # Feed operations
+    async def get_feed_items(
+        self,
+        profile_id: int,
+        content_types: Optional[List[str]] = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[Dict]:
+        """Get personalized feed items for a patient."""
+        async with self.acquire() as conn:
+            # Get profile keywords
+            profile = await self.get_patient_profile(profile_id)
+            if not profile:
+                return []
+
+            keywords = profile.get('extracted_keywords', [])
+            conditions = profile.get('extracted_conditions', [])
+
+            # Search trials matching keywords/conditions
+            where_clauses = ["status IN ('RECRUITING', 'NOT_YET_RECRUITING', 'ACTIVE_NOT_RECRUITING')"]
+            params = []
+            param_idx = 1
+
+            if keywords or conditions:
+                search_terms = keywords + conditions
+                where_clauses.append(f"""
+                    (condition && ${param_idx}
+                     OR title_original ILIKE ANY(${param_idx + 1}))
+                """)
+                params.append(search_terms)
+                params.append([f"%{term}%" for term in search_terms])
+                param_idx += 2
+
+            where_sql = " AND ".join(where_clauses)
+
+            rows = await conn.fetch(f"""
+                SELECT *, 'clinical_trial' as content_type
+                FROM trials
+                WHERE {where_sql}
+                ORDER BY relevance_score DESC, updated_at DESC
+                LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            """, *params, limit, offset)
+
+            return [dict(row) for row in rows]
+
+    async def save_feed_item(self, profile_id: int, item_id: str, notes: Optional[str] = None):
+        """Save a feed item for later."""
+        async with self.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO saved_feed_items (profile_id, item_id, notes, saved_at)
+                VALUES ($1, $2, $3, NOW())
+                ON CONFLICT (profile_id, item_id) DO UPDATE SET
+                    notes = EXCLUDED.notes
+            """, profile_id, item_id, notes)
+
+    async def get_saved_feed_items(self, profile_id: int) -> List[Dict]:
+        """Get saved feed items."""
+        async with self.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT * FROM saved_feed_items
+                WHERE profile_id = $1
+                ORDER BY saved_at DESC
+            """, profile_id)
+            return [dict(row) for row in rows]
+
+    # Notification settings
+    async def get_notification_settings(self, profile_id: int) -> Optional[Dict]:
+        """Get notification settings for a profile."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM notification_settings WHERE profile_id = $1",
+                profile_id
+            )
+            return dict(row) if row else None
+
+    async def update_notification_settings(self, profile_id: int, settings: Dict):
+        """Update notification settings."""
+        async with self.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO notification_settings (
+                    profile_id, email_enabled, push_enabled, sms_enabled,
+                    frequency, notify_trials, notify_results, notify_discoveries,
+                    notify_news, urgent_threshold, email_digest_day, email_digest_hour,
+                    updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+                ON CONFLICT (profile_id) DO UPDATE SET
+                    email_enabled = EXCLUDED.email_enabled,
+                    push_enabled = EXCLUDED.push_enabled,
+                    sms_enabled = EXCLUDED.sms_enabled,
+                    frequency = EXCLUDED.frequency,
+                    notify_trials = EXCLUDED.notify_trials,
+                    notify_results = EXCLUDED.notify_results,
+                    notify_discoveries = EXCLUDED.notify_discoveries,
+                    notify_news = EXCLUDED.notify_news,
+                    urgent_threshold = EXCLUDED.urgent_threshold,
+                    email_digest_day = EXCLUDED.email_digest_day,
+                    email_digest_hour = EXCLUDED.email_digest_hour,
+                    updated_at = NOW()
+            """,
+                profile_id,
+                settings.get('email_enabled', True),
+                settings.get('push_enabled', True),
+                settings.get('sms_enabled', False),
+                settings.get('frequency', 'weekly'),
+                settings.get('notify_trials', True),
+                settings.get('notify_results', True),
+                settings.get('notify_discoveries', True),
+                settings.get('notify_news', False),
+                settings.get('urgent_threshold', 90.0),
+                settings.get('email_digest_day', 'sunday'),
+                settings.get('email_digest_hour', 9)
+            )
+
 
 # Global database instance
 db = Database()
