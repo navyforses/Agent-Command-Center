@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web", "postgresql-16", "python-3.11"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
@@ -7,15 +7,20 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "gce"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+build = ["sh", "-c", "cd backend && pip install -r requirements.txt && cd ../client && npm install && npm run build"]
+run = ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port 8000 &  npm run start"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
 [env]
 PORT = "5000"
+PYTHONPATH = "/home/runner/${REPL_SLUG}/backend"
 
 [workflows]
 runButton = "Project"
@@ -27,7 +32,35 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
+args = "Start Backend"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Frontend"
+
+[[workflows.workflow]]
+name = "Start Backend"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && pip install -r requirements.txt && python main.py"
+waitForPort = 8000
+
+[[workflows.workflow]]
+name = "Start Frontend"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Start application"
