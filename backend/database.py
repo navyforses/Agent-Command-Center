@@ -319,13 +319,23 @@ class Database:
 
     async def update_patient_profile(self, profile_id: int, updates: Dict):
         """Update patient profile."""
+        ALLOWED_COLUMNS = {
+            'patient_name', 'date_of_birth', 'gender', 'country', 'city',
+            'willing_to_travel', 'travel_distance_km', 'primary_diagnosis',
+            'diagnosis_date', 'secondary_diagnoses', 'medical_history',
+            'current_treatments', 'past_treatments', 'allergies', 'form_100_text',
+            'ai_summary', 'extracted_conditions', 'extracted_keywords',
+            'age_category', 'preferred_language', 'notification_frequency',
+            'content_types'
+        }
+        
         async with self.acquire() as conn:
             set_clauses = []
             params = []
             param_idx = 1
 
             for key, value in updates.items():
-                if key not in ['id', 'user_id', 'created_at']:
+                if key in ALLOWED_COLUMNS:
                     set_clauses.append(f"{key} = ${param_idx}")
                     params.append(value)
                     param_idx += 1
