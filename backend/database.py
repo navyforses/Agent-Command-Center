@@ -32,11 +32,13 @@ class Database:
     @asynccontextmanager
     async def acquire(self):
         """Acquire a connection from the pool."""
+        if self.pool is None:
+            raise RuntimeError("Database pool not initialized. Call connect() first.")
         async with self.pool.acquire() as conn:
             yield conn
 
     # Trial operations
-    async def upsert_trial(self, trial: Dict[str, Any]) -> int:
+    async def upsert_trial(self, trial: Dict[str, Any]) -> Optional[int]:
         """Insert or update a trial record."""
         async with self.acquire() as conn:
             result = await conn.fetchrow("""
@@ -158,7 +160,7 @@ class Database:
 
             return [dict(row) for row in rows]
 
-    async def count_trials(self, query: str = None, filters: Dict = None) -> int:
+    async def count_trials(self, query: Optional[str] = None, filters: Optional[Dict[str, Any]] = None) -> int:
         """Count trials matching criteria."""
         async with self.acquire() as conn:
             where_clauses = []
@@ -254,7 +256,7 @@ class Database:
             return [dict(row) for row in rows]
 
     # Patient Profile operations
-    async def create_patient_profile(self, user_id: str, profile: Dict) -> int:
+    async def create_patient_profile(self, user_id: str, profile: Dict[str, Any]) -> Optional[int]:
         """Create a new patient profile."""
         async with self.acquire() as conn:
             result = await conn.fetchrow("""
