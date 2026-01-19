@@ -1,706 +1,309 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Plus,
-  FileText,
-  Calendar,
-  Activity,
-  Pill,
-  CheckCircle2,
-  Circle,
-  Clock,
-  ArrowRight,
-  Sparkles,
-  Sun,
-  Moon,
-  Sunrise,
-  TrendingUp,
-  AlertCircle,
-  MessageSquare,
-  Upload,
-  Baby,
-  BookOpen,
-  Zap,
-  Brain,
-  Lightbulb,
-  FlaskConical,
-} from "lucide-react";
-import { DocumentUploadZone } from "@/components/dashboard/DocumentUploadZone";
-import { SmartOnboarding } from "@/components/onboarding/SmartOnboarding";
-import { QuickLog } from "@/components/therapy/QuickLog";
-import { AIDailyBrief } from "@/components/dashboard/AIDailyBrief";
+import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
-import type { Child, Appointment, Therapy, EvolutionReport, AccumulatedKnowledge } from "@shared/schema";
-import { format, isToday, isTomorrow, differenceInHours, parseISO } from "date-fns";
-
-// Get greeting based on time of day
-function getGreeting(language: string): { text: string; icon: React.ElementType } {
-  const hour = new Date().getHours();
-  if (hour < 12) {
-    return {
-      text: language === "ka" ? "დილა მშვიდობისა" : "Good morning",
-      icon: Sunrise,
-    };
-  } else if (hour < 18) {
-    return {
-      text: language === "ka" ? "შუადღე მშვიდობისა" : "Good afternoon",
-      icon: Sun,
-    };
-  } else {
-    return {
-      text: language === "ka" ? "საღამო მშვიდობისა" : "Good evening",
-      icon: Moon,
-    };
-  }
-}
-
-// Task item component
-function TaskItem({
-  title,
-  time,
-  completed,
-  type,
-  onToggle,
-}: {
-  title: string;
-  time?: string;
-  completed: boolean;
-  type: "medication" | "therapy" | "appointment";
-  onToggle?: () => void;
-}) {
-  const typeConfig = {
-    medication: { color: "text-blue-500", bg: "bg-blue-500/10" },
-    therapy: { color: "text-green-500", bg: "bg-green-500/10" },
-    appointment: { color: "text-purple-500", bg: "bg-purple-500/10" },
-  };
-
-  const config = typeConfig[type];
-
-  return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-        completed ? "opacity-60" : "hover:bg-muted/50"
-      }`}
-    >
-      <button
-        onClick={onToggle}
-        className={`flex-shrink-0 ${config.color}`}
-        aria-label={completed ? "Mark as incomplete" : "Mark as complete"}
-      >
-        {completed ? (
-          <CheckCircle2 className="h-5 w-5" />
-        ) : (
-          <Circle className="h-5 w-5" />
-        )}
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className={`font-medium ${completed ? "line-through" : ""}`}>{title}</p>
-        {time && (
-          <p className="text-sm text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {time}
-          </p>
-        )}
-      </div>
-      <Badge variant="outline" className={`${config.bg} ${config.color} border-0`}>
-        {type === "medication" ? <Pill className="h-3 w-3" /> :
-         type === "therapy" ? <Activity className="h-3 w-3" /> :
-         <Calendar className="h-3 w-3" />}
-      </Badge>
-    </div>
-  );
-}
-
-// Quick action button component
-function QuickActionButton({
-  icon: Icon,
-  label,
-  onClick,
-  color = "default",
-}: {
-  icon: React.ElementType;
-  label: string;
-  onClick: () => void;
-  color?: "default" | "primary" | "success" | "warning";
-}) {
-  const colorClasses = {
-    default: "hover:bg-muted",
-    primary: "hover:bg-primary/10 text-primary",
-    success: "hover:bg-green-500/10 text-green-600",
-    warning: "hover:bg-orange-500/10 text-orange-600",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${colorClasses[color]}`}
-    >
-      <div className={`p-3 rounded-full bg-muted`}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <span className="text-sm font-medium text-center">{label}</span>
-    </button>
-  );
-}
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Search,
+  FileText,
+  Bell,
+  Settings,
+  Bookmark,
+  TrendingUp,
+  ArrowRight,
+  User,
+  Calendar,
+  FlaskConical,
+  Upload,
+  ChevronRight,
+  Zap
+} from "lucide-react";
 
 export default function Dashboard() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showSmartOnboarding, setShowSmartOnboarding] = useState(false);
-  const [showQuickLog, setShowQuickLog] = useState(false);
-  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
 
-  const greeting = getGreeting(language);
-  const GreetingIcon = greeting.icon;
+  const userName = user?.firstName || user?.email?.split('@')[0] || (language === 'ka' ? 'მომხმარებელი' : 'User');
 
-  // Data fetching
-  const { data: children, isLoading: childrenLoading } = useQuery<Child[]>({
-    queryKey: ["/api/children"],
-  });
+  // Mock data for demo
+  const stats = {
+    savedTrials: 12,
+    matchingTrials: 8,
+    profileComplete: 75,
+    lastSearch: '2024-01-15'
+  };
 
-  const { data: appointments, isLoading: appointmentsLoading } = useQuery<Appointment[]>({
-    queryKey: ["/api/appointments"],
-  });
-
-  const { data: therapies, isLoading: therapiesLoading } = useQuery<Therapy[]>({
-    queryKey: ["/api/therapies"],
-  });
-
-  // Evolution research data
-  const { data: evolutionReports } = useQuery<EvolutionReport[]>({
-    queryKey: ["/api/evolution/reports"],
-  });
-
-  const { data: accumulatedKnowledge } = useQuery<AccumulatedKnowledge[]>({
-    queryKey: ["/api/evolution/accumulated-knowledge"],
-  });
-
-  const isLoading = childrenLoading || appointmentsLoading || therapiesLoading;
-
-  const userName = user?.firstName || (language === "ka" ? "მშობელი" : "Parent");
-  const childrenList = children || [];
-  const hasChildren = childrenList.length > 0;
-  const primaryChild = childrenList[0];
-
-  // Generate today's tasks
-  const todaysTasks = () => {
-    const tasks: Array<{
-      id: string;
-      title: string;
-      time?: string;
-      type: "medication" | "therapy" | "appointment";
-    }> = [];
-
-    // Add appointments for today
-    appointments?.forEach((apt) => {
-      const aptDate = new Date(apt.appointmentDate);
-      if (isToday(aptDate)) {
-        tasks.push({
-          id: `apt-${apt.id}`,
-          title: apt.title,
-          time: format(aptDate, "HH:mm"),
-          type: "appointment",
-        });
-      }
-    });
-
-    // Add active therapies as daily tasks
-    therapies?.filter(t => t.isActive).slice(0, 2).forEach((therapy) => {
-      tasks.push({
-        id: `therapy-${therapy.id}`,
-        title: therapy.name,
-        type: "therapy",
-      });
-    });
-
-    // Add sample medication tasks if we have children
-    if (hasChildren) {
-      tasks.push(
-        { id: "med-1", title: language === "ka" ? "დილის წამალი" : "Morning medication", time: "09:00", type: "medication" },
-        { id: "med-2", title: language === "ka" ? "საღამოს წამალი" : "Evening medication", time: "21:00", type: "medication" }
-      );
+  const recentTrials = [
+    {
+      id: '1',
+      title: 'Phase 3 Study of Drug X for Type 2 Diabetes',
+      status: 'recruiting',
+      match: 92,
+      location: 'Germany'
+    },
+    {
+      id: '2',
+      title: 'Immunotherapy Trial for Advanced Melanoma',
+      status: 'recruiting',
+      match: 87,
+      location: 'USA'
+    },
+    {
+      id: '3',
+      title: 'Novel Treatment for Chronic Pain Management',
+      status: 'active',
+      match: 78,
+      location: 'UK'
     }
-
-    return tasks.sort((a, b) => {
-      if (!a.time) return 1;
-      if (!b.time) return -1;
-      return a.time.localeCompare(b.time);
-    });
-  };
-
-  // Calculate task completion percentage
-  const tasks = todaysTasks();
-  const completedCount = tasks.filter((t) => completedTasks.has(t.id)).length;
-  const completionPercentage = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
-
-  // Get upcoming appointments
-  const upcomingAppointments = appointments
-    ?.filter((apt) => new Date(apt.appointmentDate) > new Date())
-    .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
-    .slice(0, 3);
-
-  // Navigation handlers
-  const navigateTo = (path: string) => setLocation(path);
-
-  const toggleTask = (taskId: string) => {
-    setCompletedTasks((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
-      return newSet;
-    });
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-32 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  ];
 
   return (
-    <div className="p-4 md:p-6 space-y-6" data-testid="text-page-title">
-      {/* Greeting Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <GreetingIcon className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl md:text-3xl font-bold">
-              {greeting.text}, {userName}
-            </h1>
-          </div>
-          {hasChildren && primaryChild && (
-            <p className="text-muted-foreground">
-              {language === "ka"
-                ? `${primaryChild.firstName}-ს დღეს აქვს ${tasks.length} დავალება`
-                : `${primaryChild.firstName} has ${tasks.length} tasks today`}
-            </p>
-          )}
-        </div>
-
-        {/* Progress indicator */}
-        {tasks.length > 0 && (
-          <div className="flex items-center gap-3 bg-muted/50 px-4 py-2 rounded-full">
-            <div className="text-sm font-medium">
-              {completedCount}/{tasks.length}
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="container py-8 px-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {t('profile.welcome')}, {userName}!
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {language === 'ka'
+                  ? 'თქვენი პერსონალიზებული კლინიკური კვლევების პანელი'
+                  : 'Your personalized clinical trials dashboard'}
+              </p>
             </div>
-            <Progress value={completionPercentage} className="w-24 h-2" />
-            <span className="text-sm text-muted-foreground">
-              {language === "ka" ? "შესრულებული" : "completed"}
-            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setLocation('/profile')}>
+                <User className="h-4 w-4 mr-2" />
+                {t('nav.profile')}
+              </Button>
+              <Button onClick={() => setLocation('/search')}>
+                <Search className="h-4 w-4 mr-2" />
+                {t('nav.search')}
+              </Button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* AI Daily Brief */}
-      <AIDailyBrief
-        children={childrenList}
-        appointments={appointments}
-        therapies={therapies}
-        onNavigate={navigateTo}
-      />
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column - Tasks & Actions */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Today's Tasks */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {language === "ka" ? "დღის დავალებები" : "Today's Tasks"}
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => navigateTo("/therapy")}>
-                  {language === "ka" ? "ყველას ნახვა" : "View all"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              {tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    title={task.title}
-                    time={task.time}
-                    completed={completedTasks.has(task.id)}
-                    type={task.type}
-                    onToggle={() => toggleTask(task.id)}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>{language === "ka" ? "დღეს დავალებები არ არის" : "No tasks for today"}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions Grid */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">
-                {language === "ka" ? "სწრაფი მოქმედებები" : "Quick Actions"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Quick Log - Primary action */}
-                <Dialog open={showQuickLog} onOpenChange={setShowQuickLog}>
-                  <DialogTrigger asChild>
-                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors hover:bg-green-500/10 text-green-600 border-green-200 dark:border-green-900" data-testid="button-quick-log">
-                      <div className="p-3 rounded-full bg-green-500/10">
-                        <Zap className="h-5 w-5" />
-                      </div>
-                      <span className="text-sm font-medium text-center">
-                        {language === "ka" ? "სწრაფი ჩანაწერი" : "Quick Log"}
-                      </span>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md p-0">
-                    <QuickLog
-                      onComplete={() => setShowQuickLog(false)}
-                      onCancel={() => setShowQuickLog(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                  <DialogTrigger asChild>
-                    <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors hover:bg-purple-500/10 text-purple-600">
-                      <div className="p-3 rounded-full bg-purple-500/10">
-                        <Upload className="h-5 w-5" />
-                      </div>
-                      <span className="text-sm font-medium text-center">
-                        {language === "ka" ? "დოკუმენტი" : "Upload"}
-                      </span>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {language === "ka" ? "დოკუმენტის ატვირთვა" : "Upload Document"}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <DocumentUploadZone onUploadComplete={() => setShowUploadDialog(false)} />
-                  </DialogContent>
-                </Dialog>
-
-                <QuickActionButton
-                  icon={Calendar}
-                  label={language === "ka" ? "ახალი ვიზიტი" : "New Appointment"}
-                  onClick={() => navigateTo("/calendar")}
-                  color="primary"
-                />
-                <QuickActionButton
-                  icon={MessageSquare}
-                  label={language === "ka" ? "AI ჩატი" : "AI Chat"}
-                  onClick={() => navigateTo("/assistant")}
-                  color="success"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Appointments & Insights */}
-        <div className="space-y-6">
-          {/* Upcoming Appointments */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {language === "ka" ? "მომავალი ვიზიტები" : "Upcoming"}
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => navigateTo("/calendar")}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {upcomingAppointments && upcomingAppointments.length > 0 ? (
-                upcomingAppointments.map((apt) => {
-                  const aptDate = new Date(apt.appointmentDate);
-                  const isAptToday = isToday(aptDate);
-                  const isAptTomorrow = isTomorrow(aptDate);
-
-                  return (
-                    <div
-                      key={apt.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => navigateTo("/calendar")}
-                    >
-                      <div className={`p-2 rounded-lg ${isAptToday ? "bg-red-500/10" : "bg-muted"}`}>
-                        <Calendar className={`h-4 w-4 ${isAptToday ? "text-red-500" : ""}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{apt.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {isAptToday
-                            ? language === "ka"
-                              ? "დღეს"
-                              : "Today"
-                            : isAptTomorrow
-                            ? language === "ka"
-                              ? "ხვალ"
-                              : "Tomorrow"
-                            : format(aptDate, "MMM d")}
-                          {" • "}
-                          {format(aptDate, "HH:mm")}
-                        </p>
-                      </div>
-                      {isAptToday && (
-                        <Badge variant="destructive" className="text-xs">
-                          {language === "ka" ? "დღეს" : "Today"}
-                        </Badge>
-                      )}
+      <div className="container py-8 px-4">
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Main Content - Left 2 columns */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Profile Completion Card */}
+            {stats.profileComplete < 100 && (
+              <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-transparent">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-xl bg-primary/10">
+                      <FileText className="h-6 w-6 text-primary" />
                     </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">
-                    {language === "ka" ? "ვიზიტები არ არის" : "No upcoming appointments"}
-                  </p>
-                  <Button variant="link" size="sm" onClick={() => navigateTo("/calendar")}>
-                    {language === "ka" ? "დაამატე" : "Add one"}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Child Quick View */}
-          {hasChildren && primaryChild ? (
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigateTo(`/child/${primaryChild.id}`)}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <Baby className="h-6 w-6 text-primary" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold mb-1">
+                        {language === 'ka' ? 'შეავსეთ პროფილი' : 'Complete Your Profile'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {language === 'ka'
+                          ? 'სრული პროფილი დაგეხმარებათ უკეთესი შესაბამისობის პოვნაში'
+                          : 'A complete profile helps us find better matching trials'}
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <Progress value={stats.profileComplete} className="flex-1 h-2" />
+                        <span className="text-sm font-medium">{stats.profileComplete}%</span>
+                      </div>
+                      <Button variant="link" className="p-0 h-auto mt-2" onClick={() => setLocation('/profile')}>
+                        {language === 'ka' ? 'პროფილის შევსება' : 'Complete Profile'}
+                        <ArrowRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold">
-                      {primaryChild.firstName} {primaryChild.lastName}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {primaryChild.diagnosis || (language === "ka" ? "პროფილის ნახვა" : "View profile")}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
-              <CardContent className="p-6 text-center">
-                <div className="inline-flex p-3 bg-primary/10 rounded-full mb-3">
-                  <Sparkles className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="font-medium mb-1">
-                  {language === "ka" ? "სმარტ პროფილის შექმნა" : "Smart Profile Setup"}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {language === "ka"
-                    ? "ატვირთეთ დოკუმენტი და AI ავტომატურად შეავსებს პროფილს"
-                    : "Upload a document and AI will auto-fill the profile"}
-                </p>
-                <Dialog open={showSmartOnboarding} onOpenChange={setShowSmartOnboarding}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full gap-2" data-testid="button-smart-onboarding">
-                      <Upload className="h-4 w-4" />
-                      {language === "ka" ? "დაწყება" : "Get Started"}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <SmartOnboarding
-                      onComplete={() => {
-                        setShowSmartOnboarding(false);
-                        // Refresh children data
-                        window.location.reload();
-                      }}
-                      onCancel={() => {
-                        setShowSmartOnboarding(false);
-                        navigateTo("/child-profile");
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 w-full text-muted-foreground"
-                  onClick={() => navigateTo("/child-profile")}
-                >
-                  {language === "ka" ? "ხელით შევსება" : "Fill Manually"}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Research Results Section */}
-          {(evolutionReports && evolutionReports.length > 0) || (accumulatedKnowledge && accumulatedKnowledge.length > 0) ? (
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors border-primary/20 bg-gradient-to-br from-primary/5 to-transparent"
-              onClick={() => navigateTo("/evolution")}
-            >
-              <CardHeader className="pb-2">
+            {/* Matching Trials */}
+            <Card>
+              <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FlaskConical className="h-5 w-5 text-primary" />
-                    {language === "ka" ? "კვლევის შედეგები" : "Research Results"}
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    {language === "ka" ? "ახალი" : "New"}
+                  <div>
+                    <CardTitle>{t('profile.matchingTrials')}</CardTitle>
+                    <CardDescription>
+                      {language === 'ka'
+                        ? 'კვლევები რომლებიც შეესაბამება თქვენს პროფილს'
+                        : 'Trials that match your profile'}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <Zap className="h-3 w-3" />
+                    {stats.matchingTrials} {language === 'ka' ? 'ახალი' : 'new'}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Daily Discovery - Narrative Format */}
-                {(() => {
-                  const latestReport = evolutionReports?.[0];
-                  const latestKnowledge = accumulatedKnowledge?.find(k => k.status === "active" || k.status === "validated");
-
-                  // Get narrative content from report summary or knowledge content
-                  const narrativeText = latestReport
-                    ? (language === "ka" && latestReport.summaryKa ? latestReport.summaryKa : latestReport.summaryEn)
-                    : latestKnowledge
-                      ? (language === "ka" && latestKnowledge.contentKa ? latestKnowledge.contentKa : latestKnowledge.contentEn)
-                      : null;
-
-                  const narrativeTitle = latestReport
-                    ? (language === "ka" && latestReport.titleKa ? latestReport.titleKa : latestReport.titleEn)
-                    : latestKnowledge
-                      ? (language === "ka" && latestKnowledge.titleKa ? latestKnowledge.titleKa : latestKnowledge.titleEn)
-                      : null;
-
-                  const narrativeDate = latestReport?.reportDate
-                    ? format(parseISO(latestReport.reportDate), "d MMM, yyyy")
-                    : latestKnowledge?.createdAt
-                      ? format(new Date(latestKnowledge.createdAt), "d MMM, yyyy")
-                      : null;
-
-                  if (!narrativeText) return null;
-
-                  return (
-                    <div className="p-3 bg-gradient-to-r from-primary/5 to-blue-500/5 rounded-lg border border-primary/10">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Brain className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-medium text-primary">
-                          {language === "ka" ? "დღის აღმოჩენა" : "Today's Discovery"}
-                        </span>
-                        {narrativeDate && (
-                          <span className="text-xs text-muted-foreground ml-auto">
-                            {narrativeDate}
-                          </span>
-                        )}
+                {recentTrials.map((trial) => (
+                  <div
+                    key={trial.id}
+                    className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/trial/${trial.id}`)}
+                  >
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <FlaskConical className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium line-clamp-1">{trial.title}</h4>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                        <Badge variant={trial.status === 'recruiting' ? 'default' : 'secondary'} className="text-xs">
+                          {trial.status === 'recruiting'
+                            ? (language === 'ka' ? 'რეკრუტირება' : 'Recruiting')
+                            : (language === 'ka' ? 'აქტიური' : 'Active')}
+                        </Badge>
+                        <span>•</span>
+                        <span>{trial.location}</span>
                       </div>
-                      {narrativeTitle && (
-                        <h4 className="font-medium text-sm mb-1">{narrativeTitle}</h4>
-                      )}
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
-                        {narrativeText}
-                      </p>
                     </div>
-                  );
-                })()}
-
-                {/* Knowledge Stats */}
-                {accumulatedKnowledge && accumulatedKnowledge.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2 bg-muted/50 rounded-md">
-                      <p className="text-lg font-bold text-primary">
-                        {accumulatedKnowledge.filter(k => k.status === "validated").length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {language === "ka" ? "დადასტურებული" : "Validated"}
-                      </p>
-                    </div>
-                    <div className="p-2 bg-muted/50 rounded-md">
-                      <p className="text-lg font-bold text-green-600">
-                        {accumulatedKnowledge.filter(k => k.status === "active").length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {language === "ka" ? "აქტიური" : "Active"}
-                      </p>
-                    </div>
-                    <div className="p-2 bg-muted/50 rounded-md">
-                      <p className="text-lg font-bold text-blue-600">
-                        {accumulatedKnowledge.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {language === "ka" ? "სულ" : "Total"}
-                      </p>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-primary">{trial.match}%</div>
+                      <div className="text-xs text-muted-foreground">{t('feed.matchScore')}</div>
                     </div>
                   </div>
-                )}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-primary hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigateTo("/evolution");
-                  }}
-                >
-                  {language === "ka" ? "სრულად ნახვა" : "View Full Details"}
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                ))}
+                <Button variant="ghost" className="w-full" onClick={() => setLocation('/feed')}>
+                  {language === 'ka' ? 'ყველას ნახვა' : 'View All'}
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            /* AI Tip - shown when no research results */
-            <Card className="border-dashed">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+
+            {/* Quick Actions */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation('/search')}>
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-blue-500/10">
+                    <Search className="h-6 w-6 text-blue-500" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">
-                      {language === "ka" ? "AI რჩევა" : "AI Tip"}
-                    </p>
+                    <h3 className="font-semibold">{t('search.title')}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {language === "ka"
-                        ? "ატვირთეთ სამედიცინო დოკუმენტები AI ანალიზისთვის და მიიღეთ პერსონალიზებული რეკომენდაციები."
-                        : "Upload medical documents for AI analysis and get personalized recommendations."}
+                      {language === 'ka' ? 'მოძებნეთ ახალი კვლევები' : 'Find new trials'}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation('/profile')}>
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-orange-500/10">
+                    <Upload className="h-6 w-6 text-orange-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{t('profile.uploadForm100')}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {language === 'ka' ? 'AI ანალიზისთვის' : 'For AI analysis'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Sidebar - Right column */}
+          <div className="space-y-6">
+            {/* Stats Cards */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{t('profile.savedTrials')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-pink-500/10">
+                      <Bookmark className="h-5 w-5 text-pink-500" />
+                    </div>
+                    <div className="text-3xl font-bold">{stats.savedTrials}</div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation('/saved')}>
+                    {language === 'ka' ? 'ნახვა' : 'View'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          )}
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{t('profile.notifications')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-500/10">
+                      <Bell className="h-5 w-5 text-green-500" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-semibold">
+                        {language === 'ka' ? 'ჩართული' : 'Enabled'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {language === 'ka' ? 'კვირეული დაიჯესტი' : 'Weekly digest'}
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation('/settings')}>
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Deep Search Promo */}
+            <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="h-5 w-5" />
+                  <span className="font-semibold">Deep Search</span>
+                </div>
+                <p className="text-sm opacity-90 mb-4">
+                  {language === 'ka'
+                    ? 'ექსპერტები იპოვიან თქვენთვის იდეალურ კვლევებს'
+                    : 'Let our experts find the perfect trials for you'}
+                </p>
+                <Button variant="secondary" size="sm" className="w-full" onClick={() => setLocation('/pricing')}>
+                  {language === 'ka' ? 'გაიგეთ მეტი' : 'Learn More'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Quick Links */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  {language === 'ka' ? 'სწრაფი ბმულები' : 'Quick Links'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link href="/feed">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <FlaskConical className="h-4 w-4 mr-2" />
+                    {t('nav.feed')}
+                  </Button>
+                </Link>
+                <Link href="/blog">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t('nav.blog')}
+                  </Button>
+                </Link>
+                <Link href="/settings">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Settings className="h-4 w-4 mr-2" />
+                    {t('nav.settings')}
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
