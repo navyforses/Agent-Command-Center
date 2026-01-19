@@ -484,3 +484,26 @@ CREATE TABLE IF NOT EXISTS news_translations (
 
 CREATE INDEX IF NOT EXISTS idx_news_translations_lang ON news_translations(language_code);
 CREATE INDEX IF NOT EXISTS idx_news_translations_news ON news_translations(news_id);
+
+-- ================================
+-- Payment History
+-- ================================
+CREATE TABLE IF NOT EXISTS payment_history (
+    id SERIAL PRIMARY KEY,
+    stripe_customer_id VARCHAR(100),
+    stripe_invoice_id VARCHAR(100) UNIQUE,
+    stripe_payment_intent_id VARCHAR(100),
+
+    amount_paid DECIMAL(10,2),
+    currency VARCHAR(3) DEFAULT 'usd',
+    status VARCHAR(20),
+
+    payment_type VARCHAR(50), -- subscription, deep_search
+    description TEXT,
+
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_history_customer ON payment_history(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_payment_history_date ON payment_history(paid_at DESC);
