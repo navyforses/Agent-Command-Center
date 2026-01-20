@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Check, Sparkles, Zap, Crown, Search, Loader2 } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Search, Loader2, FlaskConical, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PricingTier {
@@ -33,6 +36,97 @@ interface PricingData {
   tiers: PricingTier[];
   deep_search: DeepSearchTier[];
 }
+
+// Static fallback pricing data
+const fallbackPricingData: PricingData = {
+  tiers: [
+    {
+      id: "free",
+      name: { ka: "უფასო", en: "Free", ru: "Бесплатно" },
+      description: {
+        ka: "იდეალურია დამწყებთათვის",
+        en: "Perfect for getting started",
+        ru: "Идеально для начала"
+      },
+      price_monthly: 0,
+      price_yearly: 0,
+      features: [
+        { key: "searches", value: "5" },
+        { key: "languages", value: "3" },
+        { key: "digest", value: "weekly" },
+        { key: "saved", value: "10" },
+        { key: "deep_search", value: false },
+        { key: "priority_support", value: false },
+        { key: "api_access", value: false }
+      ],
+      cta: "get_started"
+    },
+    {
+      id: "premium",
+      name: { ka: "პრემიუმი", en: "Premium", ru: "Премиум" },
+      description: {
+        ka: "სერიოზული მომხმარებლებისთვის",
+        en: "For serious users",
+        ru: "Для серьёзных пользователей"
+      },
+      price_monthly: 19,
+      price_yearly: 182,
+      features: [
+        { key: "searches", value: "50" },
+        { key: "languages", value: "40+" },
+        { key: "digest", value: "daily" },
+        { key: "saved", value: "100" },
+        { key: "deep_search", value: "10%" },
+        { key: "priority_support", value: true },
+        { key: "api_access", value: false }
+      ],
+      popular: true,
+      cta: "subscribe"
+    },
+    {
+      id: "premium_plus",
+      name: { ka: "პრემიუმი+", en: "Premium+", ru: "Премиум+" },
+      description: {
+        ka: "პროფესიონალებისთვის",
+        en: "For professionals",
+        ru: "Для профессионалов"
+      },
+      price_monthly: 49,
+      price_yearly: 470,
+      features: [
+        { key: "searches", value: "unlimited" },
+        { key: "languages", value: "40+" },
+        { key: "digest", value: "realtime" },
+        { key: "saved", value: "unlimited" },
+        { key: "deep_search", value: "25%" },
+        { key: "priority_support", value: true },
+        { key: "api_access", value: true }
+      ],
+      cta: "subscribe"
+    }
+  ],
+  deep_search: [
+    {
+      id: "basic",
+      name: { ka: "Basic", en: "Basic", ru: "Basic" },
+      price: 49,
+      includes: ["5 კვლევის ანალიზი", "48 საათში", "ელფოსტით მხარდაჭერა"]
+    },
+    {
+      id: "standard",
+      name: { ka: "Standard", en: "Standard", ru: "Standard" },
+      price: 99,
+      includes: ["15 კვლევის ანალიზი", "24 საათში", "პრიორიტეტული მხარდაჭერა", "1 კონსულტაცია"],
+      popular: true
+    },
+    {
+      id: "premium",
+      name: { ka: "Premium", en: "Premium", ru: "Premium" },
+      price: 199,
+      includes: ["შეუზღუდავი კვლევები", "12 საათში", "VIP მხარდაჭერა", "3 კონსულტაცია"]
+    }
+  ]
+};
 
 const translations = {
   en: {
@@ -62,6 +156,10 @@ const translations = {
       daily: "Daily",
       realtime: "Real-time",
     },
+    included: "Included",
+    notIncluded: "Not included",
+    unlimited: "Unlimited",
+    questions: "Questions? Contact us at support@trialnavigator.com"
   },
   ka: {
     title: "აირჩიეთ გეგმა",
@@ -90,6 +188,10 @@ const translations = {
       daily: "ყოველდღიური",
       realtime: "რეალურ დროში",
     },
+    included: "შედის",
+    notIncluded: "არ შედის",
+    unlimited: "შეუზღუდავი",
+    questions: "გაქვთ კითხვები? დაგვიკავშირდით support@trialnavigator.com"
   },
   ru: {
     title: "Выберите план",
@@ -108,7 +210,7 @@ const translations = {
       searches: "Поисков в день",
       languages: "Языков перевода",
       digest: "Email-дайджест",
-      saved: "Сохраненных исследований",
+      saved: "Сохранённых исследований",
       deep_search: "Скидка на Deep Search",
       priority_support: "Приоритетная поддержка",
       api_access: "Доступ к API",
@@ -118,6 +220,10 @@ const translations = {
       daily: "Ежедневный",
       realtime: "В реальном времени",
     },
+    included: "Включено",
+    notIncluded: "Не включено",
+    unlimited: "Неограниченно",
+    questions: "Есть вопросы? Свяжитесь с нами: support@trialnavigator.com"
   },
 };
 
@@ -128,19 +234,27 @@ const tierIcons: Record<string, React.ReactNode> = {
 };
 
 export default function Pricing() {
-  const { language } = useLanguage();
+  const { t: globalT, language } = useLanguage();
   const { toast } = useToast();
   const [isYearly, setIsYearly] = useState(false);
   const t = translations[language as keyof typeof translations] || translations.en;
 
-  // Fetch pricing data
+  // Fetch pricing data with fallback
   const { data: pricingData, isLoading } = useQuery<PricingData>({
     queryKey: ["pricing"],
     queryFn: async () => {
-      const res = await fetch("/api/payments/pricing");
-      if (!res.ok) throw new Error("Failed to fetch pricing");
-      return res.json();
+      try {
+        const res = await fetch("/api/payments/pricing");
+        if (!res.ok) throw new Error("Failed to fetch pricing");
+        const data = await res.json();
+        // If no tiers returned, use fallback
+        if (!data?.tiers?.length) return fallbackPricingData;
+        return data;
+      } catch {
+        return fallbackPricingData;
+      }
     },
+    initialData: fallbackPricingData,
   });
 
   // Create checkout session
@@ -150,7 +264,7 @@ export default function Pricing() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-User-ID": "current-user-id", // Should come from auth
+          "X-User-ID": "current-user-id",
         },
         body: JSON.stringify({ tier, billing_period: billingPeriod }),
       });
@@ -158,7 +272,6 @@ export default function Pricing() {
       return res.json();
     },
     onSuccess: (data) => {
-      // Redirect to Stripe Checkout
       window.location.href = data.url;
     },
     onError: () => {
@@ -178,208 +291,269 @@ export default function Pricing() {
     });
   };
 
-  const formatFeatureValue = (key: string, value: string | boolean): string => {
+  const formatFeatureValue = (key: string, value: string | boolean): { text: string; included: boolean } => {
     if (typeof value === "boolean") {
-      return value ? "Yes" : "No";
+      return { text: value ? t.included : t.notIncluded, included: value };
     }
     if (key === "digest" && t.digestOptions[value as keyof typeof t.digestOptions]) {
-      return t.digestOptions[value as keyof typeof t.digestOptions];
+      return { text: t.digestOptions[value as keyof typeof t.digestOptions], included: true };
     }
     if (value === "unlimited") {
-      return language === "ka" ? "შეუზღუდავი" : language === "ru" ? "Неограниченно" : "Unlimited";
+      return { text: t.unlimited, included: true };
     }
-    return value;
+    if (key === "deep_search" && typeof value === "string" && value.includes("%")) {
+      return { text: value + " " + (language === 'ka' ? 'ფასდაკლება' : language === 'ru' ? 'скидка' : 'discount'), included: true };
+    }
+    return { text: value, included: true };
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-4">{t.title}</h1>
-        <p className="text-xl text-muted-foreground mb-8">{t.subtitle}</p>
-
-        {/* Billing toggle */}
-        <div className="flex items-center justify-center gap-4">
-          <Label
-            htmlFor="billing-toggle"
-            className={!isYearly ? "font-semibold" : "text-muted-foreground"}
-          >
-            {t.monthly}
-          </Label>
-          <Switch
-            id="billing-toggle"
-            checked={isYearly}
-            onCheckedChange={setIsYearly}
-          />
-          <Label
-            htmlFor="billing-toggle"
-            className={isYearly ? "font-semibold" : "text-muted-foreground"}
-          >
-            {t.yearly}
-            <Badge variant="secondary" className="ml-2">
-              {t.save}
-            </Badge>
-          </Label>
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <FlaskConical className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-lg">Trial Navigator</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/pricing" className="text-sm font-medium text-primary">
+              {globalT('nav.pricing')}
+            </Link>
+            <Link href="/services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+              {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
+            </Link>
+          </nav>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+            <Link href="/login">
+              <Button variant="ghost" size="sm">
+                {globalT('nav.login')}
+              </Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm">
+                {globalT('nav.register')}
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Pricing tiers */}
-      <div className="grid md:grid-cols-3 gap-6 mb-16">
-        {pricingData?.tiers.map((tier) => {
-          const price = isYearly ? tier.price_yearly : tier.price_monthly;
-          const period = isYearly ? t.perYear : t.perMonth;
-          const name = tier.name[language] || tier.name.en;
-          const description = tier.description[language] || tier.description.en;
+      <div className="container mx-auto px-4 py-12 max-w-6xl">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t.title}</h1>
+          <p className="text-lg text-muted-foreground mb-8">{t.subtitle}</p>
 
-          return (
-            <Card
-              key={tier.id}
-              className={`relative ${
-                tier.popular
-                  ? "border-primary shadow-lg scale-105"
-                  : ""
-              }`}
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-4">
+            <Label
+              htmlFor="billing-toggle"
+              className={!isYearly ? "font-semibold" : "text-muted-foreground"}
             >
-              {tier.popular && (
-                <Badge
-                  className="absolute -top-3 left-1/2 -translate-x-1/2"
-                  variant="default"
+              {t.monthly}
+            </Label>
+            <Switch
+              id="billing-toggle"
+              checked={isYearly}
+              onCheckedChange={setIsYearly}
+            />
+            <Label
+              htmlFor="billing-toggle"
+              className={isYearly ? "font-semibold" : "text-muted-foreground"}
+            >
+              {t.yearly}
+              <Badge variant="secondary" className="ml-2">
+                {t.save}
+              </Badge>
+            </Label>
+          </div>
+        </div>
+
+        {/* Pricing tiers */}
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-6 mb-16">
+            {pricingData?.tiers.map((tier) => {
+              const price = isYearly ? tier.price_yearly : tier.price_monthly;
+              const period = isYearly ? t.perYear : t.perMonth;
+              const name = tier.name[language] || tier.name.en;
+              const description = tier.description[language] || tier.description.en;
+
+              return (
+                <Card
+                  key={tier.id}
+                  className={`relative flex flex-col ${
+                    tier.popular
+                      ? "border-primary shadow-lg scale-[1.02]"
+                      : ""
+                  }`}
                 >
-                  {language === "ka" ? "პოპულარული" : language === "ru" ? "Популярный" : "Most Popular"}
-                </Badge>
-              )}
-
-              <CardHeader className="text-center pb-2">
-                <div className="mx-auto mb-2 p-3 rounded-full bg-primary/10 w-fit">
-                  {tierIcons[tier.id]}
-                </div>
-                <CardTitle className="text-2xl">{name}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-
-              <CardContent className="text-center">
-                <div className="mb-6">
-                  <span className="text-4xl font-bold">
-                    {price === 0 ? (language === "ka" ? "უფასო" : language === "ru" ? "Бесплатно" : "Free") : `$${price}`}
-                  </span>
-                  {price > 0 && (
-                    <span className="text-muted-foreground">{period}</span>
+                  {tier.popular && (
+                    <Badge
+                      className="absolute -top-3 left-1/2 -translate-x-1/2"
+                      variant="default"
+                    >
+                      {language === "ka" ? "პოპულარული" : language === "ru" ? "Популярный" : "Most Popular"}
+                    </Badge>
                   )}
-                </div>
 
-                <ul className="space-y-3 text-left">
-                  {tier.features.map((feature) => (
-                    <li key={feature.key} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-sm">
-                        <span className="text-muted-foreground">
-                          {t.features[feature.key as keyof typeof t.features] || feature.key}:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {formatFeatureValue(feature.key, feature.value)}
-                        </span>
+                  <CardHeader className="text-center pb-4">
+                    <div className="mx-auto mb-3 p-3 rounded-full bg-primary/10 w-fit">
+                      {tierIcons[tier.id]}
+                    </div>
+                    <CardTitle className="text-xl">{name}</CardTitle>
+                    <CardDescription className="text-sm">{description}</CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="text-center flex-1">
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold">
+                        {price === 0 ? (language === "ka" ? "უფასო" : language === "ru" ? "Бесплатно" : "Free") : `$${price}`}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
+                      {price > 0 && (
+                        <span className="text-muted-foreground text-sm">{period}</span>
+                      )}
+                    </div>
 
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={tier.popular ? "default" : "outline"}
-                  disabled={tier.id === "free" || checkoutMutation.isPending}
-                  onClick={() => handleSubscribe(tier.id)}
-                >
-                  {checkoutMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {tier.id === "free"
-                    ? t.currentPlan
-                    : t.subscribe}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+                    <ul className="space-y-3 text-left">
+                      {tier.features.map((feature) => {
+                        const { text, included } = formatFeatureValue(feature.key, feature.value);
+                        return (
+                          <li key={feature.key} className="flex items-start gap-2">
+                            {included ? (
+                              <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                            ) : (
+                              <X className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            )}
+                            <span className={`text-sm ${!included ? 'text-muted-foreground' : ''}`}>
+                              <span className="text-muted-foreground">
+                                {t.features[feature.key as keyof typeof t.features] || feature.key}:
+                              </span>{" "}
+                              <span className={`font-medium ${!included ? 'text-muted-foreground' : ''}`}>
+                                {text}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </CardContent>
 
-      <Separator className="my-12" />
+                  <CardFooter className="pt-4">
+                    <Button
+                      className="w-full"
+                      variant={tier.popular ? "default" : "outline"}
+                      disabled={checkoutMutation.isPending}
+                      onClick={() => tier.id === "free" ? window.location.href = "/register" : handleSubscribe(tier.id)}
+                    >
+                      {checkoutMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      {tier.id === "free" ? t.getStarted : t.subscribe}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Deep Search section */}
-      <div className="text-center mb-8">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Search className="h-8 w-8 text-primary" />
-          <h2 className="text-3xl font-bold">{t.deepSearchTitle}</h2>
+        <Separator className="my-12" />
+
+        {/* Deep Search section */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Search className="h-7 w-7 text-primary" />
+            <h2 className="text-2xl md:text-3xl font-bold">{t.deepSearchTitle}</h2>
+          </div>
+          <p className="text-muted-foreground">{t.deepSearchSubtitle}</p>
         </div>
-        <p className="text-lg text-muted-foreground">{t.deepSearchSubtitle}</p>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {pricingData?.deep_search.map((tier) => {
+            const name = tier.name[language] || tier.name.en;
+
+            return (
+              <Card
+                key={tier.id}
+                className={`relative ${tier.popular ? "border-primary shadow-lg" : ""}`}
+              >
+                {tier.popular && (
+                  <Badge
+                    className="absolute -top-3 left-1/2 -translate-x-1/2"
+                    variant="default"
+                  >
+                    {language === "ka" ? "რეკომენდებული" : language === "ru" ? "Рекомендуемый" : "Recommended"}
+                  </Badge>
+                )}
+
+                <CardHeader className="text-center">
+                  <CardTitle className="text-lg">{name}</CardTitle>
+                  <div className="text-3xl font-bold mt-2">${tier.price}</div>
+                  <CardDescription className="text-sm">
+                    {language === "ka" ? "ერთჯერადი გადახდა" : language === "ru" ? "Разовый платёж" : "One-time payment"}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent>
+                  <ul className="space-y-2">
+                    {tier.includes.map((item, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-sm">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+
+                <CardFooter>
+                  <Button className="w-full" variant={tier.popular ? "default" : "outline"}>
+                    {language === "ka" ? "შეკვეთა" : language === "ru" ? "Заказать" : "Order Now"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* FAQ or additional info */}
+        <div className="mt-16 text-center text-sm text-muted-foreground">
+          <p>{t.questions}</p>
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {pricingData?.deep_search.map((tier) => {
-          const name = tier.name[language] || tier.name.en;
-
-          return (
-            <Card
-              key={tier.id}
-              className={tier.popular ? "border-primary shadow-lg" : ""}
-            >
-              {tier.popular && (
-                <Badge
-                  className="absolute -top-3 left-1/2 -translate-x-1/2"
-                  variant="default"
-                >
-                  {language === "ka" ? "რეკომენდებული" : language === "ru" ? "Рекомендуемый" : "Recommended"}
-                </Badge>
-              )}
-
-              <CardHeader className="text-center">
-                <CardTitle>{name}</CardTitle>
-                <div className="text-3xl font-bold mt-2">${tier.price}</div>
-                <CardDescription>
-                  {language === "ka" ? "ერთჯერადი გადახდა" : language === "ru" ? "Разовый платёж" : "One-time payment"}
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <ul className="space-y-2">
-                  {tier.includes.map((item, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-
-              <CardFooter>
-                <Button className="w-full" variant={tier.popular ? "default" : "outline"}>
-                  {language === "ka" ? "შეკვეთა" : language === "ru" ? "Заказать" : "Order Now"}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* FAQ or additional info could go here */}
-      <div className="mt-16 text-center text-sm text-muted-foreground">
-        <p>
-          {language === "ka"
-            ? "გაქვთ კითხვები? დაგვიკავშირდით support@trialnavigator.com"
-            : language === "ru"
-            ? "Есть вопросы? Свяжитесь с нами: support@trialnavigator.com"
-            : "Questions? Contact us at support@trialnavigator.com"}
-        </p>
-      </div>
+      {/* Footer */}
+      <footer className="border-t bg-muted/30">
+        <div className="container py-10 px-4 md:px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
+                <FlaskConical className="h-3 w-3 text-primary-foreground" />
+              </div>
+              <span className="font-semibold">Trial Navigator</span>
+            </div>
+            <nav className="flex gap-6">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                {globalT('nav.home')}
+              </Link>
+              <Link href="/services" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
+              </Link>
+            </nav>
+            <p className="text-sm text-muted-foreground">
+              © 2024 Trial Navigator. {globalT('footer.rights')}
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
