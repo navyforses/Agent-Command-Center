@@ -170,8 +170,6 @@ async def seed_sample_trials():
     for trial in trials:
         await db.upsert_trial(trial)
 
-    print(f"Seeded {len(trials)} sample trials")
-
 
 async def seed_sample_news():
     """Create sample medical news items."""
