@@ -283,16 +283,22 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Link href="/profile">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <User className="h-4 w-4 mr-2" />
+                    {t('nav.profile')}
+                  </Button>
+                </Link>
                 <Link href="/feed">
                   <Button variant="ghost" className="w-full justify-start">
                     <FlaskConical className="h-4 w-4 mr-2" />
                     {t('nav.feed')}
                   </Button>
                 </Link>
-                <Link href="/blog">
+                <Link href="/services">
                   <Button variant="ghost" className="w-full justify-start">
                     <FileText className="h-4 w-4 mr-2" />
-                    {t('nav.blog')}
+                    {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
                   </Button>
                 </Link>
                 <Link href="/settings">

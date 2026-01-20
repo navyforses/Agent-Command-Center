@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react";
 // Public pages (eagerly loaded)
 import Landing from "@/pages/Landing";
 import Pricing from "@/pages/Pricing";
-import Blog from "@/pages/Blog";
+import Services from "@/pages/Services";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 
@@ -43,7 +43,7 @@ function PublicRouter() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/pricing" component={Pricing} />
-      <Route path="/blog" component={Blog} />
+      <Route path="/services" component={Services} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       {/* Fallback to landing */}
@@ -65,7 +65,7 @@ function ProtectedRouter() {
         <Route path="/profile" component={CreateProfile} />
         <Route path="/settings" component={Settings} />
         <Route path="/pricing" component={Pricing} />
-        <Route path="/blog" component={Blog} />
+        <Route path="/services" component={Services} />
         {/* Fallback to dashboard */}
         <Route component={Dashboard} />
       </Switch>

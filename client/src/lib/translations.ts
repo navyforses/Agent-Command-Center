@@ -11,6 +11,7 @@ export const translations = {
     feed: { ka: 'სიახლეები', en: 'Feed', ru: 'Лента' },
     profile: { ka: 'პროფილი', en: 'Profile', ru: 'Профиль' },
     pricing: { ka: 'ფასები', en: 'Pricing', ru: 'Цены' },
+    services: { ka: 'სერვისები', en: 'Services', ru: 'Услуги' },
     blog: { ka: 'ბლოგი', en: 'Blog', ru: 'Блог' },
     login: { ka: 'შესვლა', en: 'Sign In', ru: 'Войти' },
     register: { ka: 'რეგისტრაცია', en: 'Sign Up', ru: 'Регистрация' },
