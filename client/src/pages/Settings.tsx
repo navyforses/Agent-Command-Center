@@ -14,7 +14,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bell, Globe, Moon, Shield, User, Download, Loader2, Check } from "lucide-react";
+import { Bell, Globe, Moon, Shield, User, Download, Loader2, Check, LogOut } from "lucide-react";
 import { TestimonialForm } from "@/components/TestimonialForm";
 
 // Profile form schema
@@ -443,6 +443,29 @@ export default function Settings() {
         </Card>
 
         <TestimonialForm />
+
+        {/* Logout Section */}
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <LogOut className="h-5 w-5" />
+              {language === 'ka' ? 'სესიის დასრულება' : language === 'ru' ? 'Завершение сеанса' : 'Session'}
+            </CardTitle>
+            <CardDescription>
+              {language === 'ka' ? 'გამოდით თქვენი ანგარიშიდან' : language === 'ru' ? 'Выйти из аккаунта' : 'Log out of your account'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              onClick={() => window.location.href = '/api/logout'}
+              className="w-full sm:w-auto"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              {language === 'ka' ? 'გასვლა' : language === 'ru' ? 'Выйти' : 'Log out'}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
