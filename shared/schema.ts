@@ -33,15 +33,9 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  // Language preference for translations
-  languagePreference: varchar("language_preference", { length: 10 }).default("ka"),
-  // Soft delete support
-  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  index("idx_users_email").on(table.email),
-]);
+});
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -118,16 +112,8 @@ export const documents = pgTable("documents", {
   purpose: text("purpose"),
   extractedText: text("extracted_text"),
   conversationId: integer("conversation_id"),
-  // Soft delete support
-  deletedAt: timestamp("deleted_at"),
-  // Timestamps
   uploadedAt: timestamp("uploaded_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  index("idx_documents_user").on(table.userId),
-  index("idx_documents_category").on(table.category),
-  index("idx_documents_processing_status").on(table.processingStatus),
-]);
+});
 
 export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
@@ -2085,8 +2071,6 @@ export const clinicalTrials = pgTable("clinical_trials", {
   relevanceScore: real("relevance_score"), // AI-calculated 0-100
   qualityScore: real("quality_score"), // Data completeness score
   
-  // Soft delete support
-  deletedAt: timestamp("deleted_at"),
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -2094,7 +2078,6 @@ export const clinicalTrials = pgTable("clinical_trials", {
   index("idx_trials_nct").on(table.nctNumber),
   index("idx_trials_status").on(table.status),
   index("idx_trials_phase").on(table.phase),
-  index("idx_trials_conditions").using("gin", table.conditions),
 ]);
 
 export const insertClinicalTrialSchema = createInsertSchema(clinicalTrials, {
