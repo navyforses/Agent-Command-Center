@@ -14,10 +14,12 @@ import { Loader2 } from "lucide-react";
 import Landing from "@/pages/Landing";
 import Pricing from "@/pages/Pricing";
 import Services from "@/pages/Services";
+import About from "@/pages/About";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 
 // Protected pages (lazy loaded)
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PatientFeed = lazy(() => import("@/pages/PatientFeed"));
 const TrialSearch = lazy(() => import("@/pages/TrialSearch"));
@@ -44,6 +46,7 @@ function PublicRouter() {
       <Route path="/" component={Landing} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/services" component={Services} />
+      <Route path="/about" component={About} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       {/* Fallback to landing */}
@@ -57,6 +60,10 @@ function ProtectedRouter() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
+        {/* Onboarding - first page after login */}
+        <Route path="/onboarding" component={Onboarding} />
+
+        {/* Main app pages */}
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/feed" component={PatientFeed} />
@@ -64,8 +71,12 @@ function ProtectedRouter() {
         <Route path="/trial/:id" component={TrialDetail} />
         <Route path="/profile" component={CreateProfile} />
         <Route path="/settings" component={Settings} />
+
+        {/* Public pages accessible when logged in */}
         <Route path="/pricing" component={Pricing} />
         <Route path="/services" component={Services} />
+        <Route path="/about" component={About} />
+
         {/* Fallback to dashboard */}
         <Route component={Dashboard} />
       </Switch>
