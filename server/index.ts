@@ -134,6 +134,10 @@ app.use((req, res, next) => {
       }, 24 * 60 * 60 * 1000); // 24 საათი
 
       log("ClinicalTrials.gov sync scheduler initialized (first sync in 5 min, then every 24h)", "trials-sync");
+      
+      // Evolution scheduler გათიშულია
+      // startEvolutionScheduler();
+      // log("Evolution Scheduler started");
     },
   );
 })();
