@@ -96,7 +96,9 @@ export async function registerRoutes(
   // Trial Navigator routes
   app.use("/api", trialRoutes);
 
-  // Patient Profile & Research Monitor routes
+  // Patient Profile & Research Monitor routes (require authentication)
+  app.use("/api/patient-profile", isAuthenticated);
+  app.use("/api/research-monitor", isAuthenticated);
   app.use("/api", patientProfileRoutes);
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
