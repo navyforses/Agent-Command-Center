@@ -43,8 +43,15 @@ Primary languages: Georgian (ქართული) and English.
 **Server Framework**: Express.js with TypeScript
 - Node.js HTTP server with Vite middleware in development
 - RESTful API architecture (routes prefixed with `/api`)
-- Session-based authentication via Replit Auth
+- Email/password authentication with bcrypt hashing and PostgreSQL session store
 - Static file serving for production builds
+
+**Authentication System**:
+- Email/password registration and login (no Replit account required)
+- Bcrypt password hashing with 10 salt rounds
+- Session regeneration on login/register for security
+- PostgreSQL-backed session store
+- Routes: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/user
 
 **Trial API Endpoints**:
 - `GET /api/trials/search?q={query}&phase={phase}&status={status}` - Search trials
