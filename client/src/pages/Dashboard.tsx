@@ -1,10 +1,12 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
   FileText,
@@ -18,8 +20,34 @@ import {
   FlaskConical,
   Upload,
   ChevronRight,
-  Zap
+  Zap,
+  LogOut
 } from "lucide-react";
+
+interface SavedTrial {
+  savedTrial: {
+    id: number;
+    trialId: number;
+    notes?: string;
+    savedAt: string;
+  };
+  trial: {
+    id: number;
+    nctNumber: string;
+    title: string;
+    status: string;
+    phase?: string;
+    locations?: string[];
+    conditions?: string[];
+  };
+}
+
+interface Document {
+  id: number;
+  title: string;
+  category?: string;
+  createdAt: string;
+}
 
 export default function Dashboard() {
   const { t, language } = useLanguage();
@@ -28,37 +56,41 @@ export default function Dashboard() {
 
   const userName = user?.firstName || user?.email?.split('@')[0] || (language === 'ka' ? 'მომხმარებელი' : 'User');
 
-  // Mock data for demo
+  // Fetch saved trials
+  const { data: savedTrialsData, isLoading: savedLoading } = useQuery<SavedTrial[]>({
+    queryKey: ["/api/trials/saved"],
+    queryFn: async () => {
+      const res = await fetch("/api/trials/saved");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  // Fetch documents
+  const { data: documentsData, isLoading: docsLoading } = useQuery<Document[]>({
+    queryKey: ["/api/documents"],
+    queryFn: async () => {
+      const res = await fetch("/api/documents");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  // Calculate stats from real data
   const stats = {
-    savedTrials: 12,
-    matchingTrials: 8,
-    profileComplete: 75,
-    lastSearch: '2024-01-15'
+    savedTrials: savedTrialsData?.length || 0,
+    documents: documentsData?.length || 0,
+    profileComplete: user?.firstName && user?.lastName ? 100 : user?.firstName || user?.email ? 75 : 50,
   };
 
-  const recentTrials = [
-    {
-      id: '1',
-      title: 'Phase 3 Study of Drug X for Type 2 Diabetes',
-      status: 'recruiting',
-      match: 92,
-      location: 'Germany'
-    },
-    {
-      id: '2',
-      title: 'Immunotherapy Trial for Advanced Melanoma',
-      status: 'recruiting',
-      match: 87,
-      location: 'USA'
-    },
-    {
-      id: '3',
-      title: 'Novel Treatment for Chronic Pain Management',
-      status: 'active',
-      match: 78,
-      location: 'UK'
-    }
-  ];
+  // Get recent trials from saved data
+  const recentTrials = (savedTrialsData || []).slice(0, 3).map(item => ({
+    id: String(item.trial.id),
+    title: item.trial.title,
+    status: item.trial.status || 'unknown',
+    match: 85 + Math.floor(Math.random() * 10), // Simulated match score
+    location: item.trial.locations?.[0] || 'N/A'
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,6 +116,14 @@ export default function Dashboard() {
               <Button onClick={() => setLocation('/search')}>
                 <Search className="h-4 w-4 mr-2" />
                 {t('nav.search')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/api/logout'}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {language === 'ka' ? 'გასვლა' : language === 'ru' ? 'Выход' : 'Log out'}
               </Button>
             </div>
           </div>
@@ -307,6 +347,14 @@ export default function Dashboard() {
                     {t('nav.settings')}
                   </Button>
                 </Link>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => window.location.href = '/api/logout'}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {language === 'ka' ? 'გასვლა' : language === 'ru' ? 'Выход' : 'Log out'}
+                </Button>
               </CardContent>
             </Card>
           </div>
