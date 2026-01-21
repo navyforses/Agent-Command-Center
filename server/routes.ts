@@ -97,8 +97,8 @@ export async function registerRoutes(
   app.use("/api", trialRoutes);
 
   // Patient Profile & Research Monitor routes (require authentication)
-  app.use("/api/patient-profile", isAuthenticated);
-  app.use("/api/research-monitor", isAuthenticated);
+  app.use("/api/patient-profile", isEmailAuthenticated);
+  app.use("/api/research-monitor", isEmailAuthenticated);
   app.use("/api", patientProfileRoutes);
 
   // User Profile routes
