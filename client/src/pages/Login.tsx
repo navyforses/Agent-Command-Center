@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
@@ -13,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const { t } = useLanguage();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
@@ -37,7 +36,8 @@ export default function Login() {
           title: t('common.success'),
           description: t('auth.loginTitle'),
         });
-        setLocation("/dashboard");
+        // Full page reload to ensure auth state is properly loaded
+        window.location.href = "/dashboard";
       } else {
         const data = await response.json();
         toast({
