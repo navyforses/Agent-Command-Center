@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupEmailAuth, isEmailAuthenticated } from "./emailAuth";
 import trialRoutes from "./trialRoutes";
 import patientProfileRoutes from "./patientProfileRoutes";
 import {
@@ -91,7 +91,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
+  await setupEmailAuth(app);
 
   // Trial Navigator routes
   app.use("/api", trialRoutes);
@@ -99,19 +99,8 @@ export async function registerRoutes(
   // Patient Profile & Research Monitor routes
   app.use("/api", patientProfileRoutes);
 
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
   // User Profile routes
-  app.put("/api/user/profile", isAuthenticated, async (req: any, res) => {
+  app.put("/api/user/profile", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { firstName, lastName, email } = req.body;
@@ -134,7 +123,7 @@ export async function registerRoutes(
   });
 
   // User Preferences routes
-  app.get("/api/user/preferences", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/preferences", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       let preferences = await storage.getUserPreferences(userId);
@@ -159,7 +148,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/user/preferences", isAuthenticated, async (req: any, res) => {
+  app.put("/api/user/preferences", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = updateUserPreferencesSchema.safeParse(req.body);
@@ -185,7 +174,7 @@ export async function registerRoutes(
   });
 
   // Export user data
-  app.get("/api/user/export", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/export", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
 
@@ -225,7 +214,7 @@ export async function registerRoutes(
   });
 
   // Children routes
-  app.get("/api/children", isAuthenticated, async (req: any, res) => {
+  app.get("/api/children", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const children = await storage.getChildren(userId);
@@ -236,7 +225,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/children", isAuthenticated, async (req: any, res) => {
+  app.post("/api/children", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertChildSchema.safeParse({ ...req.body, userId });
@@ -251,7 +240,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/children/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/children/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -269,7 +258,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/children/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/children/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -292,7 +281,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/children/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/children/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -311,7 +300,7 @@ export async function registerRoutes(
   });
 
   // Translation endpoint using Gemini AI (Replit AI Integrations)
-  app.post("/api/translate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/translate", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { text, targetLanguage } = req.body;
       
@@ -370,7 +359,7 @@ ${text}`;
   });
 
   // Documents routes
-  app.get("/api/documents", isAuthenticated, async (req: any, res) => {
+  app.get("/api/documents", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const documents = await storage.getDocuments(userId);
@@ -381,7 +370,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/documents", isAuthenticated, async (req: any, res) => {
+  app.post("/api/documents", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertDocumentSchema.safeParse({ ...req.body, userId });
@@ -396,7 +385,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/documents/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -414,7 +403,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/documents/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -437,7 +426,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/documents/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -456,7 +445,7 @@ ${text}`;
   });
 
   // Get documents for specific child
-  app.get("/api/children/:childId/documents", isAuthenticated, async (req: any, res) => {
+  app.get("/api/children/:childId/documents", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -472,7 +461,7 @@ ${text}`;
   });
 
   // Therapies routes
-  app.get("/api/therapies", isAuthenticated, async (req: any, res) => {
+  app.get("/api/therapies", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const therapies = await storage.getTherapies(userId);
@@ -483,7 +472,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/therapies", isAuthenticated, async (req: any, res) => {
+  app.post("/api/therapies", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertTherapySchema.safeParse({ ...req.body, userId });
@@ -498,7 +487,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/therapies/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -516,7 +505,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/therapies/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -539,7 +528,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/therapies/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/therapies/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -558,7 +547,7 @@ ${text}`;
   });
 
   // Get therapies for specific child
-  app.get("/api/children/:childId/therapies", isAuthenticated, async (req: any, res) => {
+  app.get("/api/children/:childId/therapies", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -574,7 +563,7 @@ ${text}`;
   });
 
   // Therapy Sessions routes
-  app.get("/api/therapies/:therapyId/sessions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/therapies/:therapyId/sessions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const therapyId = parseInt(req.params.therapyId, 10);
@@ -589,7 +578,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/therapies/:therapyId/sessions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/therapies/:therapyId/sessions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const therapyId = parseInt(req.params.therapyId, 10);
@@ -612,7 +601,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/therapy-sessions/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/therapy-sessions/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -635,7 +624,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/therapy-sessions/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/therapy-sessions/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -654,7 +643,7 @@ ${text}`;
   });
 
   // Appointments routes
-  app.get("/api/appointments", isAuthenticated, async (req: any, res) => {
+  app.get("/api/appointments", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const appointments = await storage.getAppointments(userId);
@@ -665,7 +654,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/appointments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/appointments", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertAppointmentSchema.safeParse({ ...req.body, userId });
@@ -680,7 +669,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/appointments/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -698,7 +687,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/appointments/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -721,7 +710,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/appointments/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -740,7 +729,7 @@ ${text}`;
   });
 
   // Emails routes
-  app.get("/api/emails", isAuthenticated, async (req: any, res) => {
+  app.get("/api/emails", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const emails = await storage.getEmails(userId);
@@ -751,7 +740,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/emails", isAuthenticated, async (req: any, res) => {
+  app.post("/api/emails", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertEmailSchema.safeParse({ ...req.body, userId });
@@ -783,7 +772,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/emails/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -801,7 +790,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/emails/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -824,7 +813,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/emails/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/emails/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -843,7 +832,7 @@ ${text}`;
   });
 
   // Conversation routes
-  app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
+  app.get("/api/conversations", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const conversations = await storage.getConversations(userId);
@@ -854,7 +843,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/conversations", isAuthenticated, async (req: any, res) => {
+  app.post("/api/conversations", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertConversationSchema.safeParse({ ...req.body, userId });
@@ -869,7 +858,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/conversations/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -887,7 +876,7 @@ ${text}`;
     }
   });
 
-  app.patch("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/conversations/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -910,7 +899,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/conversations/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -928,7 +917,7 @@ ${text}`;
     }
   });
 
-  app.get("/api/conversations/:id/messages", isAuthenticated, async (req: any, res) => {
+  app.get("/api/conversations/:id/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -948,7 +937,7 @@ ${text}`;
   });
 
   // Chat Messages routes
-  app.get("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+  app.get("/api/chat/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const messages = await storage.getChatMessages(userId);
@@ -959,7 +948,7 @@ ${text}`;
     }
   });
 
-  app.post("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+  app.post("/api/chat/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertChatMessageSchema.safeParse({ ...req.body, userId });
@@ -974,7 +963,7 @@ ${text}`;
     }
   });
 
-  app.delete("/api/chat/messages", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/chat/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       await storage.clearChatMessages(userId);
@@ -987,7 +976,7 @@ ${text}`;
 
   // AI Chat endpoint - uses multi-AI consensus with OpenAI function calling for emails
   // First attempts OpenAI with function calling, then uses multi-AI consensus for regular responses
-  app.post("/api/chat", isAuthenticated, async (req: any, res) => {
+  app.post("/api/chat", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { content } = req.body;
@@ -1220,7 +1209,7 @@ Be supportive and understanding of the emotional challenges parents face.`;
   });
 
   // Document Analysis endpoint - analyzes document with AI
-  app.post("/api/documents/:id/analyze", isAuthenticated, async (req: any, res) => {
+  app.post("/api/documents/:id/analyze", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -1302,7 +1291,7 @@ Format your response as JSON with the following structure:
   });
 
   // Object Storage routes
-  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+  app.get("/objects/:objectPath(*)", isEmailAuthenticated, async (req: any, res) => {
     const userId = req.user?.claims?.sub;
     const objectStorageService = new ObjectStorageService();
     try {
@@ -1325,13 +1314,13 @@ Format your response as JSON with the following structure:
     }
   });
 
-  app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
+  app.post("/api/objects/upload", isEmailAuthenticated, async (req: any, res) => {
     const objectStorageService = new ObjectStorageService();
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     res.json({ uploadURL });
   });
 
-  app.post("/api/objects/acl", isAuthenticated, async (req: any, res) => {
+  app.post("/api/objects/acl", isEmailAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const objectStorageService = new ObjectStorageService();
     
@@ -1389,7 +1378,7 @@ Format your response as JSON with the following structure:
     }
   });
 
-  app.put("/api/documents/:id/file", isAuthenticated, async (req: any, res) => {
+  app.put("/api/documents/:id/file", isEmailAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const id = parseInt(req.params.id, 10);
     
@@ -1428,7 +1417,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get current user's testimonial (authenticated)
-  app.get("/api/testimonials/me", isAuthenticated, async (req: any, res) => {
+  app.get("/api/testimonials/me", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const testimonial = await storage.getUserTestimonial(userId);
@@ -1440,7 +1429,7 @@ Format your response as JSON with the following structure:
   });
 
   // Create testimonial (authenticated)
-  app.post("/api/testimonials", isAuthenticated, async (req: any, res) => {
+  app.post("/api/testimonials", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -1464,7 +1453,7 @@ Format your response as JSON with the following structure:
   });
 
   // Update testimonial (authenticated - own only)
-  app.patch("/api/testimonials/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/testimonials/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -1490,7 +1479,7 @@ Format your response as JSON with the following structure:
   });
 
   // Delete testimonial (authenticated - own only)
-  app.delete("/api/testimonials/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/testimonials/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -1512,7 +1501,7 @@ Format your response as JSON with the following structure:
   // AI Command Center Routes
   
   // Get assistant messages with action metadata
-  app.get("/api/assistant/messages", isAuthenticated, async (req: any, res) => {
+  app.get("/api/assistant/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const messages = await storage.getChatMessages(userId);
@@ -1524,7 +1513,7 @@ Format your response as JSON with the following structure:
   });
 
   // Enhanced AI chat with function calling for actions
-  app.post("/api/assistant/chat", isAuthenticated, async (req: any, res) => {
+  app.post("/api/assistant/chat", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { content, documentIds, conversationId: providedConversationId } = req.body;
@@ -1631,7 +1620,7 @@ Format your response as JSON with the following structure:
   });
 
   // Upload and analyze document via AI Command Center
-  app.post("/api/assistant/upload", isAuthenticated, async (req: any, res) => {
+  app.post("/api/assistant/upload", isEmailAuthenticated, async (req: any, res) => {
     let documentId: number | null = null;
     const userId = req.user.claims.sub;
     
@@ -1794,7 +1783,7 @@ Format your response as JSON with the following structure:
   });
 
   // Execute a suggested action from AI
-  app.post("/api/assistant/execute", isAuthenticated, async (req: any, res) => {
+  app.post("/api/assistant/execute", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { actionType, actionData, messageId } = req.body;
@@ -1845,7 +1834,7 @@ Format your response as JSON with the following structure:
   });
 
   // Cancel a pending action
-  app.post("/api/assistant/cancel", isAuthenticated, async (req: any, res) => {
+  app.post("/api/assistant/cancel", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { messageId } = req.body;
@@ -1891,7 +1880,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get documents with AI analysis for knowledge base
-  app.get("/api/assistant/knowledge", isAuthenticated, async (req: any, res) => {
+  app.get("/api/assistant/knowledge", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const documents = await storage.getDocuments(userId);
@@ -1913,7 +1902,7 @@ Format your response as JSON with the following structure:
   // ============================================================================
 
   // AI Status - Get all AI agents with their status
-  app.get("/api/nexus/ai-status", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/ai-status", isEmailAuthenticated, async (req: any, res) => {
     try {
       const agents = await storage.getNexusAiAgents();
       res.json(agents);
@@ -1924,7 +1913,7 @@ Format your response as JSON with the following structure:
   });
 
   // Research Queries - Start new multi-AI research
-  app.post("/api/nexus/query", isAuthenticated, async (req: any, res) => {
+  app.post("/api/nexus/query", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertNexusResearchQuerySchema.safeParse({ ...req.body, userId });
@@ -1940,7 +1929,7 @@ Format your response as JSON with the following structure:
   });
 
   // Run multi-AI research - orchestrates all AI agents and stores results
-  app.post("/api/nexus/research", isAuthenticated, diagnosisUpload.single("diagnosis"), async (req: any, res) => {
+  app.post("/api/nexus/research", isEmailAuthenticated, diagnosisUpload.single("diagnosis"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const queryText = req.body.queryText || "";
@@ -1996,7 +1985,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get user's research queries
-  app.get("/api/nexus/queries", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/queries", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const queries = await storage.getNexusResearchQueries(userId);
@@ -2008,7 +1997,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get specific research query status and results
-  app.get("/api/nexus/query/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/query/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2027,7 +2016,7 @@ Format your response as JSON with the following structure:
   });
 
   // Update research query status
-  app.patch("/api/nexus/query/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/nexus/query/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2051,7 +2040,7 @@ Format your response as JSON with the following structure:
   });
 
   // Findings - List all findings (optionally filter by queryId)
-  app.get("/api/nexus/findings", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/findings", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const queryId = req.query.queryId ? parseInt(req.query.queryId as string, 10) : undefined;
@@ -2067,7 +2056,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get consensus findings only (high/unanimous)
-  app.get("/api/nexus/findings/consensus", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/findings/consensus", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const findings = await storage.getNexusConsensusFindingsOnly(userId);
@@ -2079,7 +2068,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get finding details with AI analyses
-  app.get("/api/nexus/findings/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/findings/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2104,7 +2093,7 @@ Format your response as JSON with the following structure:
   });
 
   // Hypotheses - List all hypotheses
-  app.get("/api/nexus/hypotheses", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/hypotheses", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const hypotheses = await storage.getNexusHypotheses(userId);
@@ -2116,7 +2105,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get specific hypothesis
-  app.get("/api/nexus/hypotheses/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/hypotheses/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2135,7 +2124,7 @@ Format your response as JSON with the following structure:
   });
 
   // Update hypothesis status
-  app.patch("/api/nexus/hypotheses/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/nexus/hypotheses/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2158,7 +2147,7 @@ Format your response as JSON with the following structure:
   });
 
   // Debates - List all debates
-  app.get("/api/nexus/debates", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/debates", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const debates = await storage.getNexusDebates(userId);
@@ -2170,7 +2159,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get specific debate
-  app.get("/api/nexus/debates/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/debates/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2189,7 +2178,7 @@ Format your response as JSON with the following structure:
   });
 
   // Action Items - List all action items
-  app.get("/api/nexus/actions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/actions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const actions = await storage.getNexusActionItems(userId);
@@ -2201,7 +2190,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get specific action item
-  app.get("/api/nexus/actions/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/actions/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2220,7 +2209,7 @@ Format your response as JSON with the following structure:
   });
 
   // Update action item status
-  app.patch("/api/nexus/actions/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/nexus/actions/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2243,7 +2232,7 @@ Format your response as JSON with the following structure:
   });
 
   // Knowledge Graph - Get all nodes
-  app.get("/api/nexus/knowledge/nodes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/knowledge/nodes", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const nodes = await storage.getNexusKnowledgeNodes(userId);
@@ -2255,7 +2244,7 @@ Format your response as JSON with the following structure:
   });
 
   // Knowledge Graph - Get all edges
-  app.get("/api/nexus/knowledge/edges", isAuthenticated, async (req: any, res) => {
+  app.get("/api/nexus/knowledge/edges", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const edges = await storage.getNexusKnowledgeEdges(userId);
@@ -2271,7 +2260,7 @@ Format your response as JSON with the following structure:
   // ============================================================================
 
   // Get all evolution cycles for user
-  app.get("/api/evolution/cycles", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/cycles", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const cycles = await storage.getEvolutionCycles(userId);
@@ -2283,7 +2272,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get active evolution cycle
-  app.get("/api/evolution/cycles/active", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/cycles/active", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const cycle = await storage.getActiveEvolutionCycle(userId);
@@ -2295,7 +2284,7 @@ Format your response as JSON with the following structure:
   });
 
   // Get specific evolution cycle
-  app.get("/api/evolution/cycles/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/cycles/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2314,7 +2303,7 @@ Format your response as JSON with the following structure:
   });
 
   // Start new evolution cycle with file upload for child info extraction
-  app.post("/api/evolution/cycles", isAuthenticated, diagnosisUpload.single("diagnosisFile"), async (req: any, res) => {
+  app.post("/api/evolution/cycles", isEmailAuthenticated, diagnosisUpload.single("diagnosisFile"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { endDate, childId } = req.body;
@@ -2449,7 +2438,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Update evolution cycle (pause/resume/cancel)
-  app.patch("/api/evolution/cycles/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/evolution/cycles/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2472,7 +2461,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Get daily runs for a cycle
-  app.get("/api/evolution/cycles/:cycleId/runs", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/cycles/:cycleId/runs", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const cycleId = parseInt(req.params.cycleId, 10);
@@ -2492,7 +2481,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Get all evolution reports for user
-  app.get("/api/evolution/reports", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/reports", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const reports = await storage.getEvolutionReports(userId);
@@ -2504,7 +2493,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Get specific evolution report
-  app.get("/api/evolution/reports/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/reports/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2523,7 +2512,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Download report as PDF (bilingual support)
-  app.get("/api/evolution/reports/:id/pdf", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/reports/:id/pdf", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2565,7 +2554,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Download cycle summary as PDF
-  app.get("/api/evolution/cycles/:id/pdf", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/cycles/:id/pdf", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const cycleId = parseInt(req.params.id, 10);
@@ -2612,7 +2601,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Get messages for a specific report (chat history)
-  app.get("/api/evolution/reports/:id/messages", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/reports/:id/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2632,7 +2621,7 @@ ${extractedText.substring(0, 8000)}`;
   });
 
   // Send message to report chat and get AI response
-  app.post("/api/evolution/reports/:id/messages", isAuthenticated, async (req: any, res) => {
+  app.post("/api/evolution/reports/:id/messages", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const reportId = parseInt(req.params.id, 10);
@@ -2710,7 +2699,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Trigger evolution tick (for scheduler or manual triggering)
-  app.post("/api/evolution/tick", isAuthenticated, async (req: any, res) => {
+  app.post("/api/evolution/tick", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { triggerManualTick } = await import("./evolutionScheduler");
       const result = await triggerManualTick();
@@ -2722,7 +2711,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Manually generate report for a completed daily run
-  app.post("/api/evolution/runs/:runId/generate-report", isAuthenticated, async (req: any, res) => {
+  app.post("/api/evolution/runs/:runId/generate-report", isEmailAuthenticated, async (req: any, res) => {
     try {
       const runId = parseInt(req.params.runId);
       const userId = req.user.claims.sub;
@@ -2779,7 +2768,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Academic Research Routes - OpenAlex, Semantic Scholar, Cross-Disciplinary
-  app.post("/api/academic/search", isAuthenticated, async (req: any, res) => {
+  app.post("/api/academic/search", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { 
         query, 
@@ -2811,7 +2800,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
-  app.post("/api/academic/openalex", isAuthenticated, async (req: any, res) => {
+  app.post("/api/academic/openalex", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { 
         query, 
@@ -2841,7 +2830,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
-  app.post("/api/academic/semantic-scholar", isAuthenticated, async (req: any, res) => {
+  app.post("/api/academic/semantic-scholar", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { 
         query, 
@@ -2871,7 +2860,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
-  app.post("/api/academic/cross-disciplinary", isAuthenticated, async (req: any, res) => {
+  app.post("/api/academic/cross-disciplinary", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { 
         medicalQuery, 
@@ -2896,7 +2885,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
     }
   });
 
-  app.post("/api/academic/recommendations", isAuthenticated, async (req: any, res) => {
+  app.post("/api/academic/recommendations", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { paperIds, maxResults = 20 } = req.body;
 
@@ -2918,7 +2907,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get all accumulated knowledge for user
-  app.get("/api/evolution/accumulated-knowledge", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/accumulated-knowledge", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const knowledge = await storage.getAccumulatedKnowledge(userId);
@@ -2930,7 +2919,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get accumulated knowledge for specific child
-  app.get("/api/evolution/accumulated-knowledge/child/:childId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/accumulated-knowledge/child/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -2946,7 +2935,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get active accumulated knowledge (for use in cycle initialization)
-  app.get("/api/evolution/accumulated-knowledge/active", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/accumulated-knowledge/active", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const knowledge = await storage.getActiveAccumulatedKnowledge(userId);
@@ -2958,7 +2947,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get single accumulated knowledge item
-  app.get("/api/evolution/accumulated-knowledge/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/evolution/accumulated-knowledge/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -2977,7 +2966,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Create new accumulated knowledge
-  app.post("/api/evolution/accumulated-knowledge", isAuthenticated, async (req: any, res) => {
+  app.post("/api/evolution/accumulated-knowledge", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parseResult = insertAccumulatedKnowledgeSchema.safeParse({ ...req.body, userId });
@@ -2993,7 +2982,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Update accumulated knowledge
-  app.patch("/api/evolution/accumulated-knowledge/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/evolution/accumulated-knowledge/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id, 10);
@@ -3049,7 +3038,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ----- ClinicalTrials.gov API Routes -----
 
   // Search clinical trials
-  app.get("/api/clinical-trials", isAuthenticated, async (req: any, res) => {
+  app.get("/api/clinical-trials", isEmailAuthenticated, async (req: any, res) => {
     try {
       const {
         condition,
@@ -3079,7 +3068,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Search HIE-specific clinical trials
-  app.get("/api/clinical-trials/hie", isAuthenticated, async (req: any, res) => {
+  app.get("/api/clinical-trials/hie", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { childAge, location, status, pageSize } = req.query;
 
@@ -3098,7 +3087,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get specific clinical trial by NCT ID
-  app.get("/api/clinical-trials/:nctId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/clinical-trials/:nctId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { nctId } = req.params;
 
@@ -3122,7 +3111,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ----- PubMed API Routes -----
 
   // Search PubMed articles
-  app.get("/api/pubmed/search", isAuthenticated, async (req: any, res) => {
+  app.get("/api/pubmed/search", isEmailAuthenticated, async (req: any, res) => {
     try {
       const {
         term,
@@ -3154,7 +3143,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Search HIE-specific research articles
-  app.get("/api/pubmed/hie", isAuthenticated, async (req: any, res) => {
+  app.get("/api/pubmed/hie", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { topic, maxResults, recentOnly } = req.query;
 
@@ -3172,7 +3161,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get specific PubMed article by PMID
-  app.get("/api/pubmed/article/:pmid", isAuthenticated, async (req: any, res) => {
+  app.get("/api/pubmed/article/:pmid", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { pmid } = req.params;
 
@@ -3194,7 +3183,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get related articles for a PMID
-  app.get("/api/pubmed/article/:pmid/related", isAuthenticated, async (req: any, res) => {
+  app.get("/api/pubmed/article/:pmid/related", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { pmid } = req.params;
       const { maxResults } = req.query;
@@ -3218,7 +3207,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ----- OpenFDA API Routes -----
 
   // Search drug labels
-  app.get("/api/fda/drugs", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/drugs", isEmailAuthenticated, async (req: any, res) => {
     try {
       const {
         query,
@@ -3248,7 +3237,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Search HIE-related medications
-  app.get("/api/fda/drugs/hie", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/drugs/hie", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { type, limit } = req.query;
 
@@ -3265,7 +3254,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get specific drug label by ID
-  app.get("/api/fda/drugs/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/drugs/:id", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -3283,7 +3272,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get drug interactions
-  app.get("/api/fda/drugs/:name/interactions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/drugs/:name/interactions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { name } = req.params;
 
@@ -3297,7 +3286,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Search drug adverse events
-  app.get("/api/fda/adverse-events", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/adverse-events", isEmailAuthenticated, async (req: any, res) => {
     try {
       const {
         drugName,
@@ -3323,7 +3312,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Search drug recalls
-  app.get("/api/fda/recalls", isAuthenticated, async (req: any, res) => {
+  app.get("/api/fda/recalls", isEmailAuthenticated, async (req: any, res) => {
     try {
       const {
         query,
@@ -3355,7 +3344,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get Prometheus status for a child
-  app.get("/api/prometheus/status/:childId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/status/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3397,7 +3386,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Semantic search across knowledge
-  app.post("/api/prometheus/search", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/search", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { childId, query: searchQuery, options } = req.body;
@@ -3431,7 +3420,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get predictions for a child
-  app.get("/api/prometheus/predictions/:childId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/predictions/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3479,7 +3468,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Validate a prediction
-  app.post("/api/prometheus/predictions/:predictionId/validate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/predictions/:predictionId/validate", isEmailAuthenticated, async (req: any, res) => {
     try {
       const predictionId = parseInt(req.params.predictionId, 10);
       const { actualOutcome, wasCorrect, deviationScore, notes } = req.body;
@@ -3507,7 +3496,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get cross-child insights
-  app.get("/api/prometheus/insights", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/insights", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { childId } = req.query;
 
@@ -3535,7 +3524,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Verify a knowledge node
-  app.post("/api/prometheus/verify/:nodeId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/verify/:nodeId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const nodeId = parseInt(req.params.nodeId, 10);
 
@@ -3558,7 +3547,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Run Phase 2 maintenance
-  app.post("/api/prometheus/maintenance/:childId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/maintenance/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3592,7 +3581,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get Pinecone stats
-  app.get("/api/prometheus/vectordb/stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/vectordb/stats", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { getPineconeStats } = await import("./prometheus/phase2");
       const stats = await getPineconeStats();
@@ -3604,7 +3593,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Sync to Pinecone
-  app.post("/api/prometheus/vectordb/sync/:childId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/vectordb/sync/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3633,7 +3622,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Hybrid semantic search
-  app.post("/api/prometheus/vectordb/search/:childId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/vectordb/search/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3676,7 +3665,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get user notifications
-  app.get("/api/prometheus/notifications", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/notifications", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { unreadOnly, limit } = req.query;
@@ -3695,7 +3684,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get notifications for specific child
-  app.get("/api/prometheus/notifications/:childId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/notifications/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3728,7 +3717,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Mark notification as read
-  app.patch("/api/prometheus/notifications/:notificationId/read", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/prometheus/notifications/:notificationId/read", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const notificationId = parseInt(req.params.notificationId, 10);
@@ -3748,7 +3737,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Mark all notifications as read
-  app.post("/api/prometheus/notifications/mark-all-read", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/notifications/mark-all-read", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { prometheusId } = req.body;
@@ -3767,7 +3756,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Delete notification
-  app.delete("/api/prometheus/notifications/:notificationId", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/prometheus/notifications/:notificationId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const notificationId = parseInt(req.params.notificationId, 10);
@@ -3787,7 +3776,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Generate notification digest
-  app.get("/api/prometheus/notifications/digest/:period", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/notifications/digest/:period", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const period = req.params.period as "daily" | "weekly";
@@ -3807,7 +3796,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Check and notify important discoveries
-  app.post("/api/prometheus/notifications/check/:childId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/notifications/check/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3840,7 +3829,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get full knowledge graph for visualization
-  app.get("/api/prometheus/knowledge-graph/:childId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/knowledge-graph/:childId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -3909,7 +3898,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get node details with related nodes
-  app.get("/api/prometheus/knowledge-graph/:childId/node/:nodeId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/knowledge-graph/:childId/node/:nodeId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4006,7 +3995,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Register as expert
-  app.post("/api/prometheus/experts/register", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/experts/register", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { registerExpert } = await import("./prometheus/phase3");
@@ -4024,7 +4013,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get expert profile
-  app.get("/api/prometheus/experts/:expertId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/experts/:expertId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const expertId = parseInt(req.params.expertId, 10);
       const { getExpertProfile } = await import("./prometheus/phase3");
@@ -4042,7 +4031,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get pending reviews for expert
-  app.get("/api/prometheus/experts/:expertId/reviews/pending", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/experts/:expertId/reviews/pending", isEmailAuthenticated, async (req: any, res) => {
     try {
       const expertId = parseInt(req.params.expertId, 10);
       const limit = parseInt(req.query.limit as string, 10) || 20;
@@ -4058,7 +4047,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Submit expert review
-  app.post("/api/prometheus/experts/:expertId/reviews", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/experts/:expertId/reviews", isEmailAuthenticated, async (req: any, res) => {
     try {
       const expertId = parseInt(req.params.expertId, 10);
       const { targetType, targetId, verdict } = req.body;
@@ -4074,7 +4063,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get review statistics for Prometheus
-  app.get("/api/prometheus/:childId/review-stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/review-stats", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4145,7 +4134,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Share knowledge to community
-  app.post("/api/prometheus/:childId/share", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/share", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4175,7 +4164,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Vote on shared knowledge
-  app.post("/api/prometheus/community/knowledge/:knowledgeId/vote", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/community/knowledge/:knowledgeId/vote", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const knowledgeId = parseInt(req.params.knowledgeId, 10);
@@ -4192,7 +4181,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Submit contribution
-  app.post("/api/prometheus/community/contributions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/community/contributions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
 
@@ -4224,7 +4213,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get translation for content
-  app.get("/api/prometheus/translate/:sourceType/:sourceId/:language", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/translate/:sourceType/:sourceId/:language", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { sourceType, sourceId, language } = req.params;
 
@@ -4243,7 +4232,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Create translation
-  app.post("/api/prometheus/translate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/translate", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { sourceType, sourceId, sourceLanguage, targetLanguage, text, context, medicalDomain } = req.body;
@@ -4267,7 +4256,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Batch translate Prometheus content
-  app.post("/api/prometheus/:childId/translate-all", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/translate-all", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4313,7 +4302,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get translation statistics
-  app.get("/api/prometheus/translation-stats", isAuthenticated, async (req, res) => {
+  app.get("/api/prometheus/translation-stats", isEmailAuthenticated, async (req, res) => {
     try {
       const { getTranslationStats } = await import("./prometheus/phase3");
       const stats = await getTranslationStats();
@@ -4330,7 +4319,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // ============================================================================
 
   // Get user's clinical integrations
-  app.get("/api/prometheus/clinical/integrations", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/clinical/integrations", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = req.query.childId ? parseInt(req.query.childId as string, 10) : undefined;
@@ -4346,7 +4335,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Create clinical integration
-  app.post("/api/prometheus/clinical/integrations", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/clinical/integrations", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
 
@@ -4364,7 +4353,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Give consent for integration
-  app.post("/api/prometheus/clinical/integrations/:integrationId/consent", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/clinical/integrations/:integrationId/consent", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const integrationId = parseInt(req.params.integrationId, 10);
@@ -4384,7 +4373,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Revoke consent
-  app.delete("/api/prometheus/clinical/integrations/:integrationId/consent", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/prometheus/clinical/integrations/:integrationId/consent", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const integrationId = parseInt(req.params.integrationId, 10);
@@ -4404,7 +4393,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Trigger sync
-  app.post("/api/prometheus/clinical/integrations/:integrationId/sync", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/clinical/integrations/:integrationId/sync", isEmailAuthenticated, async (req: any, res) => {
     try {
       const integrationId = parseInt(req.params.integrationId, 10);
 
@@ -4423,7 +4412,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Import lab results manually
-  app.post("/api/prometheus/:childId/clinical/lab-results", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/clinical/lab-results", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4453,7 +4442,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Import medications manually
-  app.post("/api/prometheus/:childId/clinical/medications", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/clinical/medications", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4483,7 +4472,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get import history
-  app.get("/api/prometheus/:childId/clinical/imports", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/clinical/imports", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4513,7 +4502,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get import statistics
-  app.get("/api/prometheus/:childId/clinical/stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/clinical/stats", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4548,7 +4537,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Research Priorities ---
 
   // Get knowledge gaps for a child
-  app.get("/api/prometheus/:childId/research/gaps", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/research/gaps", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4569,7 +4558,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get research priorities
-  app.get("/api/prometheus/:childId/research/priorities", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/research/priorities", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4590,7 +4579,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Create research priority from gap
-  app.post("/api/prometheus/:childId/research/priorities", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/research/priorities", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4612,7 +4601,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Execute research for a priority
-  app.post("/api/prometheus/research/priorities/:priorityId/execute", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/research/priorities/:priorityId/execute", isEmailAuthenticated, async (req: any, res) => {
     try {
       const priorityId = parseInt(req.params.priorityId, 10);
 
@@ -4629,7 +4618,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Hypothesis Generation ---
 
   // Detect patterns for a child
-  app.get("/api/prometheus/:childId/hypotheses/patterns", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/hypotheses/patterns", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4650,7 +4639,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get hypotheses for a child
-  app.get("/api/prometheus/:childId/hypotheses", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/hypotheses", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4672,7 +4661,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Generate hypothesis
-  app.post("/api/prometheus/:childId/hypotheses", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/hypotheses", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4699,7 +4688,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Validate hypothesis
-  app.post("/api/prometheus/hypotheses/:hypothesisId/validate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/hypotheses/:hypothesisId/validate", isEmailAuthenticated, async (req: any, res) => {
     try {
       const hypothesisId = parseInt(req.params.hypothesisId, 10);
       const { evidence } = req.body;
@@ -4717,7 +4706,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Treatment Recommendations ---
 
   // Get treatment recommendations for a child
-  app.get("/api/prometheus/:childId/treatments", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/:childId/treatments", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4739,7 +4728,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Generate treatment recommendation
-  app.post("/api/prometheus/:childId/treatments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/treatments", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4780,7 +4769,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get treatment protocol
-  app.get("/api/prometheus/treatments/:recommendationId/protocol", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/treatments/:recommendationId/protocol", isEmailAuthenticated, async (req: any, res) => {
     try {
       const recommendationId = parseInt(req.params.recommendationId, 10);
 
@@ -4795,7 +4784,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Start treatment with outcome tracking
-  app.post("/api/prometheus/treatments/:recommendationId/start", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/treatments/:recommendationId/start", isEmailAuthenticated, async (req: any, res) => {
     try {
       const recommendationId = parseInt(req.params.recommendationId, 10);
 
@@ -4810,7 +4799,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Update recommendation status
-  app.patch("/api/prometheus/treatments/:recommendationId", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/prometheus/treatments/:recommendationId", isEmailAuthenticated, async (req: any, res) => {
     try {
       const recommendationId = parseInt(req.params.recommendationId, 10);
       const { status, feedback } = req.body;
@@ -4828,7 +4817,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Outcome Tracking ---
 
   // Initialize outcome tracking
-  app.post("/api/prometheus/:childId/outcomes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/outcomes", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -4854,7 +4843,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Record measurement
-  app.post("/api/prometheus/outcomes/:trackingId/measurements", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/outcomes/:trackingId/measurements", isEmailAuthenticated, async (req: any, res) => {
     try {
       const trackingId = parseInt(req.params.trackingId, 10);
       const { measurementType, value, unit, notes, measuredBy, confidence } = req.body;
@@ -4878,7 +4867,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Analyze outcomes
-  app.get("/api/prometheus/outcomes/:trackingId/analysis", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/outcomes/:trackingId/analysis", isEmailAuthenticated, async (req: any, res) => {
     try {
       const trackingId = parseInt(req.params.trackingId, 10);
 
@@ -4893,7 +4882,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Complete tracking
-  app.post("/api/prometheus/outcomes/:trackingId/complete", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/outcomes/:trackingId/complete", isEmailAuthenticated, async (req: any, res) => {
     try {
       const trackingId = parseInt(req.params.trackingId, 10);
       const { reason } = req.body;
@@ -4911,7 +4900,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Feedback Loops ---
 
   // Process pending feedback loops
-  app.post("/api/prometheus/feedback/process", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/feedback/process", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { feedbackProcessor } = await import("./prometheus/phase4");
       const result = await feedbackProcessor.processPendingLoops();
@@ -4924,7 +4913,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Validate predictions
-  app.post("/api/prometheus/feedback/validate-predictions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/feedback/validate-predictions", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { feedbackProcessor } = await import("./prometheus/phase4");
       const result = await feedbackProcessor.validatePredictions();
@@ -4939,7 +4928,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Autonomous Actions ---
 
   // Get action statistics
-  app.get("/api/prometheus/actions/stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/actions/stats", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { autonomousActions } = await import("./prometheus/phase4");
       const stats = await autonomousActions.getActionStatistics();
@@ -4952,7 +4941,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Execute pending actions
-  app.post("/api/prometheus/actions/execute", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/actions/execute", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { autonomousActions } = await import("./prometheus/phase4");
       const result = await autonomousActions.executePendingActions();
@@ -4965,7 +4954,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Approve action
-  app.post("/api/prometheus/actions/:actionId/approve", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/actions/:actionId/approve", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const actionId = parseInt(req.params.actionId, 10);
@@ -4985,7 +4974,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Reject action
-  app.post("/api/prometheus/actions/:actionId/reject", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/actions/:actionId/reject", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const actionId = parseInt(req.params.actionId, 10);
@@ -5008,7 +4997,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   // --- Autonomous Cycle ---
 
   // Run full autonomous cycle
-  app.post("/api/prometheus/:childId/autonomous-cycle", isAuthenticated, async (req: any, res) => {
+  app.post("/api/prometheus/:childId/autonomous-cycle", isEmailAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const childId = parseInt(req.params.childId, 10);
@@ -5029,7 +5018,7 @@ Respond in a clear, accessible manner suitable for parents and caregivers while 
   });
 
   // Get system health
-  app.get("/api/prometheus/system-health", isAuthenticated, async (req: any, res) => {
+  app.get("/api/prometheus/system-health", isEmailAuthenticated, async (req: any, res) => {
     try {
       const { phase4Orchestrator } = await import("./prometheus/phase4");
       const health = await phase4Orchestrator.getSystemHealth();
