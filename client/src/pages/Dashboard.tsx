@@ -329,9 +329,15 @@ export default function Dashboard() {
                     {t('nav.profile')}
                   </Button>
                 </Link>
-                <Link href="/feed">
+                <Link href="/research">
                   <Button variant="ghost" className="w-full justify-start">
                     <FlaskConical className="h-4 w-4 mr-2" />
+                    {language === 'ka' ? 'მკვლევარის რეჟიმი' : 'Research Mode'}
+                  </Button>
+                </Link>
+                <Link href="/feed">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Bell className="h-4 w-4 mr-2" />
                     {t('nav.feed')}
                   </Button>
                 </Link>

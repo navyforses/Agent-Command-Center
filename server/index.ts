@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startEvolutionScheduler } from "./evolutionScheduler";
+import { syncNewTrials } from "./services/clinicalTrialsApi";
 
 const app = express();
 const httpServer = createServer(app);
@@ -94,6 +95,45 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      startEvolutionScheduler();
+      log("Evolution Scheduler started");
+
+      // ====================================================================
+      // ClinicalTrials.gov Sync - ავტომატური განახლება
+      // ====================================================================
+
+      // სერვერის გაშვებისას პირველი sync (5 წუთის შემდეგ, რომ სერვერი ჯერ სტაბილურად ამუშავდეს)
+      setTimeout(async () => {
+        log("Starting initial ClinicalTrials.gov sync...", "trials-sync");
+        try {
+          const result = await syncNewTrials([
+            "hypoxic ischemic encephalopathy",
+            "cerebral palsy",
+            "neonatal encephalopathy"
+          ]);
+          log(`Initial sync completed: inserted=${result.inserted}, updated=${result.updated}, unchanged=${result.unchanged}`, "trials-sync");
+        } catch (error) {
+          log(`Initial sync failed: ${error}`, "trials-sync");
+        }
+      }, 5 * 60 * 1000); // 5 წუთი
+
+      // ყოველ 24 საათში ავტომატური sync
+      setInterval(async () => {
+        log("Starting scheduled ClinicalTrials.gov sync...", "trials-sync");
+        try {
+          const result = await syncNewTrials([
+            "hypoxic ischemic encephalopathy",
+            "cerebral palsy",
+            "neonatal encephalopathy"
+          ]);
+          log(`Scheduled sync completed: inserted=${result.inserted}, updated=${result.updated}, unchanged=${result.unchanged}`, "trials-sync");
+        } catch (error) {
+          log(`Scheduled sync failed: ${error}`, "trials-sync");
+        }
+      }, 24 * 60 * 60 * 1000); // 24 საათი
+
+      log("ClinicalTrials.gov sync scheduler initialized (first sync in 5 min, then every 24h)", "trials-sync");
       
       // Evolution scheduler გათიშულია
       // startEvolutionScheduler();

@@ -203,6 +203,137 @@ const searchCache = new ApiCache(5 * 60 * 1000, 500); // 5 min TTL, max 500 entr
 const studyCache = new ApiCache(30 * 60 * 1000, 1000); // 30 min TTL, max 1000 entries
 
 // ============================================================================
+// Dynamic Condition Sync Tracker
+// ============================================================================
+
+interface ConditionSyncInfo {
+  lastSyncedAt: number;
+  syncInProgress: boolean;
+  trialsCount: number;
+}
+
+class ConditionSyncTracker {
+  private conditions = new Map<string, ConditionSyncInfo>();
+  private readonly SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24 საათი
+
+  // ამოწმებს საჭიროა თუ არა sync
+  needsSync(condition: string): boolean {
+    const normalized = condition.toLowerCase().trim();
+    const info = this.conditions.get(normalized);
+
+    if (!info) return true; // არასდროს სინქრონიზებულა
+    if (info.syncInProgress) return false; // უკვე მიმდინარეობს
+    if (Date.now() - info.lastSyncedAt > this.SYNC_INTERVAL) return true; // მოძველებულია
+
+    return false;
+  }
+
+  // აღნიშნავს რომ sync დაიწყო
+  markSyncStarted(condition: string): void {
+    const normalized = condition.toLowerCase().trim();
+    const existing = this.conditions.get(normalized);
+    this.conditions.set(normalized, {
+      lastSyncedAt: existing?.lastSyncedAt || 0,
+      syncInProgress: true,
+      trialsCount: existing?.trialsCount || 0,
+    });
+    console.log(`[Condition Tracker] Sync started for: "${condition}"`);
+  }
+
+  // აღნიშნავს რომ sync დასრულდა
+  markSyncCompleted(condition: string, trialsCount: number): void {
+    const normalized = condition.toLowerCase().trim();
+    this.conditions.set(normalized, {
+      lastSyncedAt: Date.now(),
+      syncInProgress: false,
+      trialsCount,
+    });
+    console.log(`[Condition Tracker] Sync completed for: "${condition}" (${trialsCount} trials)`);
+  }
+
+  // აღნიშნავს რომ sync ჩავარდა
+  markSyncFailed(condition: string): void {
+    const normalized = condition.toLowerCase().trim();
+    const existing = this.conditions.get(normalized);
+    if (existing) {
+      existing.syncInProgress = false;
+    }
+    console.log(`[Condition Tracker] Sync failed for: "${condition}"`);
+  }
+
+  // სტატისტიკა
+  getStats(): { conditions: string[]; total: number } {
+    return {
+      conditions: Array.from(this.conditions.keys()),
+      total: this.conditions.size,
+    };
+  }
+
+  // კონკრეტული condition-ის ინფო
+  getConditionInfo(condition: string): ConditionSyncInfo | null {
+    return this.conditions.get(condition.toLowerCase().trim()) || null;
+  }
+}
+
+const conditionTracker = new ConditionSyncTracker();
+
+/**
+ * Background-ში სინქრონიზაცია კონკრეტული condition-ისთვის
+ * მომხმარებელს არ აცდის - მაშინვე აბრუნებს
+ */
+export function triggerBackgroundSync(condition: string): void {
+  if (!condition || condition.length < 2) return;
+
+  // შევამოწმოთ საჭიროა თუ არა sync
+  if (!conditionTracker.needsSync(condition)) {
+    console.log(`[Background Sync] Skipping "${condition}" - already synced or in progress`);
+    return;
+  }
+
+  // აღვნიშნოთ რომ დაიწყო
+  conditionTracker.markSyncStarted(condition);
+
+  // Background-ში გავუშვათ (არ ველოდებით)
+  syncNewTrials([condition])
+    .then((result) => {
+      conditionTracker.markSyncCompleted(condition, result.inserted + result.updated);
+    })
+    .catch((error) => {
+      console.error(`[Background Sync] Error syncing "${condition}":`, error);
+      conditionTracker.markSyncFailed(condition);
+    });
+}
+
+/**
+ * ძიების query-დან ამოიღებს შესაძლო condition-ებს
+ */
+export function extractConditionsFromQuery(query: string): string[] {
+  if (!query || query.length < 3) return [];
+
+  // გავფილტროთ ძალიან მოკლე ან generic სიტყვები
+  const stopWords = new Set([
+    "the", "and", "or", "for", "with", "in", "on", "at", "to", "a", "an",
+    "trial", "trials", "study", "studies", "clinical", "treatment", "therapy",
+    "და", "ან", "ის", "ეს", "რომ", "თუ", "მაგრამ"
+  ]);
+
+  const words = query.toLowerCase().split(/\s+/);
+
+  // თუ მთლიანი query არის condition-ის სახელი
+  if (query.length > 3 && !stopWords.has(query.toLowerCase())) {
+    return [query];
+  }
+
+  // ცალკეული სიტყვები რომლებიც შეიძლება იყოს condition
+  return words.filter(word => word.length > 3 && !stopWords.has(word));
+}
+
+// Export tracker stats
+export function getConditionTrackerStats() {
+  return conditionTracker.getStats();
+}
+
+// ============================================================================
 // Rate Limiter Implementation
 // ============================================================================
 
@@ -983,4 +1114,7 @@ export default {
   syncNewTrials,
   clearCache,
   getCacheStats,
+  triggerBackgroundSync,
+  extractConditionsFromQuery,
+  getConditionTrackerStats,
 };

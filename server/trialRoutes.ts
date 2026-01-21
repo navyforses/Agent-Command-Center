@@ -14,6 +14,11 @@ import multer from "multer";
 import * as trialAggregator from "./services/trialAggregator";
 import * as trialTranslator from "./services/trialTranslator";
 import {
+  triggerBackgroundSync,
+  extractConditionsFromQuery,
+  getConditionTrackerStats,
+} from "./services/clinicalTrialsApi";
+import {
   extractTextFromPDF,
   extractTextFromImage,
   processDocument,
@@ -194,6 +199,26 @@ router.get("/trials/search", async (req: Request, res: Response) => {
 
     // Cache the result
     trialCache.set(cacheKey, result);
+
+    // ====================================================================
+    // Dynamic Background Sync - ახალი condition-ებისთვის
+    // ====================================================================
+    // თუ მომხმარებელმა მოძებნა რაიმე, background-ში დავიწყოთ sync
+    // ეს არ აჩერებს response-ს - მომხმარებელი მაშინვე იღებს შედეგს
+    if (q && String(q).length >= 3) {
+      const searchQuery = String(q);
+
+      // მთლიანი query როგორც condition
+      triggerBackgroundSync(searchQuery);
+
+      // ასევე ცალკეული სიტყვები თუ query შეიცავს სივრცეებს
+      const conditions = extractConditionsFromQuery(searchQuery);
+      conditions.forEach((condition) => {
+        if (condition !== searchQuery.toLowerCase()) {
+          triggerBackgroundSync(condition);
+        }
+      });
+    }
 
     // Log search history for authenticated users
     const userId = (req as any).user?.id;
@@ -804,6 +829,19 @@ router.post("/cache/clear", async (req: Request, res: Response) => {
   res.json({
     success: true,
     message: pattern ? `Cache cleared for pattern: ${pattern}` : "All cache cleared",
+  });
+});
+
+// ============================================================================
+// Condition Sync Stats Endpoint
+// ============================================================================
+
+router.get("/sync/stats", async (_req: Request, res: Response) => {
+  const stats = getConditionTrackerStats();
+  res.json({
+    ...stats,
+    description: "მოძებნილი დაავადებები რომლებიც სინქრონიზებულია ClinicalTrials.gov-დან",
+    timestamp: new Date().toISOString(),
   });
 });
 
