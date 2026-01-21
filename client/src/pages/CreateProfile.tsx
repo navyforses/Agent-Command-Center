@@ -110,29 +110,72 @@ export default function CreateProfile() {
     const newFiles = [...data.uploadedFiles, file];
     updateData({ uploadedFiles: newFiles });
 
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Read file content for text extraction
+      const fileContent = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve('');
+        if (file.type.includes('text') || file.type.includes('json')) {
+          reader.readAsText(file);
+        } else {
+          reader.readAsDataURL(file);
+        }
+      });
 
-    // Mock extracted text (in production, this would come from OCR/API)
-    const mockExtractedText = `
+      // Call API to analyze document
+      const response = await fetch('/api/assistant/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          content: fileContent.length < 50000 ? fileContent : null, // Limit content size
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Extract text from API response
+        const extractedText = result.document?.extractedText || result.document?.aiSummary || `
+დოკუმენტი: ${file.name}
+ტიპი: ${file.type}
+ზომა: ${(file.size / 1024).toFixed(1)} KB
 პაციენტი: ${data.patientName || 'უცნობი'}
-დიაგნოზი: ჰიპოქსიურ-იშემიური ენცეფალოპათია (HIE)
 დაბადების თარიღი: ${data.dateOfBirth || 'უცნობი'}
-მიმდინარე მდგომარეობა: სტაბილური
-მკურნალობის ისტორია: თერაპიული ჰიპოთერმია, რეაბილიტაცია
-    `;
+        `;
 
-    updateData({ form100Text: mockExtractedText });
+        updateData({ form100Text: extractedText });
 
-    // Mock AI summary
-    setAiSummary(`
-AI-მ წარმატებით გააანალიზა დოკუმენტი.
+        // Set AI summary from API or fallback
+        const summary = result.document?.aiSummary || result.document?.aiSummaryKa;
+        setAiSummary(summary || `
+AI-მ წარმატებით გააანალიზა დოკუმენტი "${file.name}".
 
-აღმოჩენილი ინფორმაცია:
-• ძირითადი დიაგნოზი: HIE (ჰიპოქსიურ-იშემიური ენცეფალოპათია)
-• რეკომენდებული კვლევების ტიპები: ღეროვანი უჯრედების თერაპია, ნეირორეაბილიტაცია
-• საძიებო საკვანძო სიტყვები: HIE, neonatal encephalopathy, stem cell therapy, cord blood
-    `);
+${result.document?.aiKeyFindings?.length ?
+  'აღმოჩენილი ინფორმაცია:\n' + result.document.aiKeyFindings.map((f: string) => `• ${f}`).join('\n')
+  : 'დოკუმენტი დამუშავდა. კლინიკური კვლევების ძიებისთვის გადადით შემდეგ ეტაპზე.'}
+        `);
+      } else {
+        // Fallback to basic info if API fails
+        const fallbackText = `
+დოკუმენტი: ${file.name}
+ტიპი: ${file.type}
+პაციენტი: ${data.patientName || 'უცნობი'}
+დაბადების თარიღი: ${data.dateOfBirth || 'უცნობი'}
+მიმდინარე მდგომარეობა: მიუთითეთ პროფილში
+        `;
+        updateData({ form100Text: fallbackText });
+        setAiSummary('დოკუმენტი ატვირთულია. გთხოვთ შეავსოთ დამატებითი ინფორმაცია პროფილში.');
+      }
+    } catch (error) {
+      console.error('Document analysis error:', error);
+      // Fallback on error
+      updateData({ form100Text: `დოკუმენტი: ${file.name}\nტიპი: ${file.type}` });
+      setAiSummary('დოკუმენტი ატვირთულია. ავტომატური ანალიზი დროებით მიუწვდომელია.');
+    }
 
     setIsAnalyzing(false);
   };
@@ -157,11 +200,35 @@ AI-მ წარმატებით გააანალიზა დოკ�
   const handleSubmit = async () => {
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Save profile data to API
+      const profileResponse = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: data.patientName?.split(' ')[0] || '',
+          lastName: data.patientName?.split(' ').slice(1).join(' ') || '',
+        }),
+      });
 
-    // Redirect to feed
-    window.location.href = '/feed';
+      // Save preferences
+      await fetch('/api/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: data.preferredLanguage || 'ka',
+          emailNotifications: data.notifyNewTrials,
+          clinicalTrialAlerts: data.notifyNewTrials,
+        }),
+      });
+
+      // Redirect to feed on success
+      window.location.href = '/feed';
+    } catch (error) {
+      console.error('Profile save error:', error);
+      // Still redirect on error for now
+      window.location.href = '/feed';
+    }
   };
 
   const canProceed = () => {

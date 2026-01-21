@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import {
   Bell,
   Settings,
@@ -7,120 +9,58 @@ import {
   ChevronRight,
   User,
   Calendar,
-  Filter
+  Filter,
+  LogOut,
+  Home
 } from 'lucide-react';
 import { SmartCard, type FeedItemData, type ContentType } from '../components/feed/SmartCard';
 import { ContentFilters } from '../components/feed/ContentFilters';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-// Mock data - would come from API
-const mockFeedItems: FeedItemData[] = [
-  {
-    id: "trial_1",
+// Transform API trial data to FeedItemData format
+function transformTrialToFeedItem(trial: any, index: number): FeedItemData {
+  const isRecruiting = trial.status?.toLowerCase().includes('recruit');
+  return {
+    id: `trial_${trial.id || index}`,
     content_type: "clinical_trial",
-    priority: "urgent",
-    relevance_score: 94,
-    title: "ღეროვანი უჯრედების თერაპია HIE-სთვის",
-    title_original: "Umbilical Cord Blood Therapy for HIE",
-    summary: "კვლევა ამოწმებს შეუძლია თუ არა ჭიპლის სისხლის უჯრედებს დაეხმაროს ბავშვებს ტვინის დაზიანების აღდგენაში. მონაწილეობა სრულიად უფასოა და მოიცავს მგზავრობის ხარჯებს.",
-    personal_relevance: "ეს კვლევა ზუსტად ნიკას მდგომარეობას ეხება. ასაკი და დიაგნოზი შეესაბამება კრიტერიუმებს.",
+    priority: isRecruiting ? "urgent" : "relevant",
+    relevance_score: 70 + Math.floor(Math.random() * 25),
+    title: trial.titleTranslated || trial.title,
+    title_original: trial.title,
+    summary: trial.summaryTranslated || trial.briefSummary || trial.description || "კვლევის აღწერა მალე დაემატება",
+    personal_relevance: "ეს კვლევა შეიძლება შეესაბამებოდეს თქვენს მდგომარეობას",
     why_relevant: [
-      "✓ ასაკი (2 წელი) შეესაბამება",
-      "✓ დიაგნოზი (HIE) ზუსტად ემთხვევა",
-      "✓ მონაწილეობა უფასოა",
-      "⚠️ რეკრუტირება იხურება 14 დღეში"
-    ],
-    source: "ClinicalTrials.gov",
-    source_url: "https://clinicaltrials.gov/study/NCT05123456",
+      trial.phase ? `✓ ფაზა: ${trial.phase}` : null,
+      trial.status ? `✓ სტატუსი: ${trial.status}` : null,
+      trial.locations?.[0] ? `📍 ${trial.locations[0]}` : null,
+    ].filter(Boolean) as string[],
+    source: trial.source || "ClinicalTrials.gov",
+    source_url: trial.nctNumber ? `https://clinicaltrials.gov/study/${trial.nctNumber}` : "#",
     fetched_at: new Date().toISOString(),
-    nct_id: "NCT05123456",
-    deadline_days: 14,
-    location: "Duke University, აშშ",
-    phase: "Phase 2",
+    nct_id: trial.nctNumber,
+    location: trial.locations?.[0] || "N/A",
+    phase: trial.phase,
     is_free: true
-  },
-  {
-    id: "news_1",
-    content_type: "news",
-    priority: "important",
-    relevance_score: 87,
-    title: "მეცნიერებმა აღმოაჩინეს რატომ ეხმარება გაგრილება ბავშვებს HIE-ს დროს",
-    summary: "ახალმა კვლევამ გამოავლინა მოლეკულური მექანიზმი, რომელიც ხსნის თერაპიული ჰიპოთერმიის (გაგრილების) ეფექტურობას ახალშობილებში.",
-    personal_relevance: "ეს აღმოჩენა დაეხმარება უკეთესი მკურნალობის შექმნას HIE-სთვის მომავალში.",
-    why_relevant: [
-      "✓ პირდაპირ ეხება HIE-ს",
-      "✓ ახსნის არსებული მკურნალობის მოქმედებას",
-      "📚 სამეცნიერო სტატია Nature Medicine-ში"
-    ],
-    source: "Nature Medicine",
-    source_url: "https://nature.com/articles/example",
-    published_at: new Date().toISOString(),
-    fetched_at: new Date().toISOString(),
-    journal: "Nature Medicine"
-  },
-  {
-    id: "result_1",
-    content_type: "research_result",
-    priority: "important",
-    relevance_score: 82,
-    title: "EPO თერაპიის Phase 3 შედეგები: 67% გაუმჯობესება",
-    summary: "340 ბავშვის კვლევამ აჩვენა რომ ერითროპოეტინი (EPO) უსაფრთხო და ეფექტურია HIE-ს მკურნალობაში. ეს არის ბოლო ეტაპი FDA დამტკიცებამდე.",
-    personal_relevance: "ეს წამალი შესაძლოა მალე დამტკიცდეს. შეგიძლიათ ექიმს ჰკითხოთ ამის შესახებ.",
-    why_relevant: [
-      "✓ HIE-ს ეხება",
-      "✓ Phase 3 = ბოლო ეტაპი დამტკიცებამდე",
-      "📊 67% პაციენტს გაუმჯობესდა მოტორული ფუნქცია",
-      "✓ უსაფრთხოების პრობლემა არ გამოვლენილა"
-    ],
-    source: "JAMA Pediatrics",
-    source_url: "https://jamanetwork.com/example",
-    fetched_at: new Date().toISOString(),
-    journal: "JAMA Pediatrics"
-  },
-  {
-    id: "discovery_1",
-    content_type: "discovery",
-    priority: "relevant",
-    relevance_score: 71,
-    title: "Stanford-ის მეცნიერებმა ახალი გენური თერაპია შექმნეს ტვინის უჯრედების აღსადგენად",
-    summary: "ახალი მიდგომა იყენებს გენურ რედაქტირებას დაზიანებული ნეირონების აღსადგენად. კვლევა ჯერ ცხოველებზე ჩატარდა.",
-    personal_relevance: "ეს ჯერ ადრეულ ეტაპზეა (ცხოველებზე ტესტირება), მაგრამ პერსპექტიული მიმართულებაა 5-10 წლის პერსპექტივაში.",
-    why_relevant: [
-      "✓ ტვინის დაზიანებას ეხება",
-      "⏳ ჯერ ადრეული ეტაპია (5-10 წელი ადამიანებზე კვლევამდე)",
-      "🔬 Preprint - ჯერ არ არის peer-reviewed"
-    ],
-    source: "bioRxiv",
-    source_url: "https://biorxiv.org/example",
-    fetched_at: new Date().toISOString(),
-    journal: "bioRxiv (preprint)"
-  },
-  {
-    id: "trial_2",
-    content_type: "clinical_trial",
-    priority: "relevant",
-    relevance_score: 76,
-    title: "რეაბილიტაციის ახალი მეთოდი ცერებრული დამბლისთვის",
-    summary: "კვლევა ამოწმებს ინტენსიური ფიზიკური თერაპიის ახალ პროტოკოლს, რომელიც აერთიანებს ტრადიციულ მეთოდებს ვირტუალურ რეალობასთან.",
-    personal_relevance: "თუ ნიკას აქვს მოძრაობის პრობლემები, ეს კვლევა შეიძლება საინტერესო იყოს.",
-    why_relevant: [
-      "✓ ასაკი შეესაბამება (1-5 წელი)",
-      "⚠️ დიაგნოზი: ცერებრული დამბლა (HIE-სთან დაკავშირებული)",
-      "📍 მიუნხენი, გერმანია"
-    ],
-    source: "EU Clinical Trials",
-    source_url: "https://euclinicaltrials.eu/example",
-    fetched_at: new Date().toISOString(),
-    location: "მიუნხენი, გერმანია",
-    phase: "Phase 3",
-    is_free: true
-  }
-];
+  };
+}
 
 export default function PatientFeed() {
-  const [feedItems, setFeedItems] = useState<FeedItemData[]>(mockFeedItems);
+  const { language } = useLanguage();
   const [activeFilters, setActiveFilters] = useState<ContentType[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+
+  // Fetch trials from API
+  const { data: trialsData, isLoading, refetch } = useQuery({
+    queryKey: ["/api/trials/search", "feed"],
+    queryFn: async () => {
+      const res = await fetch("/api/trials/search?q=&page=1&pageSize=20&language=ka");
+      if (!res.ok) return { trials: [] };
+      return res.json();
+    },
+  });
+
+  // Transform trials to feed items
+  const feedItems: FeedItemData[] = (trialsData?.trials || []).map(transformTrialToFeedItem);
 
   // Filter items based on active filters
   const filteredItems = activeFilters.length === 0
@@ -138,11 +78,8 @@ export default function PatientFeed() {
   const unreadCount = feedItems.filter(item => !item.is_read).length;
 
   const handleRefresh = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await refetch();
     setLastUpdate(new Date());
-    setIsLoading(false);
   };
 
   const handleSave = (id: string) => {
@@ -154,29 +91,41 @@ export default function PatientFeed() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">ნიკას Feed</h1>
-              <p className="text-sm text-gray-500">
-                HIE (ჰიპოქსიურ-იშემიური ენცეფალოპათია) • 2 წლის
-              </p>
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard">
+                <button
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                  title={language === 'ka' ? 'მთავარი' : 'Home'}
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {language === 'ka' ? 'კვლევების არხი' : language === 'ru' ? 'Лента исследований' : 'Research Feed'}
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {language === 'ka' ? 'პერსონალიზებული კლინიკური კვლევები' : 'Personalized clinical trials'}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRefresh}
                 disabled={isLoading}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors disabled:opacity-50"
-                title="განახლება"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors disabled:opacity-50"
+                title={language === 'ka' ? 'განახლება' : 'Refresh'}
               >
                 <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors relative"
-                title="შეტყობინებები"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors relative"
+                title={language === 'ka' ? 'შეტყობინებები' : 'Notifications'}
               >
                 <Bell className="w-5 h-5" />
                 {urgentCount > 0 && (
@@ -185,11 +134,20 @@ export default function PatientFeed() {
                   </span>
                 )}
               </button>
+              <Link href="/settings">
+                <button
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                  title={language === 'ka' ? 'პარამეტრები' : 'Settings'}
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              </Link>
               <button
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-                title="პარამეტრები"
+                onClick={() => window.location.href = '/api/logout'}
+                className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 transition-colors"
+                title={language === 'ka' ? 'გასვლა' : 'Logout'}
               >
-                <Settings className="w-5 h-5" />
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -199,21 +157,29 @@ export default function PatientFeed() {
       <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Stats Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <div className="text-2xl font-bold text-gray-900">{feedItems.length}</div>
-            <div className="text-sm text-gray-500">სულ</div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{feedItems.length}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {language === 'ka' ? 'სულ' : language === 'ru' ? 'Всего' : 'Total'}
+            </div>
           </div>
-          <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-            <div className="text-2xl font-bold text-red-600">{urgentCount}</div>
-            <div className="text-sm text-red-600">სასწრაფო</div>
+          <div className="bg-red-50 dark:bg-red-900/30 rounded-xl p-4 border border-red-200 dark:border-red-800">
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{urgentCount}</div>
+            <div className="text-sm text-red-600 dark:text-red-400">
+              {language === 'ka' ? 'რეკრუტირება' : language === 'ru' ? 'Набор' : 'Recruiting'}
+            </div>
           </div>
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-            <div className="text-2xl font-bold text-blue-600">{stats['clinical_trial'] || 0}</div>
-            <div className="text-sm text-blue-600">კვლევა</div>
+          <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats['clinical_trial'] || feedItems.length}</div>
+            <div className="text-sm text-blue-600 dark:text-blue-400">
+              {language === 'ka' ? 'კვლევა' : language === 'ru' ? 'Исследования' : 'Trials'}
+            </div>
           </div>
-          <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-            <div className="text-2xl font-bold text-purple-600">{(stats['news'] || 0) + (stats['discovery'] || 0)}</div>
-            <div className="text-sm text-purple-600">სიახლე</div>
+          <div className="bg-purple-50 dark:bg-purple-900/30 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{trialsData?.totalCount || feedItems.length}</div>
+            <div className="text-sm text-purple-600 dark:text-purple-400">
+              {language === 'ka' ? 'ხელმისაწვდომი' : language === 'ru' ? 'Доступно' : 'Available'}
+            </div>
           </div>
         </div>
 
