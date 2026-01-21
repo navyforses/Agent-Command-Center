@@ -17,6 +17,7 @@ import Services from "@/pages/Services";
 import About from "@/pages/About";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import ResetPassword from "@/pages/ResetPassword";
 
 // Protected pages (lazy loaded)
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
@@ -50,6 +51,7 @@ function PublicRouter() {
       <Route path="/about" component={About} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/reset-password" component={ResetPassword} />
       {/* Fallback to landing */}
       <Route component={Landing} />
     </Switch>
@@ -78,6 +80,7 @@ function ProtectedRouter() {
         <Route path="/pricing" component={Pricing} />
         <Route path="/services" component={Services} />
         <Route path="/about" component={About} />
+        <Route path="/reset-password" component={ResetPassword} />
 
         {/* Fallback to dashboard */}
         <Route component={Dashboard} />
