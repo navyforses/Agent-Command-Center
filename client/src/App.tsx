@@ -24,7 +24,8 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PatientFeed = lazy(() => import("@/pages/PatientFeed"));
 const TrialSearch = lazy(() => import("@/pages/TrialSearch"));
 const TrialDetail = lazy(() => import("@/pages/TrialDetail"));
-const CreateProfile = lazy(() => import("@/pages/CreateProfile"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+const ResearchFeed = lazy(() => import("@/pages/ResearchFeed"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
 // Loading fallback component
@@ -69,7 +70,8 @@ function ProtectedRouter() {
         <Route path="/feed" component={PatientFeed} />
         <Route path="/search" component={TrialSearch} />
         <Route path="/trial/:id" component={TrialDetail} />
-        <Route path="/profile" component={CreateProfile} />
+        <Route path="/profile" component={ProfilePage} />
+        <Route path="/research" component={ResearchFeed} />
         <Route path="/settings" component={Settings} />
 
         {/* Public pages accessible when logged in */}

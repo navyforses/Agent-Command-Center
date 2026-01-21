@@ -4,6 +4,7 @@ import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import trialRoutes from "./trialRoutes";
+import patientProfileRoutes from "./patientProfileRoutes";
 import {
   insertChildSchema,
   insertDocumentSchema,
@@ -94,6 +95,9 @@ export async function registerRoutes(
 
   // Trial Navigator routes
   app.use("/api", trialRoutes);
+
+  // Patient Profile & Research Monitor routes
+  app.use("/api", patientProfileRoutes);
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {

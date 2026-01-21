@@ -143,6 +143,127 @@ export const processingStatusEnum = z.enum([
 ]);
 export type ProcessingStatus = z.infer<typeof processingStatusEnum>;
 
+// ============================================================================
+// Patient Profile System (Form 100 based)
+// ============================================================================
+
+export const patientProfiles = pgTable("patient_profiles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).unique(),
+
+  // პირადი მონაცემები (ფორმა 100-დან)
+  fullName: varchar("full_name", { length: 255 }),
+  birthDate: date("birth_date"),
+  gender: varchar("gender", { length: 20 }),
+  personalNumber: varchar("personal_number", { length: 11 }),
+
+  // სამედიცინო მონაცემები
+  primaryDiagnosis: text("primary_diagnosis"),
+  icd10Codes: text("icd10_codes").array(),
+  secondaryDiagnoses: text("secondary_diagnoses").array(),
+  diagnosisDate: date("diagnosis_date"),
+
+  // დამატებითი სამედიცინო
+  attendingPhysician: varchar("attending_physician", { length: 255 }),
+  medicalInstitution: varchar("medical_institution", { length: 255 }),
+  disabilityStatus: varchar("disability_status", { length: 100 }),
+  disabilityGroup: varchar("disability_group", { length: 50 }),
+  medicalHistory: text("medical_history"),
+  currentMedications: text("current_medications").array(),
+  allergies: text("allergies").array(),
+
+  // AI ანალიზის შედეგი
+  aiExtractedData: jsonb("ai_extracted_data"),
+  extractionConfidence: real("extraction_confidence"),
+
+  // წყარო დოკუმენტი
+  sourceDocumentId: integer("source_document_id").references(() => documents.id),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPatientProfileSchema = createInsertSchema(patientProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPatientProfile = z.infer<typeof insertPatientProfileSchema>;
+export type PatientProfile = typeof patientProfiles.$inferSelect;
+
+// Research Monitor - მკვლევარის რეჟიმი
+export const researchMonitors = pgTable("research_monitors", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  patientProfileId: integer("patient_profile_id").references(() => patientProfiles.id),
+
+  isActive: boolean("is_active").default(false),
+  searchKeywords: text("search_keywords").array(),
+  conditions: text("conditions").array(),
+
+  monitorClinicalTrials: boolean("monitor_clinical_trials").default(true),
+  monitorPubmed: boolean("monitor_pubmed").default(true),
+  monitorDrugs: boolean("monitor_drugs").default(true),
+  monitorNews: boolean("monitor_news").default(true),
+
+  emailNotifications: boolean("email_notifications").default(true),
+  notificationFrequency: varchar("notification_frequency", { length: 20 }).default("daily"),
+
+  lastScanAt: timestamp("last_scan_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResearchMonitorSchema = createInsertSchema(researchMonitors).omit({
+  id: true,
+  createdAt: true,
+  lastScanAt: true,
+});
+
+export type InsertResearchMonitor = z.infer<typeof insertResearchMonitorSchema>;
+export type ResearchMonitor = typeof researchMonitors.$inferSelect;
+
+// Research Findings - აღმოჩენები
+export const researchFindings = pgTable("research_findings", {
+  id: serial("id").primaryKey(),
+  monitorId: integer("monitor_id").references(() => researchMonitors.id),
+
+  findingType: varchar("finding_type", { length: 50 }), // clinical_trial, article, drug, news
+  title: text("title"),
+  summary: text("summary"),
+  sourceUrl: text("source_url"),
+  sourceName: varchar("source_name", { length: 255 }),
+  relevanceScore: real("relevance_score"),
+  metadata: jsonb("metadata"),
+
+  isRead: boolean("is_read").default(false),
+  isSaved: boolean("is_saved").default(false),
+  isDismissed: boolean("is_dismissed").default(false),
+
+  publishedAt: timestamp("published_at"),
+  foundAt: timestamp("found_at").defaultNow(),
+}, (table) => [
+  index("idx_findings_monitor").on(table.monitorId),
+  index("idx_findings_type").on(table.findingType),
+  index("idx_findings_read").on(table.isRead),
+]);
+
+export const insertResearchFindingSchema = createInsertSchema(researchFindings).omit({
+  id: true,
+  foundAt: true,
+});
+
+export type InsertResearchFinding = z.infer<typeof insertResearchFindingSchema>;
+export type ResearchFinding = typeof researchFindings.$inferSelect;
+
+export const findingTypeEnum = z.enum([
+  "clinical_trial",
+  "article",
+  "drug",
+  "news"
+]);
+export type FindingType = z.infer<typeof findingTypeEnum>;
+
 // Therapies table
 export const therapies = pgTable("therapies", {
   id: serial("id").primaryKey(),
