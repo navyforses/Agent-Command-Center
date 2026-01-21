@@ -95,8 +95,9 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       
-      startEvolutionScheduler();
-      log("Evolution Scheduler started");
+      // Evolution scheduler გათიშულია
+      // startEvolutionScheduler();
+      // log("Evolution Scheduler started");
     },
   );
 })();
