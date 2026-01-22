@@ -93,7 +93,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupEmailAuth(app);
 
-  // Trial Navigator routes
+  // Trial Navigator routes (some require authentication)
+  app.use("/api/trials/saved", isEmailAuthenticated);
+  app.use("/api/trials/save", isEmailAuthenticated);
   app.use("/api", trialRoutes);
 
   // Patient Profile & Research Monitor routes (require authentication)
