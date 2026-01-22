@@ -43,8 +43,8 @@ Respond with JSON:
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<DocumentProcessingResult> {
   try {
-    // @ts-ignore - pdf-parse types are not well-defined
-    const data = await (pdfParse as any).default(buffer);
+    // @ts-ignore
+    const data = await pdfParse(buffer);
 
     const text = data.text?.trim() || "";
     const language = detectLanguage(text);
