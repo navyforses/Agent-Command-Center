@@ -202,7 +202,9 @@ export default function ProfilePage() {
   const { data: profileData, isLoading } = useQuery({
     queryKey: ["patient-profile"],
     queryFn: async () => {
-      const res = await fetch("/api/patient-profile");
+      const res = await fetch("/api/patient-profile", {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch profile");
       return res.json();
     },
@@ -223,6 +225,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/patient-profile/upload-form100", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       setUploadProgress(75);
@@ -252,6 +255,7 @@ export default function ProfilePage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Update failed");
       return res.json();
@@ -265,7 +269,10 @@ export default function ProfilePage() {
   // Delete profile mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/patient-profile", { method: "DELETE" });
+      const res = await fetch("/api/patient-profile", {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Delete failed");
       return res.json();
     },
@@ -277,7 +284,10 @@ export default function ProfilePage() {
   // Research monitor mutations
   const enableResearchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/research-monitor/enable", { method: "POST" });
+      const res = await fetch("/api/research-monitor/enable", {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Enable failed");
       return res.json();
     },
@@ -288,7 +298,10 @@ export default function ProfilePage() {
 
   const disableResearchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/research-monitor/disable", { method: "POST" });
+      const res = await fetch("/api/research-monitor/disable", {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Disable failed");
       return res.json();
     },
