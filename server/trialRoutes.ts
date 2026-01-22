@@ -221,7 +221,7 @@ router.get("/trials/search", async (req: Request, res: Response) => {
     }
 
     // Log search history for authenticated users
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
     if (userId && q) {
       db.insert(trialSearchHistory)
         .values({
@@ -394,7 +394,7 @@ router.post("/trials/:id/translate", async (req: Request, res: Response) => {
 
 router.get("/trials/saved", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
     if (!userId) {
       return createErrorResponse(
         res,
@@ -431,7 +431,7 @@ router.get("/trials/saved", async (req: Request, res: Response) => {
 
 router.post("/trials/:id/save", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
     if (!userId) {
       return createErrorResponse(
         res,
@@ -509,7 +509,7 @@ router.post("/trials/:id/save", async (req: Request, res: Response) => {
 
 router.delete("/trials/:id/save", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
     if (!userId) {
       return createErrorResponse(
         res,
@@ -657,7 +657,7 @@ router.post(
   documentUpload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
       if (!userId) {
         return createErrorResponse(
           res,
@@ -763,7 +763,7 @@ router.post(
 
 router.get("/documents/:id/analysis", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
     if (!userId) {
       return createErrorResponse(
         res,
