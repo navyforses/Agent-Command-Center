@@ -29,6 +29,16 @@ const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const ResearchFeed = lazy(() => import("@/pages/ResearchFeed"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
+// Feature pages (lazy loaded)
+const Therapy = lazy(() => import("@/pages/Therapy"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const ChildrenList = lazy(() => import("@/pages/ChildrenList"));
+const ChildProfile = lazy(() => import("@/pages/ChildProfile"));
+const Medications = lazy(() => import("@/pages/Medications"));
+const Evolution = lazy(() => import("@/pages/Evolution"));
+const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const EmailHub = lazy(() => import("@/pages/EmailHub"));
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -75,6 +85,16 @@ function ProtectedRouter() {
         <Route path="/profile" component={ProfilePage} />
         <Route path="/research" component={ResearchFeed} />
         <Route path="/settings" component={Settings} />
+
+        {/* Feature pages */}
+        <Route path="/therapies" component={Therapy} />
+        <Route path="/documents" component={Documents} />
+        <Route path="/children" component={ChildrenList} />
+        <Route path="/children/:id" component={ChildProfile} />
+        <Route path="/medications" component={Medications} />
+        <Route path="/evolution" component={Evolution} />
+        <Route path="/assistant" component={AIAssistant} />
+        <Route path="/emails" component={EmailHub} />
 
         {/* Public pages accessible when logged in */}
         <Route path="/pricing" component={Pricing} />
