@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { Suspense, lazy } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
@@ -81,14 +82,11 @@ function PublicRouter() {
   );
 }
 
-// Protected routes (require login)
-function ProtectedRouter() {
+// Main app content with layout
+function AppWithLayout() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <AppLayout>
       <Switch>
-        {/* Onboarding - first page after login */}
-        <Route path="/onboarding" component={Onboarding} />
-
         {/* Main app pages */}
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
@@ -129,6 +127,24 @@ function ProtectedRouter() {
         {/* Fallback to dashboard */}
         <Route component={Dashboard} />
       </Switch>
+    </AppLayout>
+  );
+}
+
+// Protected routes (require login)
+function ProtectedRouter() {
+  const [location] = useLocation();
+
+  // Onboarding has its own full-screen layout
+  const isOnboarding = location === "/onboarding";
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {isOnboarding ? (
+        <Onboarding />
+      ) : (
+        <AppWithLayout />
+      )}
     </Suspense>
   );
 }
