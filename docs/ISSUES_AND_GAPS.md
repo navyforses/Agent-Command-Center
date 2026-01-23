@@ -129,17 +129,16 @@ Created type infrastructure:
 
 ### 9. Hardcoded Values
 
-**Found in code:**
+**Status:** ✅ RESOLVED
 
-```typescript
-// In various files
-const MAX_FILE_SIZE = 10 * 1024 * 1024;  // Should be in config
-const RATE_LIMIT = 10;                    // Should be configurable
-const DEFAULT_PAGE_SIZE = 10;             // Should be configurable
-```
+Created `server/config.ts` with configurable values:
+- File upload sizes (MAX_DOCUMENT_SIZE, MAX_IMAGE_SIZE, etc.)
+- Pagination (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+- Rate limiting (RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS)
+- Cache TTLs (SEARCH_CACHE_TTL, TRIAL_CACHE_TTL)
+- AI settings (AI_MAX_TOKENS, AI_TIMEOUT)
 
-**Your Input Needed:**
-- Should these be moved to environment variables?
+All values can be overridden via environment variables.
 
 ---
 
