@@ -26,6 +26,11 @@ import {
   evolutionReports,
   evolutionReportMessages,
   accumulatedKnowledge,
+  patientProfiles,
+  userQuestions,
+  questionAnswers,
+  userSubscriptions,
+  savedItems,
   type User,
   type UpsertUser,
   type UserPreferences,
@@ -81,6 +86,16 @@ import {
   type InsertEvolutionReportMessage,
   type AccumulatedKnowledge,
   type InsertAccumulatedKnowledge,
+  type PatientProfile,
+  type InsertPatientProfile,
+  type UserQuestion,
+  type InsertUserQuestion,
+  type QuestionAnswer,
+  type InsertQuestionAnswer,
+  type UserSubscription,
+  type InsertUserSubscription,
+  type SavedItem,
+  type InsertSavedItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or } from "drizzle-orm";
@@ -1148,6 +1163,229 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(accumulatedKnowledge.updatedAt))
       .limit(20);
+  }
+
+  // ============================================================================
+  // Patient Profile Methods
+  // ============================================================================
+
+  async getPatientProfile(userId: string): Promise<PatientProfile | undefined> {
+    const [profile] = await db.select().from(patientProfiles)
+      .where(eq(patientProfiles.userId, userId));
+    return profile;
+  }
+
+  async createPatientProfile(profile: InsertPatientProfile): Promise<PatientProfile> {
+    const [newProfile] = await db.insert(patientProfiles).values(profile).returning();
+    return newProfile;
+  }
+
+  async updatePatientProfile(userId: string, profile: Partial<InsertPatientProfile>): Promise<PatientProfile | undefined> {
+    const [updated] = await db.update(patientProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(patientProfiles.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // User Questions Methods
+  // ============================================================================
+
+  async createUserQuestion(question: InsertUserQuestion): Promise<UserQuestion> {
+    const [newQuestion] = await db.insert(userQuestions).values(question).returning();
+    return newQuestion;
+  }
+
+  async getUserQuestions(userId: string, page: number = 1, limit: number = 20): Promise<UserQuestion[]> {
+    const offset = (page - 1) * limit;
+    return db.select().from(userQuestions)
+      .where(eq(userQuestions.userId, userId))
+      .orderBy(desc(userQuestions.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getUserQuestionsCount(userId: string): Promise<number> {
+    const result = await db.select({ count: userQuestions.id }).from(userQuestions)
+      .where(eq(userQuestions.userId, userId));
+    return result.length;
+  }
+
+  async getUserQuestionsThisMonth(userId: string): Promise<number> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const questions = await db.select().from(userQuestions)
+      .where(eq(userQuestions.userId, userId));
+
+    return questions.filter(q => q.createdAt && new Date(q.createdAt) >= startOfMonth).length;
+  }
+
+  async getUserQuestion(id: number, userId: string): Promise<UserQuestion | undefined> {
+    const [question] = await db.select().from(userQuestions)
+      .where(and(eq(userQuestions.id, id), eq(userQuestions.userId, userId)));
+    return question;
+  }
+
+  async deleteUserQuestion(id: number, userId: string): Promise<boolean> {
+    // First delete associated answers
+    const question = await this.getUserQuestion(id, userId);
+    if (!question) return false;
+
+    await db.delete(questionAnswers).where(eq(questionAnswers.questionId, id));
+    const result = await db.delete(userQuestions)
+      .where(and(eq(userQuestions.id, id), eq(userQuestions.userId, userId)));
+    return true;
+  }
+
+  // ============================================================================
+  // Question Answers Methods
+  // ============================================================================
+
+  async createQuestionAnswer(answer: InsertQuestionAnswer): Promise<QuestionAnswer> {
+    const [newAnswer] = await db.insert(questionAnswers).values(answer).returning();
+    return newAnswer;
+  }
+
+  async getQuestionAnswers(questionId: number): Promise<QuestionAnswer[]> {
+    return db.select().from(questionAnswers)
+      .where(eq(questionAnswers.questionId, questionId))
+      .orderBy(questionAnswers.createdAt);
+  }
+
+  // ============================================================================
+  // User Subscriptions Methods
+  // ============================================================================
+
+  async getUserSubscription(userId: string): Promise<UserSubscription | undefined> {
+    const [subscription] = await db.select().from(userSubscriptions)
+      .where(eq(userSubscriptions.userId, userId));
+    return subscription;
+  }
+
+  async createUserSubscription(subscription: InsertUserSubscription): Promise<UserSubscription> {
+    const [newSubscription] = await db.insert(userSubscriptions).values(subscription).returning();
+    return newSubscription;
+  }
+
+  async updateUserSubscription(id: number, data: Partial<InsertUserSubscription>): Promise<UserSubscription | undefined> {
+    const [updated] = await db.update(userSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userSubscriptions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // Saved Items Methods
+  // ============================================================================
+
+  async getSavedItems(userId: string, options: { type?: string; page?: number; limit?: number } = {}): Promise<SavedItem[]> {
+    const { type, page = 1, limit = 20 } = options;
+    const offset = (page - 1) * limit;
+
+    let query = db.select().from(savedItems)
+      .where(eq(savedItems.userId, userId))
+      .orderBy(desc(savedItems.savedAt))
+      .limit(limit)
+      .offset(offset);
+
+    if (type) {
+      query = db.select().from(savedItems)
+        .where(and(eq(savedItems.userId, userId), eq(savedItems.itemType, type)))
+        .orderBy(desc(savedItems.savedAt))
+        .limit(limit)
+        .offset(offset);
+    }
+
+    return query;
+  }
+
+  async getSavedItemsCount(userId: string, type?: string): Promise<number> {
+    let items;
+    if (type) {
+      items = await db.select().from(savedItems)
+        .where(and(eq(savedItems.userId, userId), eq(savedItems.itemType, type)));
+    } else {
+      items = await db.select().from(savedItems)
+        .where(eq(savedItems.userId, userId));
+    }
+    return items.length;
+  }
+
+  async getSavedItem(id: number, userId: string): Promise<SavedItem | undefined> {
+    const [item] = await db.select().from(savedItems)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)));
+    return item;
+  }
+
+  async getSavedItemByItemId(userId: string, itemId: string): Promise<SavedItem | undefined> {
+    const [item] = await db.select().from(savedItems)
+      .where(and(eq(savedItems.userId, userId), eq(savedItems.itemId, itemId)));
+    return item;
+  }
+
+  async createSavedItem(item: InsertSavedItem): Promise<SavedItem> {
+    const [newItem] = await db.insert(savedItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateSavedItem(id: number, userId: string, data: Partial<InsertSavedItem>): Promise<SavedItem | undefined> {
+    const [updated] = await db.update(savedItems)
+      .set(data)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedItem(id: number, userId: string): Promise<boolean> {
+    await db.delete(savedItems)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)));
+    return true;
+  }
+
+  async getUserSavedTags(userId: string): Promise<string[]> {
+    const items = await db.select({ tags: savedItems.tags }).from(savedItems)
+      .where(eq(savedItems.userId, userId));
+
+    const allTags = new Set<string>();
+    items.forEach(item => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+
+    return Array.from(allTags).sort();
+  }
+
+  // ============================================================================
+  // Delete User (for account deletion)
+  // ============================================================================
+
+  async deleteUser(userId: string): Promise<boolean> {
+    // Delete in order of dependencies
+    await db.delete(savedItems).where(eq(savedItems.userId, userId));
+    await db.delete(userSubscriptions).where(eq(userSubscriptions.userId, userId));
+
+    // Delete question answers first, then questions
+    const questions = await db.select().from(userQuestions).where(eq(userQuestions.userId, userId));
+    for (const q of questions) {
+      await db.delete(questionAnswers).where(eq(questionAnswers.questionId, q.id));
+    }
+    await db.delete(userQuestions).where(eq(userQuestions.userId, userId));
+
+    await db.delete(patientProfiles).where(eq(patientProfiles.userId, userId));
+    await db.delete(userPreferences).where(eq(userPreferences.userId, userId));
+
+    // Delete other user data
+    await db.delete(documents).where(eq(documents.userId, userId));
+    await db.delete(children).where(eq(children.userId, userId));
+
+    // Finally delete user
+    await db.delete(users).where(eq(users.id, userId));
+    return true;
   }
 }
 

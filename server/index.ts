@@ -1,9 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerApiRoutes } from "./routes/index";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startEvolutionScheduler } from "./evolutionScheduler";
 import { syncNewTrials } from "./services/clinicalTrialsApi";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -62,15 +64,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Register new simplified API routes (medical newspaper platform)
+  registerApiRoutes(app);
+
+  // Register legacy routes (for backwards compatibility during transition)
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  // Use centralized error handler
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

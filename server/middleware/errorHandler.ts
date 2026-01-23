@@ -289,10 +289,5 @@ export function createErrorResponse(
     statusCode,
     message,
     code || (statusCode >= 500 ? ErrorCodes.INTERNAL_ERROR : ErrorCodes.VALIDATION_ERROR)
-
-  if (details) {
-    response.details = details;
-  }
-
-  return res.status(statusCode).json(response);
+  );
 }
