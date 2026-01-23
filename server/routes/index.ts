@@ -3,52 +3,78 @@
  * ==========================================
  *
  * ეს ფაილი აერთიანებს ყველა route მოდულს.
+ * გამოიყენეთ registerModularRoutes() ფუნქცია routes.ts-ში.
  *
- * მიგრაციის გეგმა routes.ts-დან:
- * =============================
+ * სტატუსი:
+ * ========
+ * ✅ childrenRoutes.ts - ბავშვების CRUD
+ * ✅ documentRoutes.ts - დოკუმენტების CRUD
+ * ✅ therapyRoutes.ts - თერაპიები და სესიები
+ * ✅ appointmentRoutes.ts - ვიზიტები
+ * ✅ emailRoutes.ts - ელ.ფოსტა
+ * ✅ trialRoutes.ts - კლინიკური კვლევები (უკვე არსებობდა)
+ * ✅ patientProfileRoutes.ts - პაციენტის პროფილი (უკვე არსებობდა)
  *
- * ✅ დასრულებული:
- * - childrenRoutes.ts - ბავშვების CRUD
- * - trialRoutes.ts - კლინიკური კვლევები (უკვე არსებობდა)
- * - patientProfileRoutes.ts - პაციენტის პროფილი (უკვე არსებობდა)
- *
- * 📋 გასაკეთებელი (routes.ts-დან ამოსაღები):
- * - documentRoutes.ts - დოკუმენტების მართვა (lines 365-466)
- * - therapyRoutes.ts - თერაპიები და სესიები (lines 467-648)
- * - appointmentRoutes.ts - ვიზიტები (lines 649-734)
- * - emailRoutes.ts - ელ.ფოსტა (lines 735-837)
- * - chatRoutes.ts - ჩატი და საუბრები (lines 838-1214)
- * - storageRoutes.ts - Object Storage (lines 1297-1411)
- * - testimonialRoutes.ts - გამოხმაურებები (lines 1412-3038)
- * - medicalDataRoutes.ts - ClinicalTrials, PubMed, FDA (lines 3039-3346)
- * - prometheusRoutes.ts - Prometheus AI (lines 3347-5038)
- *
- * გამოყენება routes.ts-ში:
- * ========================
- *
- * import childrenRoutes from "./routes/childrenRoutes";
- * app.use("/api/children", childrenRoutes);
+ * 📋 დარჩენილი routes.ts-ში:
+ * - User Profile/Preferences (~90 ხაზი)
+ * - Translation (~60 ხაზი)
+ * - Conversations/Chat (~400 ხაზი)
+ * - Object Storage (~115 ხაზი)
+ * - Testimonials (~120 ხაზი)
+ * - Medical Data APIs (~300 ხაზი)
+ * - Prometheus AI (~1700 ხაზი)
  */
 
-import { Router } from "express";
-import childrenRoutes from "./childrenRoutes";
+import { Express } from "express";
+import { isEmailAuthenticated } from "../emailAuth";
 
-// Export all route modules
+// Import all route modules
+import childrenRoutes from "./childrenRoutes";
+import documentRoutes, { childDocumentsHandler } from "./documentRoutes";
+import therapyRoutes, { childTherapiesHandler, therapySessionRoutes } from "./therapyRoutes";
+import appointmentRoutes from "./appointmentRoutes";
+import emailRoutes from "./emailRoutes";
+
+// Export individual routes for selective use
 export {
   childrenRoutes,
+  documentRoutes,
+  therapyRoutes,
+  appointmentRoutes,
+  emailRoutes,
 };
 
-// Helper function to register all modular routes
-export function registerModularRoutes(app: any) {
+/**
+ * Register all modular routes on the Express app
+ * გამოძახეთ ეს ფუნქცია routes.ts-ში registerRoutes-ში
+ */
+export function registerModularRoutes(app: Express) {
   // Children management
   app.use("/api/children", childrenRoutes);
 
-  // Add more routes as they are extracted from routes.ts
-  // app.use("/api/documents", documentRoutes);
-  // app.use("/api/therapies", therapyRoutes);
-  // etc.
+  // Documents management
+  app.use("/api/documents", documentRoutes);
+  app.get("/api/children/:childId/documents", isEmailAuthenticated, childDocumentsHandler);
+
+  // Therapies and sessions
+  app.use("/api/therapies", therapyRoutes);
+  app.use("/api/therapy-sessions", therapySessionRoutes);
+  app.get("/api/children/:childId/therapies", isEmailAuthenticated, childTherapiesHandler);
+
+  // Appointments
+  app.use("/api/appointments", appointmentRoutes);
+
+  // Emails
+  app.use("/api/emails", emailRoutes);
+
+  console.log("[Routes] Modular routes registered successfully");
 }
 
 export default {
   childrenRoutes,
+  documentRoutes,
+  therapyRoutes,
+  appointmentRoutes,
+  emailRoutes,
+  registerModularRoutes,
 };
