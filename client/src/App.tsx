@@ -39,6 +39,10 @@ const Evolution = lazy(() => import("@/pages/Evolution"));
 const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
 const EmailHub = lazy(() => import("@/pages/EmailHub"));
 
+// Research & Trial pages (distinct functionality)
+const PubMedSearch = lazy(() => import("@/pages/Research")); // Manual PubMed article search
+const TrialDashboard = lazy(() => import("@/pages/ClinicalTrials")); // Eligibility-matched trials
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -95,6 +99,10 @@ function ProtectedRouter() {
         <Route path="/evolution" component={Evolution} />
         <Route path="/assistant" component={AIAssistant} />
         <Route path="/emails" component={EmailHub} />
+
+        {/* Research & Trial pages */}
+        <Route path="/pubmed" component={PubMedSearch} />
+        <Route path="/trials" component={TrialDashboard} />
 
         {/* Public pages accessible when logged in */}
         <Route path="/pricing" component={Pricing} />

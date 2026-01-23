@@ -234,6 +234,7 @@ export default function Onboarding() {
           await fetch('/api/documents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
               title: uploadedFile.name,
               category: 'medical_record',
@@ -252,7 +253,9 @@ export default function Onboarding() {
       let trialsFound = 0;
       if (additionalInfo.trim()) {
         try {
-          const searchResponse = await fetch(`/api/trials/search?q=${encodeURIComponent(additionalInfo)}&page=1&limit=10`);
+          const searchResponse = await fetch(`/api/trials/search?q=${encodeURIComponent(additionalInfo)}&page=1&limit=10`, {
+            credentials: 'include',
+          });
           if (searchResponse.ok) {
             const data = await searchResponse.json();
             trialsFound = data.total || data.trials?.length || 0;
