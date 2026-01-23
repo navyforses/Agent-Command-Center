@@ -46,6 +46,10 @@ const PubMedSearch = lazy(() => import("@/pages/Research")); // Manual PubMed ar
 const TrialDashboard = lazy(() => import("@/pages/ClinicalTrials")); // Eligibility-matched trials
 const Nexus = lazy(() => import("@/pages/Nexus")); // Multi-AI research orchestrator
 
+// P2 Feature pages
+const Calendar = lazy(() => import("@/pages/Calendar")); // Calendar with email extraction
+const ResearchAlertsPage = lazy(() => import("@/pages/ResearchAlertsPage")); // Research alerts
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -109,6 +113,10 @@ function ProtectedRouter() {
         <Route path="/pubmed" component={PubMedSearch} />
         <Route path="/trials" component={TrialDashboard} />
         <Route path="/nexus" component={Nexus} />
+
+        {/* P2 Feature pages */}
+        <Route path="/calendar" component={Calendar} />
+        <Route path="/research-alerts" component={ResearchAlertsPage} />
 
         {/* Public pages accessible when logged in */}
         <Route path="/pricing" component={Pricing} />

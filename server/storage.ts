@@ -31,6 +31,8 @@ import {
   questionAnswers,
   userSubscriptions,
   savedItems,
+  researchMonitors,
+  researchFindings,
   type User,
   type UpsertUser,
   type UserPreferences,
@@ -96,6 +98,10 @@ import {
   type InsertUserSubscription,
   type SavedItem,
   type InsertSavedItem,
+  type ResearchMonitor,
+  type InsertResearchMonitor,
+  type ResearchFinding,
+  type InsertResearchFinding,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or } from "drizzle-orm";
@@ -251,6 +257,21 @@ export interface IStorage {
   createAccumulatedKnowledge(knowledge: InsertAccumulatedKnowledge): Promise<AccumulatedKnowledge>;
   updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined>;
   getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
+
+  // Research Monitors & Alerts (P2 Feature)
+  getResearchMonitors(userId: string): Promise<ResearchMonitor[]>;
+  getResearchMonitor(id: number, userId: string): Promise<ResearchMonitor | undefined>;
+  createResearchMonitor(monitor: InsertResearchMonitor): Promise<ResearchMonitor>;
+  updateResearchMonitor(id: number, userId: string, monitor: Partial<InsertResearchMonitor>): Promise<ResearchMonitor | undefined>;
+  deleteResearchMonitor(id: number, userId: string): Promise<boolean>;
+
+  // Research Findings
+  getResearchFindings(userId: string, monitorId?: number): Promise<ResearchFinding[]>;
+  getUnreadResearchFindings(userId: string): Promise<ResearchFinding[]>;
+  getResearchFinding(id: number, userId: string): Promise<ResearchFinding | undefined>;
+  createResearchFinding(finding: InsertResearchFinding): Promise<ResearchFinding>;
+  updateResearchFinding(id: number, userId: string, finding: Partial<InsertResearchFinding>): Promise<ResearchFinding | undefined>;
+  deleteResearchFinding(id: number, userId: string): Promise<boolean>;
 
   // Public endpoints - no auth required (anonymous data only)
   getAllPublicReports(): Promise<Partial<EvolutionReport>[]>;
@@ -1358,6 +1379,127 @@ export class DatabaseStorage implements IStorage {
     });
 
     return Array.from(allTags).sort();
+  }
+
+  // ============================================================================
+  // Research Monitors & Alerts (P2 Feature)
+  // ============================================================================
+
+  async getResearchMonitors(userId: string): Promise<ResearchMonitor[]> {
+    return db.select().from(researchMonitors)
+      .where(eq(researchMonitors.userId, userId))
+      .orderBy(desc(researchMonitors.createdAt));
+  }
+
+  async getResearchMonitor(id: number, userId: string): Promise<ResearchMonitor | undefined> {
+    const [monitor] = await db.select().from(researchMonitors)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)));
+    return monitor;
+  }
+
+  async createResearchMonitor(monitor: InsertResearchMonitor): Promise<ResearchMonitor> {
+    const [newMonitor] = await db.insert(researchMonitors).values(monitor).returning();
+    return newMonitor;
+  }
+
+  async updateResearchMonitor(
+    id: number,
+    userId: string,
+    monitor: Partial<InsertResearchMonitor>
+  ): Promise<ResearchMonitor | undefined> {
+    const [updated] = await db
+      .update(researchMonitors)
+      .set(monitor)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteResearchMonitor(id: number, userId: string): Promise<boolean> {
+    // First delete related findings
+    const monitor = await this.getResearchMonitor(id, userId);
+    if (!monitor) return false;
+
+    await db.delete(researchFindings).where(eq(researchFindings.monitorId, id));
+    await db.delete(researchMonitors)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)));
+    return true;
+  }
+
+  // Research Findings
+  async getResearchFindings(userId: string, monitorId?: number): Promise<ResearchFinding[]> {
+    // Get monitors for user first
+    const monitors = await this.getResearchMonitors(userId);
+    const monitorIds = monitors.map(m => m.id);
+
+    if (monitorIds.length === 0) return [];
+
+    if (monitorId) {
+      if (!monitorIds.includes(monitorId)) return [];
+      return db.select().from(researchFindings)
+        .where(eq(researchFindings.monitorId, monitorId))
+        .orderBy(desc(researchFindings.foundAt));
+    }
+
+    // Get findings for all user's monitors
+    const allFindings: ResearchFinding[] = [];
+    for (const mId of monitorIds) {
+      const findings = await db.select().from(researchFindings)
+        .where(eq(researchFindings.monitorId, mId))
+        .orderBy(desc(researchFindings.foundAt));
+      allFindings.push(...findings);
+    }
+    return allFindings.sort((a, b) =>
+      new Date(b.foundAt || 0).getTime() - new Date(a.foundAt || 0).getTime()
+    );
+  }
+
+  async getUnreadResearchFindings(userId: string): Promise<ResearchFinding[]> {
+    const allFindings = await this.getResearchFindings(userId);
+    return allFindings.filter(f => !f.isRead && !f.isDismissed);
+  }
+
+  async getResearchFinding(id: number, userId: string): Promise<ResearchFinding | undefined> {
+    const [finding] = await db.select().from(researchFindings)
+      .where(eq(researchFindings.id, id));
+
+    if (!finding) return undefined;
+
+    // Verify user owns this finding's monitor
+    const monitor = await this.getResearchMonitor(finding.monitorId!, userId);
+    if (!monitor) return undefined;
+
+    return finding;
+  }
+
+  async createResearchFinding(finding: InsertResearchFinding): Promise<ResearchFinding> {
+    const [newFinding] = await db.insert(researchFindings).values(finding).returning();
+    return newFinding;
+  }
+
+  async updateResearchFinding(
+    id: number,
+    userId: string,
+    finding: Partial<InsertResearchFinding>
+  ): Promise<ResearchFinding | undefined> {
+    // Verify ownership
+    const existing = await this.getResearchFinding(id, userId);
+    if (!existing) return undefined;
+
+    const [updated] = await db
+      .update(researchFindings)
+      .set(finding)
+      .where(eq(researchFindings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteResearchFinding(id: number, userId: string): Promise<boolean> {
+    const existing = await this.getResearchFinding(id, userId);
+    if (!existing) return false;
+
+    await db.delete(researchFindings).where(eq(researchFindings.id, id));
+    return true;
   }
 
   // ============================================================================

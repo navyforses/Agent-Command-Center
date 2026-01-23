@@ -25,6 +25,9 @@ import profileRoutes from "./profileRoutes";
 
 // Keep useful existing routes
 import documentRoutes from "./documentRoutes";
+import appointmentRoutes from "./appointmentRoutes";
+import appointmentExtractRoutes from "./appointmentExtractRoutes";
+import researchAlertRoutes from "./researchAlertRoutes";
 
 /**
  * Register all API routes
@@ -42,6 +45,11 @@ export function registerApiRoutes(app: Express): void {
 
   // Document upload (for Form 100)
   app.use("/api/documents", isEmailAuthenticated, documentRoutes);
+
+  // P2 Features: Appointment extraction and Research Alerts
+  app.use("/api/appointments", appointmentRoutes);
+  app.use("/api/appointments", appointmentExtractRoutes);
+  app.use("/api/research-alerts", isEmailAuthenticated, researchAlertRoutes);
 
   console.log("[Routes] API routes registered successfully");
 }
