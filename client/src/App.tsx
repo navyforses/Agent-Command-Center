@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -139,9 +141,15 @@ function AppContent() {
     return <PageLoader />;
   }
 
-  // If authenticated, show protected routes
+  // If authenticated, show protected routes with additional providers
   if (isAuthenticated) {
-    return <ProtectedRouter />;
+    return (
+      <NotificationProvider>
+        <UserPreferencesProvider>
+          <ProtectedRouter />
+        </UserPreferencesProvider>
+      </NotificationProvider>
+    );
   }
 
   // Otherwise show public routes
