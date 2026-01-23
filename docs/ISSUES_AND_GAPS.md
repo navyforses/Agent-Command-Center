@@ -8,57 +8,48 @@ This document identifies areas that need attention, clarification, or your input
 
 ### 1. routes.ts File Size (5,038 lines)
 
-**Problem:** Main routes file is too large and difficult to maintain.
+**Status:** ✅ PARTIALLY RESOLVED
 
-**Location:** `server/routes.ts`
-
-**Recommended Action:**
-Split into separate route files by feature:
+Extracted ~615 lines into modular route files:
 ```
 server/routes/
-├── authRoutes.ts
-├── childrenRoutes.ts
-├── documentsRoutes.ts
-├── therapyRoutes.ts
-├── chatRoutes.ts
-├── appointmentRoutes.ts
-└── index.ts (combines all)
+├── childrenRoutes.ts    ✅ Created
+├── documentRoutes.ts    ✅ Created
+├── therapyRoutes.ts     ✅ Created
+├── appointmentRoutes.ts ✅ Created
+├── emailRoutes.ts       ✅ Created
+└── index.ts             ✅ Created (combines all)
 ```
 
-**Your Input Needed:**
-- Do you want me to refactor this?
-- Which features should be grouped together?
+**Remaining:** Main routes.ts still large. Consider extracting more modules (auth, chat, AI routes).
 
 ---
 
 ### 2. Duplicate Page Components
 
-**Problem:** Some pages may be duplicates with different implementations.
+**Status:** ✅ RESOLVED
 
-| Page | Possible Duplicate | Status |
-|------|-------------------|--------|
-| `Research.tsx` | `ResearchFeed.tsx` | Need verification |
-| `ClinicalTrials.tsx` | `TrialSearch.tsx` | Need verification |
+Analysis found these are NOT duplicates - they have different functionality:
 
-**Your Input Needed:**
-- Should `Research.tsx` be deleted or merged with `ResearchFeed.tsx`?
-- Should `ClinicalTrials.tsx` be deleted or merged with `TrialSearch.tsx`?
+| Page | Purpose | Route |
+|------|---------|-------|
+| `Research.tsx` | Manual PubMed article search | `/pubmed` |
+| `ResearchFeed.tsx` | Automated research monitoring | `/research` |
+| `ClinicalTrials.tsx` | Eligibility-matched trials dashboard | `/trials` |
+| `TrialSearch.tsx` | Trial search with filters | `/search` |
+
+All 4 pages preserved with proper navigation.
 
 ---
 
 ### 3. AI System Documentation Missing
 
-**Problem:** Three major AI systems lack user-facing documentation:
+**Status:** ✅ RESOLVED
 
-| System | Location | Status |
-|--------|----------|--------|
-| PROMETHEUS | `server/prometheus/` | No UI documentation |
-| NEXUS | `server/nexusOrchestrator.ts` | No UI documentation |
-| Evolution Cycles | `server/evolutionCycleEngine.ts` | Minimal documentation |
-
-**Your Input Needed:**
-- Which AI features should be exposed to users?
-- Should there be a separate AI documentation page?
+Created comprehensive AI documentation:
+- `docs/AI_SYSTEMS.md` - Full documentation for NEXUS, EVOLUTION, PROMETHEUS
+- Added NEXUS page (`/nexus`) with debates and hypotheses UI
+- All AI systems now accessible via navigation sidebar
 
 ---
 
@@ -66,70 +57,43 @@ server/routes/
 
 ### 4. Environment Variables Not Documented
 
-**Problem:** Many environment variables are used but not fully documented.
+**Status:** ✅ RESOLVED
 
-**Currently Known:**
-```env
-# Required
-DATABASE_URL
-SESSION_SECRET
-
-# AI APIs
-AI_INTEGRATIONS_OPENAI_API_KEY
-AI_INTEGRATIONS_GEMINI_API_KEY
-AI_INTEGRATIONS_ANTHROPIC_API_KEY
-XAI_API_KEY
-
-# Optional
-TAVILY_API_KEY
-GOOGLE_SEARCH_API_KEY
-PERPLEXITY_API_KEY
-RESEND_API_KEY
-```
-
-**Unknown/Undocumented:**
-- Google Cloud Storage credentials
-- Replit-specific variables
-- Email service configuration
-
-**Your Input Needed:**
-- Can you provide complete list of required/optional variables?
+Created comprehensive documentation:
+- `docs/ENV_VARIABLES.md` - Full documentation with all 30+ environment variables
+- `.env.example` - Updated template with all variables
+- Includes instructions for obtaining API keys
+- Security recommendations included
 
 ---
 
 ### 5. Database Tables Without API
 
-**Problem:** Some database tables exist but have no API endpoints.
+**Status:** ✅ RESOLVED
+
+All major tables now have API endpoints:
 
 | Table | Has API | Has UI |
 |-------|---------|--------|
-| `prometheusMemoryLayers` | ❌ | ❌ |
-| `prometheusInsights` | ❌ | ❌ |
-| `nexusDebates` | ❌ | ❌ |
-| `nexusHypotheses` | ❌ | ❌ |
-| `evolutionReports` | Partial | ❌ |
-| `accumulatedKnowledge` | ❌ | ❌ |
-| `medicalGlossary` | ❌ | ❌ |
-
-**Your Input Needed:**
-- Should these features have API/UI?
-- Are these for internal use only?
+| `prometheusMemory` | ✅ `/api/prometheus/*` | ✅ PROMETHEUS page |
+| `prometheusInsights` | ✅ `/api/prometheus/insights` | ✅ |
+| `nexusDebates` | ✅ `/api/nexus/debates` | ✅ NEXUS page |
+| `nexusHypotheses` | ✅ `/api/nexus/hypotheses` | ✅ |
+| `evolutionReports` | ✅ `/api/evolution/reports` | ✅ Evolution page |
+| `accumulatedKnowledge` | ✅ `/api/evolution/accumulated-knowledge` | ✅ |
+| `medicalGlossary` | ✅ `/api/trials/glossary` | ✅ Glossary page |
 
 ---
 
 ### 6. No Error Tracking
 
-**Problem:** No error tracking/monitoring service configured.
+**Status:** ✅ RESOLVED
 
-**Recommended:** Add Sentry or similar:
-```typescript
-import * as Sentry from '@sentry/node';
-Sentry.init({ dsn: process.env.SENTRY_DSN });
-```
-
-**Your Input Needed:**
-- Do you want error tracking added?
-- Which service to use?
+Sentry integration added:
+- `server/sentry.ts` - Centralized Sentry integration module
+- Error handler updated to capture 500 errors
+- Environment variable: `SENTRY_DSN`
+- Includes user context, breadcrumbs, and sensitive data filtering
 
 ---
 
@@ -137,13 +101,14 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 ### 7. Missing TypeScript Types
 
-**Locations with `any` type:**
-- `server/routes.ts` - Multiple `(req as any).user` usages
-- `server/aiOrchestrator.ts` - AI response types
-- Various mutation handlers
+**Status:** ✅ PARTIALLY RESOLVED
 
-**Your Input Needed:**
-- Should I create proper types for these?
+Created type infrastructure:
+- `server/types/express.ts` - AuthenticatedRequest, getUserId() helper
+- `server/types/index.ts` - Central export point
+- Modular routes updated to use proper types (childrenRoutes.ts, etc.)
+
+**Remaining:** Main routes.ts still has many `(req as any).user` usages - requires incremental refactoring.
 
 ---
 
@@ -164,17 +129,16 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 ### 9. Hardcoded Values
 
-**Found in code:**
+**Status:** ✅ RESOLVED
 
-```typescript
-// In various files
-const MAX_FILE_SIZE = 10 * 1024 * 1024;  // Should be in config
-const RATE_LIMIT = 10;                    // Should be configurable
-const DEFAULT_PAGE_SIZE = 10;             // Should be configurable
-```
+Created `server/config.ts` with configurable values:
+- File upload sizes (MAX_DOCUMENT_SIZE, MAX_IMAGE_SIZE, etc.)
+- Pagination (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+- Rate limiting (RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS)
+- Cache TTLs (SEARCH_CACHE_TTL, TRIAL_CACHE_TTL)
+- AI settings (AI_MAX_TOKENS, AI_TIMEOUT)
 
-**Your Input Needed:**
-- Should these be moved to environment variables?
+All values can be overridden via environment variables.
 
 ---
 
@@ -231,42 +195,41 @@ const DEFAULT_PAGE_SIZE = 10;             // Should be configurable
 
 ### 1. Long Functions
 
-| File | Function | Lines |
-|------|----------|-------|
-| `routes.ts` | Various route handlers | 50-200+ lines each |
-| `aiOrchestrator.ts` | `processDocument` | 150+ lines |
-| `evolutionCycleEngine.ts` | Multiple functions | 100+ lines |
+| File | Function | Lines | Status |
+|------|----------|-------|--------|
+| `routes.ts` | Various route handlers | 50-200+ lines each | Partial extraction done |
+| `aiOrchestrator.ts` | `processDocument` | 150+ lines | |
+| `evolutionCycleEngine.ts` | Multiple functions | 100+ lines | |
 
 ### 2. Repeated Patterns
 
-```typescript
-// This pattern is repeated 50+ times in routes.ts
-const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
-if (!userId) {
-  return res.status(401).json({ error: 'Unauthorized' });
-}
-```
+**Status:** ✅ Infrastructure Created
 
-**Recommendation:** Create middleware:
 ```typescript
-function getUserId(req: Request): string | null {
-  return req.user?.claims?.sub || req.user?.id;
-}
+// OLD: This pattern was repeated 50+ times
+const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+
+// NEW: Use server/types/express.ts
+import { AuthenticatedRequest, getUserId } from "../types";
+const userId = getUserId(req);
 ```
 
 ### 3. Inconsistent Error Handling
 
-Some endpoints return:
-```json
-{ "error": "message" }
-```
+**Status:** ✅ Infrastructure Created
 
-Others return:
-```json
-{ "message": "message" }
-```
+Standard error response helpers available in `server/middleware/errorHandler.ts`:
 
-**Recommendation:** Standardize error responses.
+```typescript
+import { sendError } from "../middleware/errorHandler";
+
+// Instead of: res.status(400).json({ message: "..." })
+// Use:
+sendError.badRequest(res, "Invalid input");
+sendError.notFound(res, "User");
+sendError.unauthorized(res);
+sendError.internal(res, "Database error");
+```
 
 ---
 
