@@ -219,6 +219,27 @@ CLINICAL_ENCRYPTION_KEY="your-64-char-hex-key-here..."
 
 ---
 
+## Error Tracking (არასავალდებულო)
+
+### Sentry
+
+| ცვლადი | აღწერა | საიდან მივიღოთ |
+|--------|--------|----------------|
+| `SENTRY_DSN` | Sentry Data Source Name | [sentry.io](https://sentry.io/) |
+| `APP_VERSION` | აპლიკაციის ვერსია (release tracking) | default: `1.0.0` |
+
+```bash
+SENTRY_DSN="https://xxx@xxx.ingest.sentry.io/xxx"
+APP_VERSION="1.0.0"
+```
+
+**Sentry-ის დასაყენებლად:**
+1. შექმენით ანგარიში [sentry.io](https://sentry.io)-ზე
+2. შექმენით Node.js პროექტი
+3. დააკოპირეთ DSN და დაამატეთ .env ფაილში
+
+---
+
 ## Runtime Configuration
 
 | ცვლადი | აღწერა | default |

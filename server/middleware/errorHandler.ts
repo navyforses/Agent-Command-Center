@@ -2,9 +2,11 @@
  * Centralized Error Handling Middleware
  * =====================================
  * Provides consistent error responses across all API endpoints
+ * Integrates with Sentry for error tracking
  */
 
 import { Request, Response, NextFunction } from "express";
+import { captureException, addBreadcrumb } from "../sentry";
 
 // ============================================================================
 // Error Codes
@@ -120,6 +122,13 @@ export function errorHandler(
   // Log the error
   console.error(`[Error Handler] ${req.method} ${req.path}:`, err);
 
+  // Add breadcrumb for Sentry
+  addBreadcrumb(`Error in ${req.method} ${req.path}`, "error", "error", {
+    method: req.method,
+    path: req.path,
+    query: req.query,
+  });
+
   // Default error response
   let statusCode = 500;
   let errorCode: ErrorCode = ErrorCodes.INTERNAL_ERROR;
@@ -157,6 +166,18 @@ export function errorHandler(
       message: err.message,
       stack: err.stack?.split("\n").slice(0, 5),
     };
+  }
+
+  // Capture server errors with Sentry
+  if (statusCode >= 500) {
+    captureException(err, {
+      statusCode,
+      errorCode,
+      path: req.path,
+      method: req.method,
+      query: req.query,
+      userId: (req as any).user?.id || (req as any).user?.claims?.sub,
+    });
   }
 
   const response: ErrorResponse = {
