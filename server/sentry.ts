@@ -9,8 +9,6 @@
  * 3. Copy the DSN and add to .env as SENTRY_DSN
  */
 
-import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { Express, Request, Response, NextFunction } from "express";
 
 // ============================================================================
@@ -22,12 +20,31 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const APP_VERSION = process.env.APP_VERSION || "1.0.0";
 
 // ============================================================================
+// Dynamic Sentry Module Loading
+// ============================================================================
+
+let Sentry: typeof import("@sentry/node") | null = null;
+let nodeProfilingIntegration: typeof import("@sentry/profiling-node").nodeProfilingIntegration | null = null;
+
+async function loadSentryModules(): Promise<boolean> {
+  try {
+    Sentry = await import("@sentry/node");
+    const profilingModule = await import("@sentry/profiling-node");
+    nodeProfilingIntegration = profilingModule.nodeProfilingIntegration;
+    return true;
+  } catch (error) {
+    console.log("[Sentry] Sentry packages not available - error tracking disabled");
+    return false;
+  }
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
 let sentryInitialized = false;
 
-export function initSentry(app?: Express): boolean {
+export async function initSentry(app?: Express): Promise<boolean> {
   if (!SENTRY_DSN) {
     console.log("[Sentry] No SENTRY_DSN configured - error tracking disabled");
     return false;
@@ -36,6 +53,12 @@ export function initSentry(app?: Express): boolean {
   if (sentryInitialized) {
     console.log("[Sentry] Already initialized");
     return true;
+  }
+
+  // Try to load Sentry modules
+  const modulesLoaded = await loadSentryModules();
+  if (!modulesLoaded || !Sentry || !nodeProfilingIntegration) {
+    return false;
   }
 
   try {
@@ -111,6 +134,11 @@ export function initSentry(app?: Express): boolean {
 // ============================================================================
 
 export function sentryErrorHandler() {
+  if (!Sentry) {
+    // Return a no-op middleware if Sentry is not available
+    return (_err: any, _req: Request, _res: Response, next: NextFunction) => next(_err);
+  }
+
   return Sentry.Handlers.errorHandler({
     shouldHandleError(error: any) {
       // Report all 500 errors
@@ -127,7 +155,7 @@ export function sentryErrorHandler() {
 // ============================================================================
 
 export function captureException(error: Error, context?: Record<string, any>): string | null {
-  if (!sentryInitialized) {
+  if (!sentryInitialized || !Sentry) {
     console.error("[Sentry] Not initialized - error not captured:", error.message);
     return null;
   }
@@ -138,7 +166,7 @@ export function captureException(error: Error, context?: Record<string, any>): s
 }
 
 export function captureMessage(message: string, level: "info" | "warning" | "error" = "info"): string | null {
-  if (!sentryInitialized) {
+  if (!sentryInitialized || !Sentry) {
     console.log(`[Sentry] Not initialized - message not captured: ${message}`);
     return null;
   }
@@ -151,7 +179,7 @@ export function captureMessage(message: string, level: "info" | "warning" | "err
 // ============================================================================
 
 export function setUser(user: { id: string; email?: string; username?: string } | null): void {
-  if (!sentryInitialized) return;
+  if (!sentryInitialized || !Sentry) return;
 
   if (user) {
     Sentry.setUser({
@@ -169,12 +197,12 @@ export function setUser(user: { id: string; email?: string; username?: string } 
 // ============================================================================
 
 export function setTag(key: string, value: string): void {
-  if (!sentryInitialized) return;
+  if (!sentryInitialized || !Sentry) return;
   Sentry.setTag(key, value);
 }
 
 export function setContext(name: string, context: Record<string, any>): void {
-  if (!sentryInitialized) return;
+  if (!sentryInitialized || !Sentry) return;
   Sentry.setContext(name, context);
 }
 
@@ -188,7 +216,7 @@ export function addBreadcrumb(
   level: "debug" | "info" | "warning" | "error" = "info",
   data?: Record<string, any>
 ): void {
-  if (!sentryInitialized) return;
+  if (!sentryInitialized || !Sentry) return;
 
   Sentry.addBreadcrumb({
     message,
@@ -204,7 +232,7 @@ export function addBreadcrumb(
 // ============================================================================
 
 export async function flush(timeout: number = 2000): Promise<boolean> {
-  if (!sentryInitialized) return true;
+  if (!sentryInitialized || !Sentry) return true;
   return Sentry.flush(timeout);
 }
 
