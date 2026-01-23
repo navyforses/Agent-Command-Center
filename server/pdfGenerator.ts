@@ -2,7 +2,7 @@ import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
 import type { EvolutionReport, EvolutionInsight } from "@shared/schema";
-import { translateToGeorgian } from "./evolutionCycleEngine";
+import { translateToGeorgian } from "./services/translator";
 
 interface TranslatedHypothesis {
   hypothesis: string;

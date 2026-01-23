@@ -2351,3 +2351,122 @@ export const insertDataSourceStatusSchema = createInsertSchema(dataSourceStatus)
 });
 export type InsertDataSourceStatus = z.infer<typeof insertDataSourceStatusSchema>;
 export type DataSourceStatus = typeof dataSourceStatus.$inferSelect;
+
+// ============================================================================
+// MEDICAL NEWSPAPER PLATFORM - New Simplified System
+// ============================================================================
+
+// User Questions - Questions asked by users about articles/trials
+export const userQuestions = pgTable("user_questions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  question: text("question").notNull(),
+  contextType: varchar("context_type", { length: 50 }), // clinical_trial, research_article, drug_info, general
+  contextItemId: varchar("context_item_id", { length: 255 }), // ID of the related item
+  contextItemTitle: text("context_item_title"), // Title of the related item
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_user_questions_user").on(table.userId),
+  index("idx_user_questions_context").on(table.contextType),
+]);
+
+export const insertUserQuestionSchema = createInsertSchema(userQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertUserQuestion = z.infer<typeof insertUserQuestionSchema>;
+export type UserQuestion = typeof userQuestions.$inferSelect;
+
+// Question Answers - AI-generated answers to user questions
+export const questionAnswers = pgTable("question_answers", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").references(() => userQuestions.id).notNull(),
+  answer: text("answer").notNull(),
+  confidence: real("confidence"), // 0.0 to 1.0
+  sources: text("sources").array(), // AI providers used
+  processingTimeMs: integer("processing_time_ms"),
+  isFollowUp: boolean("is_follow_up").default(false),
+  followUpQuestion: text("follow_up_question"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_question_answers_question").on(table.questionId),
+]);
+
+export const insertQuestionAnswerSchema = createInsertSchema(questionAnswers).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertQuestionAnswer = z.infer<typeof insertQuestionAnswerSchema>;
+export type QuestionAnswer = typeof questionAnswers.$inferSelect;
+
+// User Subscriptions - Subscription/billing management
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).unique().notNull(),
+  planId: varchar("plan_id", { length: 50 }).notNull(), // free, standard, premium
+  status: varchar("status", { length: 50 }).default("active"), // active, cancelled, past_due, paused
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_subscriptions_user").on(table.userId),
+  index("idx_subscriptions_status").on(table.status),
+]);
+
+export const subscriptionStatusEnum = z.enum([
+  "active",
+  "cancelled",
+  "past_due",
+  "paused",
+  "trialing"
+]);
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusEnum>;
+
+export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+
+// Saved Items - Generic bookmarks for any feed item type
+export const savedItems = pgTable("saved_items", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  itemType: varchar("item_type", { length: 50 }).notNull(), // clinical_trial, research_article, drug_info, question
+  itemId: varchar("item_id", { length: 255 }).notNull(), // External ID (e.g., NCT number, PMID, etc.)
+  title: text("title").notNull(),
+  summary: text("summary"),
+  sourceUrl: text("source_url"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  notes: text("notes"), // User's personal notes
+  tags: text("tags").array(), // User-defined tags
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_items_user").on(table.userId),
+  index("idx_saved_items_type").on(table.itemType),
+  index("idx_saved_items_item_id").on(table.itemId),
+]);
+
+export const savedItemTypeEnum = z.enum([
+  "clinical_trial",
+  "research_article",
+  "drug_info",
+  "question"
+]);
+export type SavedItemType = z.infer<typeof savedItemTypeEnum>;
+
+export const insertSavedItemSchema = createInsertSchema(savedItems, {
+  metadata: z.record(z.any()).nullable().optional(),
+  tags: z.array(z.string()).nullable().optional(),
+}).omit({
+  id: true,
+  savedAt: true,
+});
+export type InsertSavedItem = z.infer<typeof insertSavedItemSchema>;
+export type SavedItem = typeof savedItems.$inferSelect;

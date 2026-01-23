@@ -1,80 +1,70 @@
 /**
- * Routes Index - მოდულური routes სტრუქტურა
- * ==========================================
+ * Routes Index - New Simplified Structure
+ * ========================================
+ * Medical Newspaper Subscription Platform
  *
- * ეს ფაილი აერთიანებს ყველა route მოდულს.
- * გამოიყენეთ registerModularRoutes() ფუნქცია routes.ts-ში.
- *
- * სტატუსი:
- * ========
- * ✅ childrenRoutes.ts - ბავშვების CRUD
- * ✅ documentRoutes.ts - დოკუმენტების CRUD
- * ✅ therapyRoutes.ts - თერაპიები და სესიები
- * ✅ appointmentRoutes.ts - ვიზიტები
- * ✅ emailRoutes.ts - ელ.ფოსტა
- * ✅ trialRoutes.ts - კლინიკური კვლევები (უკვე არსებობდა)
- * ✅ patientProfileRoutes.ts - პაციენტის პროფილი (უკვე არსებობდა)
- *
- * 📋 დარჩენილი routes.ts-ში:
- * - User Profile/Preferences (~90 ხაზი)
- * - Translation (~60 ხაზი)
- * - Conversations/Chat (~400 ხაზი)
- * - Object Storage (~115 ხაზი)
- * - Testimonials (~120 ხაზი)
- * - Medical Data APIs (~300 ხაზი)
- * - Prometheus AI (~1700 ხაზი)
+ * Core Routes:
+ * - /api/auth - Authentication (login, register, logout)
+ * - /api/feed - Personalized news feed
+ * - /api/questions - Q&A on articles
+ * - /api/saved - Bookmarked items
+ * - /api/subscriptions - Subscription management
+ * - /api/profile - User profile & onboarding
  */
 
-import { Express } from "express";
+import { Express, Router } from "express";
 import { isEmailAuthenticated } from "../emailAuth";
 
-// Import all route modules
-import childrenRoutes from "./childrenRoutes";
-import documentRoutes, { childDocumentsHandler } from "./documentRoutes";
-import therapyRoutes, { childTherapiesHandler, therapySessionRoutes } from "./therapyRoutes";
-import appointmentRoutes from "./appointmentRoutes";
-import emailRoutes from "./emailRoutes";
+// Import route modules
+import authRoutes from "./authRoutes";
+import feedRoutes from "./feedRoutes";
+import questionRoutes from "./questionRoutes";
+import savedRoutes from "./savedRoutes";
+import subscriptionRoutes from "./subscriptionRoutes";
+import profileRoutes from "./profileRoutes";
 
-// Export individual routes for selective use
-export {
-  childrenRoutes,
-  documentRoutes,
-  therapyRoutes,
-  appointmentRoutes,
-  emailRoutes,
-};
+// Keep useful existing routes
+import documentRoutes from "./documentRoutes";
+import appointmentRoutes from "./appointmentRoutes";
+import appointmentExtractRoutes from "./appointmentExtractRoutes";
+import researchAlertRoutes from "./researchAlertRoutes";
+import aiFeatureRoutes from "./aiFeatureRoutes";
 
 /**
- * Register all modular routes on the Express app
- * გამოძახეთ ეს ფუნქცია routes.ts-ში registerRoutes-ში
+ * Register all API routes
  */
-export function registerModularRoutes(app: Express) {
-  // Children management
-  app.use("/api/children", childrenRoutes);
+export function registerApiRoutes(app: Express): void {
+  // Public routes (no auth required)
+  app.use("/api/auth", authRoutes);
 
-  // Documents management
-  app.use("/api/documents", documentRoutes);
-  app.get("/api/children/:childId/documents", isEmailAuthenticated, childDocumentsHandler);
+  // Protected routes (require authentication)
+  app.use("/api/feed", isEmailAuthenticated, feedRoutes);
+  app.use("/api/questions", isEmailAuthenticated, questionRoutes);
+  app.use("/api/saved", isEmailAuthenticated, savedRoutes);
+  app.use("/api/subscriptions", isEmailAuthenticated, subscriptionRoutes);
+  app.use("/api/profile", isEmailAuthenticated, profileRoutes);
 
-  // Therapies and sessions
-  app.use("/api/therapies", therapyRoutes);
-  app.use("/api/therapy-sessions", therapySessionRoutes);
-  app.get("/api/children/:childId/therapies", isEmailAuthenticated, childTherapiesHandler);
+  // Document upload (for Form 100)
+  app.use("/api/documents", isEmailAuthenticated, documentRoutes);
 
-  // Appointments
+  // P2 Features: Appointment extraction and Research Alerts
   app.use("/api/appointments", appointmentRoutes);
+  app.use("/api/appointments", appointmentExtractRoutes);
+  app.use("/api/research-alerts", isEmailAuthenticated, researchAlertRoutes);
 
-  // Emails
-  app.use("/api/emails", emailRoutes);
+  // P1 Features: Smart Search, Auto-Categorize, Email Draft
+  app.use("/api", aiFeatureRoutes);
 
-  console.log("[Routes] Modular routes registered successfully");
+  console.log("[Routes] API routes registered successfully");
 }
 
-export default {
-  childrenRoutes,
-  documentRoutes,
-  therapyRoutes,
-  appointmentRoutes,
-  emailRoutes,
-  registerModularRoutes,
+export {
+  authRoutes,
+  feedRoutes,
+  questionRoutes,
+  savedRoutes,
+  subscriptionRoutes,
+  profileRoutes,
 };
+
+export default { registerApiRoutes };

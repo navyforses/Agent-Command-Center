@@ -26,6 +26,13 @@ import {
   evolutionReports,
   evolutionReportMessages,
   accumulatedKnowledge,
+  patientProfiles,
+  userQuestions,
+  questionAnswers,
+  userSubscriptions,
+  savedItems,
+  researchMonitors,
+  researchFindings,
   type User,
   type UpsertUser,
   type UserPreferences,
@@ -81,6 +88,20 @@ import {
   type InsertEvolutionReportMessage,
   type AccumulatedKnowledge,
   type InsertAccumulatedKnowledge,
+  type PatientProfile,
+  type InsertPatientProfile,
+  type UserQuestion,
+  type InsertUserQuestion,
+  type QuestionAnswer,
+  type InsertQuestionAnswer,
+  type UserSubscription,
+  type InsertUserSubscription,
+  type SavedItem,
+  type InsertSavedItem,
+  type ResearchMonitor,
+  type InsertResearchMonitor,
+  type ResearchFinding,
+  type InsertResearchFinding,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or } from "drizzle-orm";
@@ -236,6 +257,21 @@ export interface IStorage {
   createAccumulatedKnowledge(knowledge: InsertAccumulatedKnowledge): Promise<AccumulatedKnowledge>;
   updateAccumulatedKnowledge(id: number, userId: string, knowledge: Partial<InsertAccumulatedKnowledge>): Promise<AccumulatedKnowledge | undefined>;
   getActiveAccumulatedKnowledge(userId: string): Promise<AccumulatedKnowledge[]>;
+
+  // Research Monitors & Alerts (P2 Feature)
+  getResearchMonitors(userId: string): Promise<ResearchMonitor[]>;
+  getResearchMonitor(id: number, userId: string): Promise<ResearchMonitor | undefined>;
+  createResearchMonitor(monitor: InsertResearchMonitor): Promise<ResearchMonitor>;
+  updateResearchMonitor(id: number, userId: string, monitor: Partial<InsertResearchMonitor>): Promise<ResearchMonitor | undefined>;
+  deleteResearchMonitor(id: number, userId: string): Promise<boolean>;
+
+  // Research Findings
+  getResearchFindings(userId: string, monitorId?: number): Promise<ResearchFinding[]>;
+  getUnreadResearchFindings(userId: string): Promise<ResearchFinding[]>;
+  getResearchFinding(id: number, userId: string): Promise<ResearchFinding | undefined>;
+  createResearchFinding(finding: InsertResearchFinding): Promise<ResearchFinding>;
+  updateResearchFinding(id: number, userId: string, finding: Partial<InsertResearchFinding>): Promise<ResearchFinding | undefined>;
+  deleteResearchFinding(id: number, userId: string): Promise<boolean>;
 
   // Public endpoints - no auth required (anonymous data only)
   getAllPublicReports(): Promise<Partial<EvolutionReport>[]>;
@@ -1148,6 +1184,350 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(accumulatedKnowledge.updatedAt))
       .limit(20);
+  }
+
+  // ============================================================================
+  // Patient Profile Methods
+  // ============================================================================
+
+  async getPatientProfile(userId: string): Promise<PatientProfile | undefined> {
+    const [profile] = await db.select().from(patientProfiles)
+      .where(eq(patientProfiles.userId, userId));
+    return profile;
+  }
+
+  async createPatientProfile(profile: InsertPatientProfile): Promise<PatientProfile> {
+    const [newProfile] = await db.insert(patientProfiles).values(profile).returning();
+    return newProfile;
+  }
+
+  async updatePatientProfile(userId: string, profile: Partial<InsertPatientProfile>): Promise<PatientProfile | undefined> {
+    const [updated] = await db.update(patientProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(patientProfiles.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // User Questions Methods
+  // ============================================================================
+
+  async createUserQuestion(question: InsertUserQuestion): Promise<UserQuestion> {
+    const [newQuestion] = await db.insert(userQuestions).values(question).returning();
+    return newQuestion;
+  }
+
+  async getUserQuestions(userId: string, page: number = 1, limit: number = 20): Promise<UserQuestion[]> {
+    const offset = (page - 1) * limit;
+    return db.select().from(userQuestions)
+      .where(eq(userQuestions.userId, userId))
+      .orderBy(desc(userQuestions.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getUserQuestionsCount(userId: string): Promise<number> {
+    const result = await db.select({ count: userQuestions.id }).from(userQuestions)
+      .where(eq(userQuestions.userId, userId));
+    return result.length;
+  }
+
+  async getUserQuestionsThisMonth(userId: string): Promise<number> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const questions = await db.select().from(userQuestions)
+      .where(eq(userQuestions.userId, userId));
+
+    return questions.filter(q => q.createdAt && new Date(q.createdAt) >= startOfMonth).length;
+  }
+
+  async getUserQuestion(id: number, userId: string): Promise<UserQuestion | undefined> {
+    const [question] = await db.select().from(userQuestions)
+      .where(and(eq(userQuestions.id, id), eq(userQuestions.userId, userId)));
+    return question;
+  }
+
+  async deleteUserQuestion(id: number, userId: string): Promise<boolean> {
+    // First delete associated answers
+    const question = await this.getUserQuestion(id, userId);
+    if (!question) return false;
+
+    await db.delete(questionAnswers).where(eq(questionAnswers.questionId, id));
+    const result = await db.delete(userQuestions)
+      .where(and(eq(userQuestions.id, id), eq(userQuestions.userId, userId)));
+    return true;
+  }
+
+  // ============================================================================
+  // Question Answers Methods
+  // ============================================================================
+
+  async createQuestionAnswer(answer: InsertQuestionAnswer): Promise<QuestionAnswer> {
+    const [newAnswer] = await db.insert(questionAnswers).values(answer).returning();
+    return newAnswer;
+  }
+
+  async getQuestionAnswers(questionId: number): Promise<QuestionAnswer[]> {
+    return db.select().from(questionAnswers)
+      .where(eq(questionAnswers.questionId, questionId))
+      .orderBy(questionAnswers.createdAt);
+  }
+
+  // ============================================================================
+  // User Subscriptions Methods
+  // ============================================================================
+
+  async getUserSubscription(userId: string): Promise<UserSubscription | undefined> {
+    const [subscription] = await db.select().from(userSubscriptions)
+      .where(eq(userSubscriptions.userId, userId));
+    return subscription;
+  }
+
+  async createUserSubscription(subscription: InsertUserSubscription): Promise<UserSubscription> {
+    const [newSubscription] = await db.insert(userSubscriptions).values(subscription).returning();
+    return newSubscription;
+  }
+
+  async updateUserSubscription(id: number, data: Partial<InsertUserSubscription>): Promise<UserSubscription | undefined> {
+    const [updated] = await db.update(userSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userSubscriptions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // Saved Items Methods
+  // ============================================================================
+
+  async getSavedItems(userId: string, options: { type?: string; page?: number; limit?: number } = {}): Promise<SavedItem[]> {
+    const { type, page = 1, limit = 20 } = options;
+    const offset = (page - 1) * limit;
+
+    let query = db.select().from(savedItems)
+      .where(eq(savedItems.userId, userId))
+      .orderBy(desc(savedItems.savedAt))
+      .limit(limit)
+      .offset(offset);
+
+    if (type) {
+      query = db.select().from(savedItems)
+        .where(and(eq(savedItems.userId, userId), eq(savedItems.itemType, type)))
+        .orderBy(desc(savedItems.savedAt))
+        .limit(limit)
+        .offset(offset);
+    }
+
+    return query;
+  }
+
+  async getSavedItemsCount(userId: string, type?: string): Promise<number> {
+    let items;
+    if (type) {
+      items = await db.select().from(savedItems)
+        .where(and(eq(savedItems.userId, userId), eq(savedItems.itemType, type)));
+    } else {
+      items = await db.select().from(savedItems)
+        .where(eq(savedItems.userId, userId));
+    }
+    return items.length;
+  }
+
+  async getSavedItem(id: number, userId: string): Promise<SavedItem | undefined> {
+    const [item] = await db.select().from(savedItems)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)));
+    return item;
+  }
+
+  async getSavedItemByItemId(userId: string, itemId: string): Promise<SavedItem | undefined> {
+    const [item] = await db.select().from(savedItems)
+      .where(and(eq(savedItems.userId, userId), eq(savedItems.itemId, itemId)));
+    return item;
+  }
+
+  async createSavedItem(item: InsertSavedItem): Promise<SavedItem> {
+    const [newItem] = await db.insert(savedItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateSavedItem(id: number, userId: string, data: Partial<InsertSavedItem>): Promise<SavedItem | undefined> {
+    const [updated] = await db.update(savedItems)
+      .set(data)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedItem(id: number, userId: string): Promise<boolean> {
+    await db.delete(savedItems)
+      .where(and(eq(savedItems.id, id), eq(savedItems.userId, userId)));
+    return true;
+  }
+
+  async getUserSavedTags(userId: string): Promise<string[]> {
+    const items = await db.select({ tags: savedItems.tags }).from(savedItems)
+      .where(eq(savedItems.userId, userId));
+
+    const allTags = new Set<string>();
+    items.forEach(item => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+
+    return Array.from(allTags).sort();
+  }
+
+  // ============================================================================
+  // Research Monitors & Alerts (P2 Feature)
+  // ============================================================================
+
+  async getResearchMonitors(userId: string): Promise<ResearchMonitor[]> {
+    return db.select().from(researchMonitors)
+      .where(eq(researchMonitors.userId, userId))
+      .orderBy(desc(researchMonitors.createdAt));
+  }
+
+  async getResearchMonitor(id: number, userId: string): Promise<ResearchMonitor | undefined> {
+    const [monitor] = await db.select().from(researchMonitors)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)));
+    return monitor;
+  }
+
+  async createResearchMonitor(monitor: InsertResearchMonitor): Promise<ResearchMonitor> {
+    const [newMonitor] = await db.insert(researchMonitors).values(monitor).returning();
+    return newMonitor;
+  }
+
+  async updateResearchMonitor(
+    id: number,
+    userId: string,
+    monitor: Partial<InsertResearchMonitor>
+  ): Promise<ResearchMonitor | undefined> {
+    const [updated] = await db
+      .update(researchMonitors)
+      .set(monitor)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteResearchMonitor(id: number, userId: string): Promise<boolean> {
+    // First delete related findings
+    const monitor = await this.getResearchMonitor(id, userId);
+    if (!monitor) return false;
+
+    await db.delete(researchFindings).where(eq(researchFindings.monitorId, id));
+    await db.delete(researchMonitors)
+      .where(and(eq(researchMonitors.id, id), eq(researchMonitors.userId, userId)));
+    return true;
+  }
+
+  // Research Findings
+  async getResearchFindings(userId: string, monitorId?: number): Promise<ResearchFinding[]> {
+    // Get monitors for user first
+    const monitors = await this.getResearchMonitors(userId);
+    const monitorIds = monitors.map(m => m.id);
+
+    if (monitorIds.length === 0) return [];
+
+    if (monitorId) {
+      if (!monitorIds.includes(monitorId)) return [];
+      return db.select().from(researchFindings)
+        .where(eq(researchFindings.monitorId, monitorId))
+        .orderBy(desc(researchFindings.foundAt));
+    }
+
+    // Get findings for all user's monitors
+    const allFindings: ResearchFinding[] = [];
+    for (const mId of monitorIds) {
+      const findings = await db.select().from(researchFindings)
+        .where(eq(researchFindings.monitorId, mId))
+        .orderBy(desc(researchFindings.foundAt));
+      allFindings.push(...findings);
+    }
+    return allFindings.sort((a, b) =>
+      new Date(b.foundAt || 0).getTime() - new Date(a.foundAt || 0).getTime()
+    );
+  }
+
+  async getUnreadResearchFindings(userId: string): Promise<ResearchFinding[]> {
+    const allFindings = await this.getResearchFindings(userId);
+    return allFindings.filter(f => !f.isRead && !f.isDismissed);
+  }
+
+  async getResearchFinding(id: number, userId: string): Promise<ResearchFinding | undefined> {
+    const [finding] = await db.select().from(researchFindings)
+      .where(eq(researchFindings.id, id));
+
+    if (!finding) return undefined;
+
+    // Verify user owns this finding's monitor
+    const monitor = await this.getResearchMonitor(finding.monitorId!, userId);
+    if (!monitor) return undefined;
+
+    return finding;
+  }
+
+  async createResearchFinding(finding: InsertResearchFinding): Promise<ResearchFinding> {
+    const [newFinding] = await db.insert(researchFindings).values(finding).returning();
+    return newFinding;
+  }
+
+  async updateResearchFinding(
+    id: number,
+    userId: string,
+    finding: Partial<InsertResearchFinding>
+  ): Promise<ResearchFinding | undefined> {
+    // Verify ownership
+    const existing = await this.getResearchFinding(id, userId);
+    if (!existing) return undefined;
+
+    const [updated] = await db
+      .update(researchFindings)
+      .set(finding)
+      .where(eq(researchFindings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteResearchFinding(id: number, userId: string): Promise<boolean> {
+    const existing = await this.getResearchFinding(id, userId);
+    if (!existing) return false;
+
+    await db.delete(researchFindings).where(eq(researchFindings.id, id));
+    return true;
+  }
+
+  // ============================================================================
+  // Delete User (for account deletion)
+  // ============================================================================
+
+  async deleteUser(userId: string): Promise<boolean> {
+    // Delete in order of dependencies
+    await db.delete(savedItems).where(eq(savedItems.userId, userId));
+    await db.delete(userSubscriptions).where(eq(userSubscriptions.userId, userId));
+
+    // Delete question answers first, then questions
+    const questions = await db.select().from(userQuestions).where(eq(userQuestions.userId, userId));
+    for (const q of questions) {
+      await db.delete(questionAnswers).where(eq(questionAnswers.questionId, q.id));
+    }
+    await db.delete(userQuestions).where(eq(userQuestions.userId, userId));
+
+    await db.delete(patientProfiles).where(eq(patientProfiles.userId, userId));
+    await db.delete(userPreferences).where(eq(userPreferences.userId, userId));
+
+    // Delete other user data
+    await db.delete(documents).where(eq(documents.userId, userId));
+    await db.delete(children).where(eq(children.userId, userId));
+
+    // Finally delete user
+    await db.delete(users).where(eq(users.id, userId));
+    return true;
   }
 }
 

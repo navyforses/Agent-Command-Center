@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
@@ -9,351 +8,340 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Check, Sparkles, Zap, Crown, Search, Loader2, FlaskConical, X } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-interface PricingTier {
-  id: string;
-  name: Record<string, string>;
-  description: Record<string, string>;
-  price_monthly: number;
-  price_yearly: number;
-  features: Array<{ key: string; value: string | boolean }>;
-  popular?: boolean;
-  cta: string;
-}
-
-interface DeepSearchTier {
-  id: string;
-  name: Record<string, string>;
-  price: number;
-  includes: string[];
-  popular?: boolean;
-}
-
-interface PricingData {
-  tiers: PricingTier[];
-  deep_search: DeepSearchTier[];
-}
-
-// Static fallback pricing data
-const fallbackPricingData: PricingData = {
-  tiers: [
-    {
-      id: "free",
-      name: { ka: "უფასო", en: "Free", ru: "Бесплатно" },
-      description: {
-        ka: "იდეალურია დამწყებთათვის",
-        en: "Perfect for getting started",
-        ru: "Идеально для начала"
-      },
-      price_monthly: 0,
-      price_yearly: 0,
-      features: [
-        { key: "searches", value: "5" },
-        { key: "languages", value: "3" },
-        { key: "digest", value: "weekly" },
-        { key: "saved", value: "10" },
-        { key: "deep_search", value: false },
-        { key: "priority_support", value: false },
-        { key: "api_access", value: false }
-      ],
-      cta: "get_started"
-    },
-    {
-      id: "premium",
-      name: { ka: "პრემიუმი", en: "Premium", ru: "Премиум" },
-      description: {
-        ka: "სერიოზული მომხმარებლებისთვის",
-        en: "For serious users",
-        ru: "Для серьёзных пользователей"
-      },
-      price_monthly: 19,
-      price_yearly: 182,
-      features: [
-        { key: "searches", value: "50" },
-        { key: "languages", value: "40+" },
-        { key: "digest", value: "daily" },
-        { key: "saved", value: "100" },
-        { key: "deep_search", value: "10%" },
-        { key: "priority_support", value: true },
-        { key: "api_access", value: false }
-      ],
-      popular: true,
-      cta: "subscribe"
-    },
-    {
-      id: "premium_plus",
-      name: { ka: "პრემიუმი+", en: "Premium+", ru: "Премиум+" },
-      description: {
-        ka: "პროფესიონალებისთვის",
-        en: "For professionals",
-        ru: "Для профессионалов"
-      },
-      price_monthly: 49,
-      price_yearly: 470,
-      features: [
-        { key: "searches", value: "unlimited" },
-        { key: "languages", value: "40+" },
-        { key: "digest", value: "realtime" },
-        { key: "saved", value: "unlimited" },
-        { key: "deep_search", value: "25%" },
-        { key: "priority_support", value: true },
-        { key: "api_access", value: true }
-      ],
-      cta: "subscribe"
-    }
-  ],
-  deep_search: [
-    {
-      id: "basic",
-      name: { ka: "Basic", en: "Basic", ru: "Basic" },
-      price: 49,
-      includes: ["5 კვლევის ანალიზი", "48 საათში", "ელფოსტით მხარდაჭერა"]
-    },
-    {
-      id: "standard",
-      name: { ka: "Standard", en: "Standard", ru: "Standard" },
-      price: 99,
-      includes: ["15 კვლევის ანალიზი", "24 საათში", "პრიორიტეტული მხარდაჭერა", "1 კონსულტაცია"],
-      popular: true
-    },
-    {
-      id: "premium",
-      name: { ka: "Premium", en: "Premium", ru: "Premium" },
-      price: 199,
-      includes: ["შეუზღუდავი კვლევები", "12 საათში", "VIP მხარდაჭერა", "3 კონსულტაცია"]
-    }
-  ]
-};
+import {
+  Check,
+  X,
+  Newspaper,
+  Zap,
+  Sparkles,
+  Crown,
+  MessageSquare,
+  Mail,
+  BookOpen,
+  Globe,
+  ArrowLeft,
+} from "lucide-react";
 
 const translations = {
-  en: {
-    title: "Choose Your Plan",
-    subtitle: "Find clinical trials that matter to you",
-    monthly: "Monthly",
-    yearly: "Yearly",
-    save: "Save 20%",
-    perMonth: "/month",
-    perYear: "/year",
-    currentPlan: "Current Plan",
-    subscribe: "Subscribe",
-    getStarted: "Get Started",
-    deepSearchTitle: "Deep Search",
-    deepSearchSubtitle: "Get personalized trial research from our experts",
-    features: {
-      searches: "Daily searches",
-      languages: "Translation languages",
-      digest: "Email digest",
-      saved: "Saved trials",
-      deep_search: "Deep Search discount",
-      priority_support: "Priority support",
-      api_access: "API access",
-    },
-    digestOptions: {
-      weekly: "Weekly",
-      daily: "Daily",
-      realtime: "Real-time",
-    },
-    included: "Included",
-    notIncluded: "Not included",
-    unlimited: "Unlimited",
-    questions: "Questions? Contact us at support@trialnavigator.com"
-  },
   ka: {
-    title: "აირჩიეთ გეგმა",
-    subtitle: "იპოვეთ თქვენთვის მნიშვნელოვანი კლინიკური კვლევები",
+    brandName: "MedNews",
+    brandTagline: "თქვენი პერსონალური სამედიცინო გაზეთი",
+    title: "აირჩიეთ თქვენი გეგმა",
+    subtitle: "მიიღეთ პერსონალიზებული სამედიცინო სიახლეები თქვენს შვილზე",
     monthly: "თვიური",
     yearly: "წლიური",
     save: "დაზოგეთ 20%",
     perMonth: "/თვე",
     perYear: "/წელი",
-    currentPlan: "მიმდინარე გეგმა",
-    subscribe: "გამოწერა",
     getStarted: "დაწყება",
-    deepSearchTitle: "ღრმა ძიება",
-    deepSearchSubtitle: "მიიღეთ პერსონალიზებული კვლევა ჩვენი ექსპერტებისგან",
-    features: {
-      searches: "ყოველდღიური ძიებები",
-      languages: "თარგმანის ენები",
-      digest: "ელფოსტის დაიჯესტი",
-      saved: "შენახული კვლევები",
-      deep_search: "ღრმა ძიების ფასდაკლება",
-      priority_support: "პრიორიტეტული მხარდაჭერა",
-      api_access: "API წვდომა",
+    subscribe: "გამოწერა",
+    contact: "დაგვიკავშირდით",
+    currentPlan: "მიმდინარე გეგმა",
+    mostPopular: "პოპულარული",
+    plans: {
+      free: {
+        name: "უფასო",
+        description: "დამწყებთათვის",
+        price: 0,
+        features: [
+          { text: "5 კითხვა თვეში", included: true },
+          { text: "პერსონალური ფიდი", included: true },
+          { text: "20 შენახული სტატია", included: true },
+          { text: "2 ენაზე თარგმანი", included: true },
+          { text: "მკვლევრებთან კონტაქტი", included: false },
+          { text: "ღრმა კვლევა", included: false },
+          { text: "პრიორიტეტული მხარდაჭერა", included: false },
+        ],
+      },
+      standard: {
+        name: "სტანდარტი",
+        description: "აქტიური მშობლებისთვის",
+        price: 25,
+        features: [
+          { text: "100 კითხვა თვეში", included: true },
+          { text: "პერსონალური ფიდი", included: true },
+          { text: "500 შენახული სტატია", included: true },
+          { text: "40+ ენაზე თარგმანი", included: true },
+          { text: "მკვლევრებთან კონტაქტი", included: true },
+          { text: "ღრმა კვლევა", included: true },
+          { text: "პრიორიტეტული მხარდაჭერა", included: false },
+        ],
+      },
+      premium: {
+        name: "პრემიუმ",
+        description: "მაქსიმალური შესაძლებლობები",
+        price: 60,
+        features: [
+          { text: "შეუზღუდავი კითხვები", included: true },
+          { text: "პერსონალური ფიდი", included: true },
+          { text: "შეუზღუდავი შენახვა", included: true },
+          { text: "40+ ენაზე თარგმანი", included: true },
+          { text: "მკვლევრებთან კონტაქტი", included: true },
+          { text: "ღრმა კვლევა", included: true },
+          { text: "პრიორიტეტული მხარდაჭერა", included: true },
+        ],
+      },
     },
-    digestOptions: {
-      weekly: "კვირეული",
-      daily: "ყოველდღიური",
-      realtime: "რეალურ დროში",
+    faq: {
+      title: "ხშირად დასმული კითხვები",
+      items: [
+        {
+          q: "როგორ მუშაობს AI კითხვა-პასუხი?",
+          a: "ჩვენი სისტემა იყენებს 5 AI მოდელს (GPT-4, Claude, Gemini, Grok, Perplexity) და აბრუნებს კონსენსუს პასუხს ციტატებით.",
+        },
+        {
+          q: "შემიძლია ნებისმიერ დროს გავაუქმო გამოწერა?",
+          a: "დიახ, გამოწერა შეგიძლიათ გააუქმოთ ნებისმიერ დროს. თქვენი წვდომა გაგრძელდება მიმდინარე პერიოდის ბოლომდე.",
+        },
+        {
+          q: "რა არის ღრმა კვლევა?",
+          a: "ღრმა კვლევა იძლევა დეტალურ ანალიზს თქვენს მდგომარეობასთან დაკავშირებით, მოიცავს მრავალ წყაროს და პროფესიონალურ მიმოხილვას.",
+        },
+      ],
     },
-    included: "შედის",
-    notIncluded: "არ შედის",
-    unlimited: "შეუზღუდავი",
-    questions: "გაქვთ კითხვები? დაგვიკავშირდით support@trialnavigator.com"
+    backToHome: "მთავარზე დაბრუნება",
+    questions: "გაქვთ კითხვები? დაგვიკავშირდით support@mednews.ge",
+  },
+  en: {
+    brandName: "MedNews",
+    brandTagline: "Your Personal Medical Newspaper",
+    title: "Choose Your Plan",
+    subtitle: "Get personalized medical news about your child",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    save: "Save 20%",
+    perMonth: "/month",
+    perYear: "/year",
+    getStarted: "Get Started",
+    subscribe: "Subscribe",
+    contact: "Contact Us",
+    currentPlan: "Current Plan",
+    mostPopular: "Most Popular",
+    plans: {
+      free: {
+        name: "Free",
+        description: "For beginners",
+        price: 0,
+        features: [
+          { text: "5 questions per month", included: true },
+          { text: "Personalized feed", included: true },
+          { text: "20 saved articles", included: true },
+          { text: "Translation in 2 languages", included: true },
+          { text: "Contact researchers", included: false },
+          { text: "Deep research", included: false },
+          { text: "Priority support", included: false },
+        ],
+      },
+      standard: {
+        name: "Standard",
+        description: "For active parents",
+        price: 25,
+        features: [
+          { text: "100 questions per month", included: true },
+          { text: "Personalized feed", included: true },
+          { text: "500 saved articles", included: true },
+          { text: "Translation in 40+ languages", included: true },
+          { text: "Contact researchers", included: true },
+          { text: "Deep research", included: true },
+          { text: "Priority support", included: false },
+        ],
+      },
+      premium: {
+        name: "Premium",
+        description: "Maximum capabilities",
+        price: 60,
+        features: [
+          { text: "Unlimited questions", included: true },
+          { text: "Personalized feed", included: true },
+          { text: "Unlimited saved articles", included: true },
+          { text: "Translation in 40+ languages", included: true },
+          { text: "Contact researchers", included: true },
+          { text: "Deep research", included: true },
+          { text: "Priority support", included: true },
+        ],
+      },
+    },
+    faq: {
+      title: "Frequently Asked Questions",
+      items: [
+        {
+          q: "How does AI Q&A work?",
+          a: "Our system uses 5 AI models (GPT-4, Claude, Gemini, Grok, Perplexity) and returns a consensus answer with citations.",
+        },
+        {
+          q: "Can I cancel my subscription anytime?",
+          a: "Yes, you can cancel your subscription at any time. Your access will continue until the end of the current billing period.",
+        },
+        {
+          q: "What is deep research?",
+          a: "Deep research provides detailed analysis related to your condition, including multiple sources and professional review.",
+        },
+      ],
+    },
+    backToHome: "Back to Home",
+    questions: "Have questions? Contact us at support@mednews.com",
   },
   ru: {
+    brandName: "MedNews",
+    brandTagline: "Ваша персональная медицинская газета",
     title: "Выберите план",
-    subtitle: "Найдите важные для вас клинические исследования",
+    subtitle: "Получайте персонализированные медицинские новости о вашем ребёнке",
     monthly: "Ежемесячно",
     yearly: "Ежегодно",
     save: "Скидка 20%",
-    perMonth: "/мес",
+    perMonth: "/месяц",
     perYear: "/год",
-    currentPlan: "Текущий план",
-    subscribe: "Подписаться",
     getStarted: "Начать",
-    deepSearchTitle: "Глубокий поиск",
-    deepSearchSubtitle: "Получите персонализированное исследование от наших экспертов",
-    features: {
-      searches: "Поисков в день",
-      languages: "Языков перевода",
-      digest: "Email-дайджест",
-      saved: "Сохранённых исследований",
-      deep_search: "Скидка на Deep Search",
-      priority_support: "Приоритетная поддержка",
-      api_access: "Доступ к API",
+    subscribe: "Подписаться",
+    contact: "Связаться",
+    currentPlan: "Текущий план",
+    mostPopular: "Популярный",
+    plans: {
+      free: {
+        name: "Бесплатно",
+        description: "Для начинающих",
+        price: 0,
+        features: [
+          { text: "5 вопросов в месяц", included: true },
+          { text: "Персональная лента", included: true },
+          { text: "20 сохранённых статей", included: true },
+          { text: "Перевод на 2 языка", included: true },
+          { text: "Связь с исследователями", included: false },
+          { text: "Глубокое исследование", included: false },
+          { text: "Приоритетная поддержка", included: false },
+        ],
+      },
+      standard: {
+        name: "Стандарт",
+        description: "Для активных родителей",
+        price: 25,
+        features: [
+          { text: "100 вопросов в месяц", included: true },
+          { text: "Персональная лента", included: true },
+          { text: "500 сохранённых статей", included: true },
+          { text: "Перевод на 40+ языков", included: true },
+          { text: "Связь с исследователями", included: true },
+          { text: "Глубокое исследование", included: true },
+          { text: "Приоритетная поддержка", included: false },
+        ],
+      },
+      premium: {
+        name: "Премиум",
+        description: "Максимальные возможности",
+        price: 60,
+        features: [
+          { text: "Неограниченные вопросы", included: true },
+          { text: "Персональная лента", included: true },
+          { text: "Неограниченное сохранение", included: true },
+          { text: "Перевод на 40+ языков", included: true },
+          { text: "Связь с исследователями", included: true },
+          { text: "Глубокое исследование", included: true },
+          { text: "Приоритетная поддержка", included: true },
+        ],
+      },
     },
-    digestOptions: {
-      weekly: "Еженедельный",
-      daily: "Ежедневный",
-      realtime: "В реальном времени",
+    faq: {
+      title: "Часто задаваемые вопросы",
+      items: [
+        {
+          q: "Как работает AI вопрос-ответ?",
+          a: "Наша система использует 5 AI моделей (GPT-4, Claude, Gemini, Grok, Perplexity) и возвращает консенсусный ответ с цитатами.",
+        },
+        {
+          q: "Могу ли я отменить подписку в любое время?",
+          a: "Да, вы можете отменить подписку в любое время. Ваш доступ продолжится до конца текущего расчётного периода.",
+        },
+        {
+          q: "Что такое глубокое исследование?",
+          a: "Глубокое исследование предоставляет детальный анализ вашего состояния, включая множество источников и профессиональный обзор.",
+        },
+      ],
     },
-    included: "Включено",
-    notIncluded: "Не включено",
-    unlimited: "Неограниченно",
-    questions: "Есть вопросы? Свяжитесь с нами: support@trialnavigator.com"
+    backToHome: "На главную",
+    questions: "Есть вопросы? Свяжитесь с нами: support@mednews.com",
   },
 };
 
-const tierIcons: Record<string, React.ReactNode> = {
+const planIcons = {
   free: <Zap className="h-6 w-6" />,
-  premium: <Sparkles className="h-6 w-6" />,
-  premium_plus: <Crown className="h-6 w-6" />,
+  standard: <Sparkles className="h-6 w-6" />,
+  premium: <Crown className="h-6 w-6" />,
+};
+
+const planGradients = {
+  free: "from-slate-500 to-slate-600",
+  standard: "from-blue-500 via-purple-500 to-pink-500",
+  premium: "from-amber-500 via-orange-500 to-red-500",
 };
 
 export default function Pricing() {
-  const { t: globalT, language } = useLanguage();
-  const { toast } = useToast();
+  const { language } = useLanguage();
   const [isYearly, setIsYearly] = useState(false);
   const t = translations[language as keyof typeof translations] || translations.en;
 
-  // Fetch pricing data with fallback
-  const { data: pricingData, isLoading } = useQuery<PricingData>({
-    queryKey: ["pricing"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/payments/pricing");
-        if (!res.ok) throw new Error("Failed to fetch pricing");
-        const data = await res.json();
-        // If no tiers returned, use fallback
-        if (!data?.tiers?.length) return fallbackPricingData;
-        return data;
-      } catch {
-        return fallbackPricingData;
-      }
-    },
-    initialData: fallbackPricingData,
-  });
-
-  // Create checkout session
-  const checkoutMutation = useMutation({
-    mutationFn: async ({ tier, billingPeriod }: { tier: string; billingPeriod: string }) => {
-      const res = await fetch("/api/payments/checkout/subscription", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-ID": "current-user-id",
-        },
-        body: JSON.stringify({ tier, billing_period: billingPeriod }),
-      });
-      if (!res.ok) throw new Error("Failed to create checkout");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      window.location.href = data.url;
-    },
-    onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to start checkout. Please try again.",
-      });
-    },
-  });
-
-  const handleSubscribe = (tierId: string) => {
-    if (tierId === "free") return;
-    checkoutMutation.mutate({
-      tier: tierId,
-      billingPeriod: isYearly ? "yearly" : "monthly",
-    });
-  };
-
-  const formatFeatureValue = (key: string, value: string | boolean): { text: string; included: boolean } => {
-    if (typeof value === "boolean") {
-      return { text: value ? t.included : t.notIncluded, included: value };
-    }
-    if (key === "digest" && t.digestOptions[value as keyof typeof t.digestOptions]) {
-      return { text: t.digestOptions[value as keyof typeof t.digestOptions], included: true };
-    }
-    if (value === "unlimited") {
-      return { text: t.unlimited, included: true };
-    }
-    if (key === "deep_search" && typeof value === "string" && value.includes("%")) {
-      return { text: value + " " + (language === 'ka' ? 'ფასდაკლება' : language === 'ru' ? 'скидка' : 'discount'), included: true };
-    }
-    return { text: value, included: true };
+  const getPrice = (monthlyPrice: number) => {
+    if (monthlyPrice === 0) return 0;
+    return isYearly ? Math.round(monthlyPrice * 12 * 0.8) : monthlyPrice;
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-950 dark:via-blue-950/30 dark:to-purple-950/30">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <FlaskConical className="h-4 w-4 text-primary-foreground" />
+      <header className="w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+              <Newspaper className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg">Trial Navigator</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                {t.brandName}
+              </span>
+              <span className="text-xs text-muted-foreground hidden sm:block">
+                {t.brandTagline}
+              </span>
+            </div>
           </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/pricing" className="text-sm font-medium text-primary">
-              {globalT('nav.pricing')}
-            </Link>
-            <Link href="/services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-              {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
-            </Link>
-          </nav>
           <div className="flex items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
             <Link href="/login">
               <Button variant="ghost" size="sm">
-                {globalT('nav.login')}
+                {language === "ka" ? "შესვლა" : language === "ru" ? "Войти" : "Login"}
               </Button>
             </Link>
             <Link href="/register">
-              <Button size="sm">
-                {globalT('nav.register')}
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700"
+              >
+                {language === "ka" ? "რეგისტრაცია" : language === "ru" ? "Регистрация" : "Register"}
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12 max-w-6xl">
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
+        {/* Back Button */}
+        <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-sm">{t.backToHome}</span>
+        </Link>
+
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t.title}</h1>
-          <p className="text-lg text-muted-foreground mb-8">{t.subtitle}</p>
+          <h1 className="text-3xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+            {t.title}
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">{t.subtitle}</p>
 
           {/* Billing toggle */}
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-full px-6 py-3 w-fit mx-auto shadow-lg">
             <Label
               htmlFor="billing-toggle"
-              className={!isYearly ? "font-semibold" : "text-muted-foreground"}
+              className={`cursor-pointer transition-colors ${!isYearly ? "font-semibold text-foreground" : "text-muted-foreground"}`}
             >
               {t.monthly}
             </Label>
@@ -361,195 +349,176 @@ export default function Pricing() {
               id="billing-toggle"
               checked={isYearly}
               onCheckedChange={setIsYearly}
+              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-blue-600 data-[state=checked]:to-purple-600"
             />
             <Label
               htmlFor="billing-toggle"
-              className={isYearly ? "font-semibold" : "text-muted-foreground"}
+              className={`cursor-pointer transition-colors flex items-center gap-2 ${isYearly ? "font-semibold text-foreground" : "text-muted-foreground"}`}
             >
               {t.yearly}
-              <Badge variant="secondary" className="ml-2">
+              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">
                 {t.save}
               </Badge>
             </Label>
           </div>
         </div>
 
-        {/* Pricing tiers */}
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
-            {pricingData?.tiers.map((tier) => {
-              const price = isYearly ? tier.price_yearly : tier.price_monthly;
-              const period = isYearly ? t.perYear : t.perMonth;
-              const name = tier.name[language] || tier.name.en;
-              const description = tier.description[language] || tier.description.en;
-
-              return (
-                <Card
-                  key={tier.id}
-                  className={`relative flex flex-col ${
-                    tier.popular
-                      ? "border-primary shadow-lg scale-[1.02]"
-                      : ""
-                  }`}
-                >
-                  {tier.popular && (
-                    <Badge
-                      className="absolute -top-3 left-1/2 -translate-x-1/2"
-                      variant="default"
-                    >
-                      {language === "ka" ? "პოპულარული" : language === "ru" ? "Популярный" : "Most Popular"}
-                    </Badge>
-                  )}
-
-                  <CardHeader className="text-center pb-4">
-                    <div className="mx-auto mb-3 p-3 rounded-full bg-primary/10 w-fit">
-                      {tierIcons[tier.id]}
-                    </div>
-                    <CardTitle className="text-xl">{name}</CardTitle>
-                    <CardDescription className="text-sm">{description}</CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="text-center flex-1">
-                    <div className="mb-6">
-                      <span className="text-4xl font-bold">
-                        {price === 0 ? (language === "ka" ? "უფასო" : language === "ru" ? "Бесплатно" : "Free") : `$${price}`}
-                      </span>
-                      {price > 0 && (
-                        <span className="text-muted-foreground text-sm">{period}</span>
-                      )}
-                    </div>
-
-                    <ul className="space-y-3 text-left">
-                      {tier.features.map((feature) => {
-                        const { text, included } = formatFeatureValue(feature.key, feature.value);
-                        return (
-                          <li key={feature.key} className="flex items-start gap-2">
-                            {included ? (
-                              <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                            ) : (
-                              <X className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                            )}
-                            <span className={`text-sm ${!included ? 'text-muted-foreground' : ''}`}>
-                              <span className="text-muted-foreground">
-                                {t.features[feature.key as keyof typeof t.features] || feature.key}:
-                              </span>{" "}
-                              <span className={`font-medium ${!included ? 'text-muted-foreground' : ''}`}>
-                                {text}
-                              </span>
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </CardContent>
-
-                  <CardFooter className="pt-4">
-                    <Button
-                      className="w-full"
-                      variant={tier.popular ? "default" : "outline"}
-                      disabled={checkoutMutation.isPending}
-                      onClick={() => tier.id === "free" ? window.location.href = "/register" : handleSubscribe(tier.id)}
-                    >
-                      {checkoutMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      {tier.id === "free" ? t.getStarted : t.subscribe}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        <Separator className="my-12" />
-
-        {/* Deep Search section */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Search className="h-7 w-7 text-primary" />
-            <h2 className="text-2xl md:text-3xl font-bold">{t.deepSearchTitle}</h2>
-          </div>
-          <p className="text-muted-foreground">{t.deepSearchSubtitle}</p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {pricingData?.deep_search.map((tier) => {
-            const name = tier.name[language] || tier.name.en;
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {(["free", "standard", "premium"] as const).map((planKey) => {
+            const plan = t.plans[planKey];
+            const isPopular = planKey === "standard";
+            const price = getPrice(plan.price);
 
             return (
               <Card
-                key={tier.id}
-                className={`relative ${tier.popular ? "border-primary shadow-lg" : ""}`}
+                key={planKey}
+                className={`relative flex flex-col border-0 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden ${
+                  isPopular ? "ring-2 ring-purple-500 scale-105 z-10" : ""
+                }`}
               >
-                {tier.popular && (
-                  <Badge
-                    className="absolute -top-3 left-1/2 -translate-x-1/2"
-                    variant="default"
-                  >
-                    {language === "ka" ? "რეკომენდებული" : language === "ru" ? "Рекомендуемый" : "Recommended"}
-                  </Badge>
+                {isPopular && (
+                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white text-center py-2 text-sm font-semibold">
+                    {t.mostPopular}
+                  </div>
                 )}
 
-                <CardHeader className="text-center">
-                  <CardTitle className="text-lg">{name}</CardTitle>
-                  <div className="text-3xl font-bold mt-2">${tier.price}</div>
-                  <CardDescription className="text-sm">
-                    {language === "ka" ? "ერთჯერადი გადახდა" : language === "ru" ? "Разовый платёж" : "One-time payment"}
-                  </CardDescription>
+                <CardHeader className={`text-center ${isPopular ? "pt-12" : "pt-6"}`}>
+                  <div className={`mx-auto mb-4 p-4 rounded-2xl bg-gradient-to-br ${planGradients[planKey]} w-fit shadow-lg`}>
+                    <div className="text-white">{planIcons[planKey]}</div>
+                  </div>
+                  <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                  <CardDescription className="text-base">{plan.description}</CardDescription>
                 </CardHeader>
 
-                <CardContent>
-                  <ul className="space-y-2">
-                    {tier.includes.map((item, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-primary shrink-0" />
-                        <span className="text-sm">{item}</span>
+                <CardContent className="text-center flex-1">
+                  <div className="mb-6">
+                    {price === 0 ? (
+                      <span className="text-4xl font-bold">
+                        {language === "ka" ? "უფასო" : language === "ru" ? "Бесплатно" : "Free"}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-bold">
+                          {language === "ka" ? "₾" : "$"}{price}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {isYearly ? t.perYear : t.perMonth}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <ul className="space-y-3 text-left">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        {feature.included ? (
+                          <div className="h-5 w-5 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Check className="h-3 w-3 text-white" />
+                          </div>
+                        ) : (
+                          <div className="h-5 w-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <X className="h-3 w-3 text-slate-400" />
+                          </div>
+                        )}
+                        <span className={feature.included ? "text-foreground" : "text-muted-foreground"}>
+                          {feature.text}
+                        </span>
                       </li>
                     ))}
                   </ul>
                 </CardContent>
 
-                <CardFooter>
-                  <Button className="w-full" variant={tier.popular ? "default" : "outline"}>
-                    {language === "ka" ? "შეკვეთა" : language === "ru" ? "Заказать" : "Order Now"}
-                  </Button>
+                <CardFooter className="pt-4">
+                  <Link href="/register" className="w-full">
+                    <Button
+                      className={`w-full h-12 text-base font-semibold transition-all ${
+                        isPopular
+                          ? "bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl"
+                          : "bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
+                      }`}
+                    >
+                      {planKey === "free" ? t.getStarted : t.subscribe}
+                    </Button>
+                  </Link>
                 </CardFooter>
               </Card>
             );
           })}
         </div>
 
-        {/* FAQ or additional info */}
+        {/* Features Grid */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold text-center mb-8">
+            {language === "ka" ? "რა შედის ყველა გეგმაში" : language === "ru" ? "Что включено во все планы" : "What's included in all plans"}
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: <BookOpen className="h-6 w-6" />,
+                title: language === "ka" ? "პერსონალური ფიდი" : language === "ru" ? "Персональная лента" : "Personalized Feed",
+                desc: language === "ka" ? "AI-ით შერჩეული სტატიები" : language === "ru" ? "Статьи, подобранные AI" : "AI-curated articles",
+              },
+              {
+                icon: <MessageSquare className="h-6 w-6" />,
+                title: language === "ka" ? "AI კითხვა-პასუხი" : language === "ru" ? "AI вопрос-ответ" : "AI Q&A",
+                desc: language === "ka" ? "5 AI მოდელის კონსენსუსი" : language === "ru" ? "Консенсус 5 AI моделей" : "5 AI model consensus",
+              },
+              {
+                icon: <Globe className="h-6 w-6" />,
+                title: language === "ka" ? "მულტიენოვანი" : language === "ru" ? "Многоязычность" : "Multi-language",
+                desc: language === "ka" ? "40+ ენაზე თარგმანი" : language === "ru" ? "Перевод на 40+ языков" : "Translation in 40+ languages",
+              },
+              {
+                icon: <Mail className="h-6 w-6" />,
+                title: language === "ka" ? "შეტყობინებები" : language === "ru" ? "Уведомления" : "Notifications",
+                desc: language === "ka" ? "ახალი კვლევების შესახებ" : language === "ru" ? "О новых исследованиях" : "About new research",
+              },
+            ].map((feature, index) => (
+              <div key={index} className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl p-6 text-center shadow-lg">
+                <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center text-white">
+                  {feature.icon}
+                </div>
+                <h3 className="font-semibold mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FAQ Section */}
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-8">{t.faq.title}</h2>
+          <div className="space-y-4">
+            {t.faq.items.map((item, index) => (
+              <div key={index} className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl p-6 shadow-lg">
+                <h3 className="font-semibold mb-2">{item.q}</h3>
+                <p className="text-muted-foreground">{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Contact */}
         <div className="mt-16 text-center text-sm text-muted-foreground">
           <p>{t.questions}</p>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
-      <footer className="border-t bg-muted/30">
-        <div className="container py-10 px-4 md:px-6">
+      <footer className="border-t bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm py-6">
+        <div className="container px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
-                <FlaskConical className="h-3 w-3 text-primary-foreground" />
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center">
+                <Newspaper className="h-4 w-4 text-white" />
               </div>
-              <span className="font-semibold">Trial Navigator</span>
+              <span className="font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                {t.brandName}
+              </span>
             </div>
-            <nav className="flex gap-6">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                {globalT('nav.home')}
-              </Link>
-              <Link href="/services" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
-              </Link>
-            </nav>
             <p className="text-sm text-muted-foreground">
-              © 2024 Trial Navigator. {globalT('footer.rights')}
+              © 2025 {t.brandName}. All rights reserved.
             </p>
           </div>
         </div>

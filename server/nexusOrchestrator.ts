@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
-import { translateToGeorgian } from "./evolutionCycleEngine";
+import { translateToGeorgian } from "./services/translator";
 import type { 
   InsertNexusFinding, 
   InsertNexusAiAnalysis, 

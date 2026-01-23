@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { Suspense, lazy } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +6,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
@@ -28,6 +31,8 @@ const TrialDetail = lazy(() => import("@/pages/TrialDetail"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const ResearchFeed = lazy(() => import("@/pages/ResearchFeed"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Questions = lazy(() => import("@/pages/Questions"));
+const SavedItems = lazy(() => import("@/pages/SavedItems"));
 
 // Feature pages (lazy loaded)
 const Therapy = lazy(() => import("@/pages/Therapy"));
@@ -43,6 +48,10 @@ const EmailHub = lazy(() => import("@/pages/EmailHub"));
 const PubMedSearch = lazy(() => import("@/pages/Research")); // Manual PubMed article search
 const TrialDashboard = lazy(() => import("@/pages/ClinicalTrials")); // Eligibility-matched trials
 const Nexus = lazy(() => import("@/pages/Nexus")); // Multi-AI research orchestrator
+
+// P2 Feature pages
+const Calendar = lazy(() => import("@/pages/Calendar")); // Calendar with email extraction
+const ResearchAlertsPage = lazy(() => import("@/pages/ResearchAlertsPage")); // Research alerts
 
 // Loading fallback component
 function PageLoader() {
@@ -73,18 +82,17 @@ function PublicRouter() {
   );
 }
 
-// Protected routes (require login)
-function ProtectedRouter() {
+// Main app content with layout
+function AppWithLayout() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <AppLayout>
       <Switch>
-        {/* Onboarding - first page after login */}
-        <Route path="/onboarding" component={Onboarding} />
-
         {/* Main app pages */}
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/feed" component={PatientFeed} />
+        <Route path="/questions" component={Questions} />
+        <Route path="/saved" component={SavedItems} />
         <Route path="/search" component={TrialSearch} />
         <Route path="/trial/:id" component={TrialDetail} />
         <Route path="/profile" component={ProfilePage} />
@@ -106,6 +114,10 @@ function ProtectedRouter() {
         <Route path="/trials" component={TrialDashboard} />
         <Route path="/nexus" component={Nexus} />
 
+        {/* P2 Feature pages */}
+        <Route path="/calendar" component={Calendar} />
+        <Route path="/research-alerts" component={ResearchAlertsPage} />
+
         {/* Public pages accessible when logged in */}
         <Route path="/pricing" component={Pricing} />
         <Route path="/services" component={Services} />
@@ -115,6 +127,24 @@ function ProtectedRouter() {
         {/* Fallback to dashboard */}
         <Route component={Dashboard} />
       </Switch>
+    </AppLayout>
+  );
+}
+
+// Protected routes (require login)
+function ProtectedRouter() {
+  const [location] = useLocation();
+
+  // Onboarding has its own full-screen layout
+  const isOnboarding = location === "/onboarding";
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {isOnboarding ? (
+        <Onboarding />
+      ) : (
+        <AppWithLayout />
+      )}
     </Suspense>
   );
 }
@@ -127,9 +157,15 @@ function AppContent() {
     return <PageLoader />;
   }
 
-  // If authenticated, show protected routes
+  // If authenticated, show protected routes with additional providers
   if (isAuthenticated) {
-    return <ProtectedRouter />;
+    return (
+      <NotificationProvider>
+        <UserPreferencesProvider>
+          <ProtectedRouter />
+        </UserPreferencesProvider>
+      </NotificationProvider>
+    );
   }
 
   // Otherwise show public routes
