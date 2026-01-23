@@ -4,17 +4,21 @@
  * CRUD operations for child patient records
  */
 
-import { Router } from "express";
+import { Router, Response } from "express";
 import { isEmailAuthenticated } from "../emailAuth";
 import { storage } from "../storage";
 import { insertChildSchema } from "@shared/schema";
+import { AuthenticatedRequest, getUserId } from "../types";
 
 const router = Router();
 
 // GET /api/children - List all children for user
-router.get("/", isEmailAuthenticated, async (req: any, res) => {
+router.get("/", isEmailAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const children = await storage.getChildren(userId);
     res.json(children);
   } catch (error) {
@@ -24,9 +28,12 @@ router.get("/", isEmailAuthenticated, async (req: any, res) => {
 });
 
 // POST /api/children - Create a new child
-router.post("/", isEmailAuthenticated, async (req: any, res) => {
+router.post("/", isEmailAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const parseResult = insertChildSchema.safeParse({ ...req.body, userId });
     if (!parseResult.success) {
       return res.status(400).json({ message: "Invalid child data", errors: parseResult.error.errors });
@@ -40,9 +47,12 @@ router.post("/", isEmailAuthenticated, async (req: any, res) => {
 });
 
 // GET /api/children/:id - Get a specific child
-router.get("/:id", isEmailAuthenticated, async (req: any, res) => {
+router.get("/:id", isEmailAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ message: "Invalid child ID" });
@@ -59,9 +69,12 @@ router.get("/:id", isEmailAuthenticated, async (req: any, res) => {
 });
 
 // PATCH /api/children/:id - Update a child
-router.patch("/:id", isEmailAuthenticated, async (req: any, res) => {
+router.patch("/:id", isEmailAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ message: "Invalid child ID" });
@@ -83,9 +96,12 @@ router.patch("/:id", isEmailAuthenticated, async (req: any, res) => {
 });
 
 // DELETE /api/children/:id - Delete a child
-router.delete("/:id", isEmailAuthenticated, async (req: any, res) => {
+router.delete("/:id", isEmailAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ message: "Invalid child ID" });

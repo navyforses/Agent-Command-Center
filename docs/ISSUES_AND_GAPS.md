@@ -101,13 +101,14 @@ Sentry integration added:
 
 ### 7. Missing TypeScript Types
 
-**Locations with `any` type:**
-- `server/routes.ts` - Multiple `(req as any).user` usages
-- `server/aiOrchestrator.ts` - AI response types
-- Various mutation handlers
+**Status:** ✅ PARTIALLY RESOLVED
 
-**Your Input Needed:**
-- Should I create proper types for these?
+Created type infrastructure:
+- `server/types/express.ts` - AuthenticatedRequest, getUserId() helper
+- `server/types/index.ts` - Central export point
+- Modular routes updated to use proper types (childrenRoutes.ts, etc.)
+
+**Remaining:** Main routes.ts still has many `(req as any).user` usages - requires incremental refactoring.
 
 ---
 
