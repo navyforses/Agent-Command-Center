@@ -222,7 +222,7 @@ export function asyncHandler(fn: AsyncHandler) {
 }
 
 // ============================================================================
-// Helper function for creating error responses (without throwing)
+// Helper functions for creating error responses (without throwing)
 // ============================================================================
 
 export function sendErrorResponse(
@@ -237,6 +237,58 @@ export function sendErrorResponse(
     code,
     timestamp: new Date().toISOString(),
   };
+
+  if (details) {
+    response.details = details;
+  }
+
+  return res.status(statusCode).json(response);
+}
+
+/**
+ * Convenience helpers for common error responses
+ */
+export const sendError = {
+  badRequest: (res: Response, message: string, details?: any) =>
+    sendErrorResponse(res, 400, message, ErrorCodes.VALIDATION_ERROR, details),
+
+  unauthorized: (res: Response, message: string = "Authentication required") =>
+    sendErrorResponse(res, 401, message, ErrorCodes.AUTH_REQUIRED),
+
+  forbidden: (res: Response, message: string = "Access denied") =>
+    sendErrorResponse(res, 403, message, ErrorCodes.ACCESS_DENIED),
+
+  notFound: (res: Response, resource: string = "Resource") =>
+    sendErrorResponse(res, 404, `${resource} not found`, ErrorCodes.NOT_FOUND),
+
+  conflict: (res: Response, message: string) =>
+    sendErrorResponse(res, 409, message, ErrorCodes.ALREADY_EXISTS),
+
+  rateLimited: (res: Response, message: string = "Too many requests") =>
+    sendErrorResponse(res, 429, message, ErrorCodes.RATE_LIMITED),
+
+  internal: (res: Response, message: string = "Internal server error", details?: any) =>
+    sendErrorResponse(res, 500, message, ErrorCodes.INTERNAL_ERROR, details),
+};
+
+// ============================================================================
+// Legacy helper (kept for backwards compatibility)
+// ============================================================================
+
+/**
+ * @deprecated Use sendError.* helpers instead
+ */
+export function createErrorResponse(
+  res: Response,
+  statusCode: number,
+  message: string,
+  code?: ErrorCode
+): Response {
+  return sendErrorResponse(
+    res,
+    statusCode,
+    message,
+    code || (statusCode >= 500 ? ErrorCodes.INTERNAL_ERROR : ErrorCodes.VALIDATION_ERROR)
 
   if (details) {
     response.details = details;

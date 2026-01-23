@@ -195,42 +195,41 @@ All values can be overridden via environment variables.
 
 ### 1. Long Functions
 
-| File | Function | Lines |
-|------|----------|-------|
-| `routes.ts` | Various route handlers | 50-200+ lines each |
-| `aiOrchestrator.ts` | `processDocument` | 150+ lines |
-| `evolutionCycleEngine.ts` | Multiple functions | 100+ lines |
+| File | Function | Lines | Status |
+|------|----------|-------|--------|
+| `routes.ts` | Various route handlers | 50-200+ lines each | Partial extraction done |
+| `aiOrchestrator.ts` | `processDocument` | 150+ lines | |
+| `evolutionCycleEngine.ts` | Multiple functions | 100+ lines | |
 
 ### 2. Repeated Patterns
 
-```typescript
-// This pattern is repeated 50+ times in routes.ts
-const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
-if (!userId) {
-  return res.status(401).json({ error: 'Unauthorized' });
-}
-```
+**Status:** ✅ Infrastructure Created
 
-**Recommendation:** Create middleware:
 ```typescript
-function getUserId(req: Request): string | null {
-  return req.user?.claims?.sub || req.user?.id;
-}
+// OLD: This pattern was repeated 50+ times
+const userId = (req as any).user?.claims?.sub || (req as any).user?.id;
+
+// NEW: Use server/types/express.ts
+import { AuthenticatedRequest, getUserId } from "../types";
+const userId = getUserId(req);
 ```
 
 ### 3. Inconsistent Error Handling
 
-Some endpoints return:
-```json
-{ "error": "message" }
-```
+**Status:** ✅ Infrastructure Created
 
-Others return:
-```json
-{ "message": "message" }
-```
+Standard error response helpers available in `server/middleware/errorHandler.ts`:
 
-**Recommendation:** Standardize error responses.
+```typescript
+import { sendError } from "../middleware/errorHandler";
+
+// Instead of: res.status(400).json({ message: "..." })
+// Use:
+sendError.badRequest(res, "Invalid input");
+sendError.notFound(res, "User");
+sendError.unauthorized(res);
+sendError.internal(res, "Database error");
+```
 
 ---
 
