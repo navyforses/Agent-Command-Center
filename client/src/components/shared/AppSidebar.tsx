@@ -15,6 +15,14 @@ import {
   Brain,
   History,
   TrendingUp,
+  User,
+  Users,
+  FileText,
+  Stethoscope,
+  Pill,
+  Bot,
+  Mail,
+  Activity,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,24 +80,56 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
       url: "/",
     },
 
+    patient: {
+      title: language === "ka" ? "პაციენტი" : "Patient",
+      icon: User,
+      items: [
+        {
+          title: language === "ka" ? "პროფილი" : "Profile",
+          icon: User,
+          url: "/profile"
+        },
+        {
+          title: language === "ka" ? "ბავშვები" : "Children",
+          icon: Users,
+          url: "/children"
+        },
+        {
+          title: language === "ka" ? "დოკუმენტები" : "Documents",
+          icon: FileText,
+          url: "/documents"
+        },
+        {
+          title: language === "ka" ? "თერაპიები" : "Therapies",
+          icon: Stethoscope,
+          url: "/therapies"
+        },
+      ],
+    } as MenuSection,
+
     trials: {
       title: language === "ka" ? "კლინიკური კვლევები" : "Clinical Trials",
       icon: FlaskConical,
       items: [
-        { 
-          title: language === "ka" ? "ძიება" : "Search", 
-          icon: Search, 
-          url: "/search" 
+        {
+          title: language === "ka" ? "ძიება" : "Search",
+          icon: Search,
+          url: "/search"
         },
-        { 
-          title: language === "ka" ? "შენახული" : "Saved Trials", 
-          icon: Bookmark, 
-          url: "/saved" 
+        {
+          title: language === "ka" ? "შესაბამისობა" : "Eligibility Match",
+          icon: Activity,
+          url: "/trials"
         },
-        { 
-          title: language === "ka" ? "ისტორია" : "History", 
-          icon: History, 
-          url: "/history" 
+        {
+          title: language === "ka" ? "შენახული" : "Saved Trials",
+          icon: Bookmark,
+          url: "/saved"
+        },
+        {
+          title: language === "ka" ? "ისტორია" : "History",
+          icon: History,
+          url: "/history"
         },
       ],
     } as MenuSection,
@@ -98,37 +138,64 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
       title: language === "ka" ? "რეესტრები" : "Registries",
       icon: Globe,
       items: [
-        { 
-          title: "ClinicalTrials.gov", 
-          icon: Globe, 
-          url: "/registry/ctgov" 
+        {
+          title: "ClinicalTrials.gov",
+          icon: Globe,
+          url: "/registry/ctgov"
         },
-        { 
-          title: "EU Clinical Trials", 
-          icon: Globe, 
-          url: "/registry/euctr" 
+        {
+          title: "EU Clinical Trials",
+          icon: Globe,
+          url: "/registry/euctr"
         },
-        { 
-          title: "WHO ICTRP", 
-          icon: Globe, 
-          url: "/registry/who" 
+        {
+          title: "WHO ICTRP",
+          icon: Globe,
+          url: "/registry/who"
+        },
+      ],
+    } as MenuSection,
+
+    research: {
+      title: language === "ka" ? "კვლევა" : "Research",
+      icon: Brain,
+      items: [
+        {
+          title: language === "ka" ? "მონიტორინგი" : "Research Monitor",
+          icon: Activity,
+          url: "/research"
+        },
+        {
+          title: language === "ka" ? "PubMed ძიება" : "PubMed Search",
+          icon: FileText,
+          url: "/pubmed"
+        },
+        {
+          title: language === "ka" ? "მედიკამენტები" : "Medications",
+          icon: Pill,
+          url: "/medications"
         },
       ],
     } as MenuSection,
 
     ai: {
       title: language === "ka" ? "AI ინსაითები" : "AI Insights",
-      icon: Brain,
+      icon: Bot,
       items: [
-        { 
-          title: language === "ka" ? "ტრენდები" : "Trial Trends", 
-          icon: TrendingUp, 
-          url: "/trends" 
+        {
+          title: language === "ka" ? "ტრენდები" : "Trial Trends",
+          icon: TrendingUp,
+          url: "/trends"
         },
-        { 
-          title: "PROMETHEUS", 
-          icon: Dna, 
-          url: "/evolution" 
+        {
+          title: "PROMETHEUS",
+          icon: Dna,
+          url: "/evolution"
+        },
+        {
+          title: language === "ka" ? "AI ასისტენტი" : "AI Assistant",
+          icon: Bot,
+          url: "/assistant"
         },
       ],
     } as MenuSection,
@@ -137,10 +204,10 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
       title: language === "ka" ? "თარგმანები" : "Translations",
       icon: Languages,
       items: [
-        { 
-          title: language === "ka" ? "გლოსარი" : "Glossary", 
-          icon: BookOpen, 
-          url: "/glossary" 
+        {
+          title: language === "ka" ? "გლოსარი" : "Glossary",
+          icon: BookOpen,
+          url: "/glossary"
         },
       ],
     } as MenuSection,
@@ -231,8 +298,10 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {renderCollapsibleSection("patient", navigationSections.patient)}
               {renderCollapsibleSection("trials", navigationSections.trials)}
               {renderCollapsibleSection("registries", navigationSections.registries)}
+              {renderCollapsibleSection("research", navigationSections.research)}
               {renderCollapsibleSection("ai", navigationSections.ai)}
               {renderCollapsibleSection("translation", navigationSections.translation)}
             </SidebarMenu>
