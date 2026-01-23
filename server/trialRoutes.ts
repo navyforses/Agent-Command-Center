@@ -30,8 +30,9 @@ import {
   userSavedTrials,
   trialSearchHistory,
   documents,
+  medicalGlossary,
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike, or } from "drizzle-orm";
 
 // Multer configuration for document uploads
 const documentUpload = multer({
@@ -584,6 +585,60 @@ router.get("/languages", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[Trial Routes] Get languages error:", error);
     res.status(500).json({ error: "Failed to get languages" });
+  }
+});
+
+// List all glossary terms with optional search
+router.get("/glossary", async (req: Request, res: Response) => {
+  try {
+    const { search, language = "ka", limit = "100", offset = "0" } = req.query;
+    const limitNum = Math.min(parseInt(String(limit), 10) || 100, 500);
+    const offsetNum = parseInt(String(offset), 10) || 0;
+
+    let query = db
+      .select()
+      .from(medicalGlossary)
+      .where(eq(medicalGlossary.languageCode, String(language)))
+      .limit(limitNum)
+      .offset(offsetNum)
+      .orderBy(medicalGlossary.termEnglish);
+
+    if (search) {
+      const searchTerm = `%${String(search).toLowerCase()}%`;
+      query = db
+        .select()
+        .from(medicalGlossary)
+        .where(
+          and(
+            eq(medicalGlossary.languageCode, String(language)),
+            or(
+              ilike(medicalGlossary.termEnglish, searchTerm),
+              ilike(medicalGlossary.termTranslated, searchTerm)
+            )
+          )
+        )
+        .limit(limitNum)
+        .offset(offsetNum)
+        .orderBy(medicalGlossary.termEnglish);
+    }
+
+    const terms = await query;
+
+    // Get total count for pagination
+    const countResult = await db
+      .select()
+      .from(medicalGlossary)
+      .where(eq(medicalGlossary.languageCode, String(language)));
+
+    res.json({
+      terms,
+      total: countResult.length,
+      limit: limitNum,
+      offset: offsetNum,
+    });
+  } catch (error) {
+    console.error("[Trial Routes] Get glossary list error:", error);
+    res.status(500).json({ error: "Failed to get glossary terms" });
   }
 });
 

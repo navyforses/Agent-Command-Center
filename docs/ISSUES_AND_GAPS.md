@@ -8,57 +8,48 @@ This document identifies areas that need attention, clarification, or your input
 
 ### 1. routes.ts File Size (5,038 lines)
 
-**Problem:** Main routes file is too large and difficult to maintain.
+**Status:** ✅ PARTIALLY RESOLVED
 
-**Location:** `server/routes.ts`
-
-**Recommended Action:**
-Split into separate route files by feature:
+Extracted ~615 lines into modular route files:
 ```
 server/routes/
-├── authRoutes.ts
-├── childrenRoutes.ts
-├── documentsRoutes.ts
-├── therapyRoutes.ts
-├── chatRoutes.ts
-├── appointmentRoutes.ts
-└── index.ts (combines all)
+├── childrenRoutes.ts    ✅ Created
+├── documentRoutes.ts    ✅ Created
+├── therapyRoutes.ts     ✅ Created
+├── appointmentRoutes.ts ✅ Created
+├── emailRoutes.ts       ✅ Created
+└── index.ts             ✅ Created (combines all)
 ```
 
-**Your Input Needed:**
-- Do you want me to refactor this?
-- Which features should be grouped together?
+**Remaining:** Main routes.ts still large. Consider extracting more modules (auth, chat, AI routes).
 
 ---
 
 ### 2. Duplicate Page Components
 
-**Problem:** Some pages may be duplicates with different implementations.
+**Status:** ✅ RESOLVED
 
-| Page | Possible Duplicate | Status |
-|------|-------------------|--------|
-| `Research.tsx` | `ResearchFeed.tsx` | Need verification |
-| `ClinicalTrials.tsx` | `TrialSearch.tsx` | Need verification |
+Analysis found these are NOT duplicates - they have different functionality:
 
-**Your Input Needed:**
-- Should `Research.tsx` be deleted or merged with `ResearchFeed.tsx`?
-- Should `ClinicalTrials.tsx` be deleted or merged with `TrialSearch.tsx`?
+| Page | Purpose | Route |
+|------|---------|-------|
+| `Research.tsx` | Manual PubMed article search | `/pubmed` |
+| `ResearchFeed.tsx` | Automated research monitoring | `/research` |
+| `ClinicalTrials.tsx` | Eligibility-matched trials dashboard | `/trials` |
+| `TrialSearch.tsx` | Trial search with filters | `/search` |
+
+All 4 pages preserved with proper navigation.
 
 ---
 
 ### 3. AI System Documentation Missing
 
-**Problem:** Three major AI systems lack user-facing documentation:
+**Status:** ✅ RESOLVED
 
-| System | Location | Status |
-|--------|----------|--------|
-| PROMETHEUS | `server/prometheus/` | No UI documentation |
-| NEXUS | `server/nexusOrchestrator.ts` | No UI documentation |
-| Evolution Cycles | `server/evolutionCycleEngine.ts` | Minimal documentation |
-
-**Your Input Needed:**
-- Which AI features should be exposed to users?
-- Should there be a separate AI documentation page?
+Created comprehensive AI documentation:
+- `docs/AI_SYSTEMS.md` - Full documentation for NEXUS, EVOLUTION, PROMETHEUS
+- Added NEXUS page (`/nexus`) with debates and hypotheses UI
+- All AI systems now accessible via navigation sidebar
 
 ---
 
@@ -66,54 +57,31 @@ server/routes/
 
 ### 4. Environment Variables Not Documented
 
-**Problem:** Many environment variables are used but not fully documented.
+**Status:** ✅ RESOLVED
 
-**Currently Known:**
-```env
-# Required
-DATABASE_URL
-SESSION_SECRET
-
-# AI APIs
-AI_INTEGRATIONS_OPENAI_API_KEY
-AI_INTEGRATIONS_GEMINI_API_KEY
-AI_INTEGRATIONS_ANTHROPIC_API_KEY
-XAI_API_KEY
-
-# Optional
-TAVILY_API_KEY
-GOOGLE_SEARCH_API_KEY
-PERPLEXITY_API_KEY
-RESEND_API_KEY
-```
-
-**Unknown/Undocumented:**
-- Google Cloud Storage credentials
-- Replit-specific variables
-- Email service configuration
-
-**Your Input Needed:**
-- Can you provide complete list of required/optional variables?
+Created comprehensive documentation:
+- `docs/ENV_VARIABLES.md` - Full documentation with all 30+ environment variables
+- `.env.example` - Updated template with all variables
+- Includes instructions for obtaining API keys
+- Security recommendations included
 
 ---
 
 ### 5. Database Tables Without API
 
-**Problem:** Some database tables exist but have no API endpoints.
+**Status:** ✅ RESOLVED
+
+All major tables now have API endpoints:
 
 | Table | Has API | Has UI |
 |-------|---------|--------|
-| `prometheusMemoryLayers` | ❌ | ❌ |
-| `prometheusInsights` | ❌ | ❌ |
-| `nexusDebates` | ❌ | ❌ |
-| `nexusHypotheses` | ❌ | ❌ |
-| `evolutionReports` | Partial | ❌ |
-| `accumulatedKnowledge` | ❌ | ❌ |
-| `medicalGlossary` | ❌ | ❌ |
-
-**Your Input Needed:**
-- Should these features have API/UI?
-- Are these for internal use only?
+| `prometheusMemory` | ✅ `/api/prometheus/*` | ✅ PROMETHEUS page |
+| `prometheusInsights` | ✅ `/api/prometheus/insights` | ✅ |
+| `nexusDebates` | ✅ `/api/nexus/debates` | ✅ NEXUS page |
+| `nexusHypotheses` | ✅ `/api/nexus/hypotheses` | ✅ |
+| `evolutionReports` | ✅ `/api/evolution/reports` | ✅ Evolution page |
+| `accumulatedKnowledge` | ✅ `/api/evolution/accumulated-knowledge` | ✅ |
+| `medicalGlossary` | ✅ `/api/trials/glossary` | ✅ Glossary page |
 
 ---
 
