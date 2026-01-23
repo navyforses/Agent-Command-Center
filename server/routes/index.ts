@@ -28,6 +28,7 @@ import documentRoutes from "./documentRoutes";
 import appointmentRoutes from "./appointmentRoutes";
 import appointmentExtractRoutes from "./appointmentExtractRoutes";
 import researchAlertRoutes from "./researchAlertRoutes";
+import aiFeatureRoutes from "./aiFeatureRoutes";
 
 /**
  * Register all API routes
@@ -50,6 +51,9 @@ export function registerApiRoutes(app: Express): void {
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointments", appointmentExtractRoutes);
   app.use("/api/research-alerts", isEmailAuthenticated, researchAlertRoutes);
+
+  // P1 Features: Smart Search, Auto-Categorize, Email Draft
+  app.use("/api", aiFeatureRoutes);
 
   console.log("[Routes] API routes registered successfully");
 }
