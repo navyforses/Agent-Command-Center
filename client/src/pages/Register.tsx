@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FlaskConical, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { Newspaper, Check, Loader2, Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -15,7 +15,7 @@ import { queryClient } from "@/lib/queryClient";
 const translations = {
   ka: {
     title: "რეგისტრაცია",
-    subtitle: "შექმენით ახალი ანგარიში",
+    subtitle: "შექმენით თქვენი პერსონალური სამედიცინო გაზეთი",
     firstNameLabel: "სახელი",
     firstNamePlaceholder: "თქვენი სახელი",
     lastNameLabel: "გვარი",
@@ -31,23 +31,24 @@ const translations = {
     benefits: {
       title: "რას მიიღებთ:",
       items: [
-        "უფასო წვდომა 1M+ კლინიკურ კვლევაზე",
-        "AI-ით მართული მოძიება",
-        "პერსონალური რეკომენდაციები",
-        "40+ ენაზე თარგმნა"
+        "პერსონალიზებული სამედიცინო ფიდი",
+        "AI კითხვა-პასუხი ნებისმიერ სტატიაზე",
+        "კონტაქტი მკვლევრებთან",
+        "40+ ენაზე თარგმანი"
       ]
     },
     hasAccount: "უკვე გაქვთ ანგარიში?",
     login: "შესვლა",
-    or: "ან",
-    backToHome: "მთავარ გვერდზე დაბრუნება",
+    backToHome: "მთავარზე დაბრუნება",
     registerSuccess: "რეგისტრაცია წარმატებით დასრულდა",
     registerError: "რეგისტრაცია ვერ მოხერხდა",
-    passwordMismatch: "პაროლები არ ემთხვევა"
+    passwordMismatch: "პაროლები არ ემთხვევა",
+    brandName: "MedNews",
+    brandTagline: "თქვენი პერსონალური სამედიცინო გაზეთი"
   },
   en: {
     title: "Create Account",
-    subtitle: "Create a new account",
+    subtitle: "Create your personal medical newspaper",
     firstNameLabel: "First Name",
     firstNamePlaceholder: "Your first name",
     lastNameLabel: "Last Name",
@@ -63,23 +64,24 @@ const translations = {
     benefits: {
       title: "What you'll get:",
       items: [
-        "Free access to 1M+ clinical trials",
-        "AI-powered search",
-        "Personalized recommendations",
+        "Personalized medical feed",
+        "AI Q&A on any article",
+        "Contact researchers directly",
         "Translation in 40+ languages"
       ]
     },
     hasAccount: "Already have an account?",
     login: "Sign in",
-    or: "or",
     backToHome: "Back to Home",
     registerSuccess: "Account created successfully",
     registerError: "Failed to create account",
-    passwordMismatch: "Passwords do not match"
+    passwordMismatch: "Passwords do not match",
+    brandName: "MedNews",
+    brandTagline: "Your Personal Medical Newspaper"
   },
   ru: {
     title: "Регистрация",
-    subtitle: "Создайте новый аккаунт",
+    subtitle: "Создайте вашу персональную медицинскую газету",
     firstNameLabel: "Имя",
     firstNamePlaceholder: "Ваше имя",
     lastNameLabel: "Фамилия",
@@ -95,19 +97,20 @@ const translations = {
     benefits: {
       title: "Что вы получите:",
       items: [
-        "Бесплатный доступ к 1M+ клинических исследований",
-        "Поиск на основе ИИ",
-        "Персонализированные рекомендации",
+        "Персонализированная медицинская лента",
+        "AI вопрос-ответ по любой статье",
+        "Связь с исследователями",
         "Перевод на 40+ языков"
       ]
     },
     hasAccount: "Уже есть аккаунт?",
     login: "Войти",
-    or: "или",
-    backToHome: "Вернуться на главную",
+    backToHome: "На главную",
     registerSuccess: "Аккаунт успешно создан",
     registerError: "Не удалось создать аккаунт",
-    passwordMismatch: "Пароли не совпадают"
+    passwordMismatch: "Пароли не совпадают",
+    brandName: "MedNews",
+    brandTagline: "Ваша персональная медицинская газета"
   }
 };
 
@@ -116,7 +119,7 @@ export default function Register() {
   const t = translations[language as keyof typeof translations] || translations.en;
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -127,7 +130,7 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast({
         title: t.passwordMismatch,
@@ -145,13 +148,13 @@ export default function Register() {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      
+
       toast({
         title: t.registerSuccess,
       });
-      
+
       setLocation("/");
     } catch (error: any) {
       toast({
@@ -165,14 +168,22 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">
-      <header className="w-full border-b bg-background/95 backdrop-blur">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-950 dark:via-blue-950/30 dark:to-purple-950/30">
+      {/* Header */}
+      <header className="w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <FlaskConical className="h-4 w-4 text-primary-foreground" />
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+              <Newspaper className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-xl">Trial Navigator</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                {t.brandName}
+              </span>
+              <span className="text-xs text-muted-foreground hidden sm:block">
+                {t.brandTagline}
+              </span>
+            </div>
           </Link>
           <div className="flex items-center gap-2">
             <LanguageToggle />
@@ -181,156 +192,187 @@ export default function Register() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">{t.title}</CardTitle>
-            <CardDescription>{t.subtitle}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 mb-6">
-              <p className="text-sm font-medium">{t.benefits.title}</p>
-              <ul className="space-y-2">
-                {t.benefits.items.map((item, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-4 py-8">
+        <div className="w-full max-w-lg">
+          {/* Back Button */}
+          <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">{t.backToHome}</span>
+          </Link>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <Card className="border-0 shadow-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
+                <Newspaper className="h-8 w-8 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-bold">{t.title}</CardTitle>
+              <CardDescription className="text-base">{t.subtitle}</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {/* Benefits */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-xl p-4 mb-6">
+                <p className="text-sm font-semibold mb-3 text-foreground">{t.benefits.title}</p>
+                <ul className="space-y-2">
+                  {t.benefits.items.map((item, index) => (
+                    <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-5 w-5 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                        <Check className="h-3 w-3 text-white" />
+                      </div>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-sm font-medium">{t.firstNameLabel}</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="firstName"
+                        type="text"
+                        placeholder={t.firstNamePlaceholder}
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={isLoading}
+                        className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                        data-testid="input-first-name"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-sm font-medium">{t.lastNameLabel}</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder={t.lastNamePlaceholder}
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={isLoading}
+                        className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                        data-testid="input-last-name"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">{t.firstNameLabel}</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder={t.firstNamePlaceholder}
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={isLoading}
-                    data-testid="input-first-name"
-                  />
+                  <Label htmlFor="email" className="text-sm font-medium">{t.emailLabel}</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder={t.emailPlaceholder}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                      data-testid="input-email"
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">{t.lastNameLabel}</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder={t.lastNamePlaceholder}
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    disabled={isLoading}
-                    data-testid="input-last-name"
-                  />
+                  <Label htmlFor="password" className="text-sm font-medium">{t.passwordLabel}</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder={t.passwordPlaceholder}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={isLoading}
+                      className="pl-10 pr-12 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                      data-testid="input-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="button-toggle-password"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">{t.emailLabel}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder={t.emailPlaceholder}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  data-testid="input-email"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">{t.passwordLabel}</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder={t.passwordPlaceholder}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    disabled={isLoading}
-                    data-testid="input-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    data-testid="button-toggle-password"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium">{t.confirmPasswordLabel}</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder={t.confirmPasswordPlaceholder}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={isLoading}
+                      className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                      data-testid="input-confirm-password"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">{t.confirmPasswordLabel}</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder={t.confirmPasswordPlaceholder}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all"
+                  size="lg"
                   disabled={isLoading}
-                  data-testid="input-confirm-password"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-12 text-lg"
-                size="lg"
-                disabled={isLoading}
-                data-testid="button-register"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    {t.loading}
-                  </>
-                ) : (
-                  t.registerButton
-                )}
-              </Button>
-            </form>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">{t.or}</span>
-              </div>
-            </div>
-
-            <Link href="/">
-              <Button variant="outline" className="w-full" data-testid="button-back-home">
-                {t.backToHome}
-              </Button>
-            </Link>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <p className="text-sm text-muted-foreground">
-              {t.hasAccount}{" "}
-              <Link href="/login" className="text-primary hover:underline font-medium" data-testid="link-login">
-                {t.login}
-              </Link>
-            </p>
-          </CardFooter>
-        </Card>
+                  data-testid="button-register"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      {t.loading}
+                    </>
+                  ) : (
+                    t.registerButton
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+            <CardFooter className="justify-center pt-2">
+              <p className="text-sm text-muted-foreground">
+                {t.hasAccount}{" "}
+                <Link
+                  href="/login"
+                  className="font-semibold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent hover:underline"
+                  data-testid="link-login"
+                >
+                  {t.login}
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm py-4">
+        <div className="container px-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            © 2025 {t.brandName}. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
