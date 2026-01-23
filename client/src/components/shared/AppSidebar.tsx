@@ -183,9 +183,9 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
       icon: Bot,
       items: [
         {
-          title: language === "ka" ? "ტრენდები" : "Trial Trends",
-          icon: TrendingUp,
-          url: "/trends"
+          title: "NEXUS",
+          icon: Brain,
+          url: "/nexus"
         },
         {
           title: "PROMETHEUS",
@@ -196,6 +196,11 @@ export const AppSidebar = memo(function AppSidebar({ user }: AppSidebarProps) {
           title: language === "ka" ? "AI ასისტენტი" : "AI Assistant",
           icon: Bot,
           url: "/assistant"
+        },
+        {
+          title: language === "ka" ? "ტრენდები" : "Trial Trends",
+          icon: TrendingUp,
+          url: "/trends"
         },
       ],
     } as MenuSection,
