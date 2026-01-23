@@ -60,7 +60,9 @@ export default function Dashboard() {
   const { data: savedTrialsData, isLoading: savedLoading } = useQuery<SavedTrial[]>({
     queryKey: ["/api/trials/saved"],
     queryFn: async () => {
-      const res = await fetch("/api/trials/saved");
+      const res = await fetch("/api/trials/saved", {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -70,7 +72,9 @@ export default function Dashboard() {
   const { data: documentsData, isLoading: docsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
     queryFn: async () => {
-      const res = await fetch("/api/documents");
+      const res = await fetch("/api/documents", {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },

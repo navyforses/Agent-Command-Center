@@ -269,7 +269,9 @@ export default function ResearchFeed() {
   const { data: profileData, isLoading: profileLoading } = useQuery({
     queryKey: ["patient-profile"],
     queryFn: async () => {
-      const res = await fetch("/api/patient-profile");
+      const res = await fetch("/api/patient-profile", {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch profile");
       return res.json();
     },
@@ -286,7 +288,9 @@ export default function ResearchFeed() {
       if (activeTab !== "all") {
         params.set("type", activeTab);
       }
-      const res = await fetch(`/api/research-monitor/findings?${params}`);
+      const res = await fetch(`/api/research-monitor/findings?${params}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch findings");
       return res.json();
     },
@@ -296,7 +300,10 @@ export default function ResearchFeed() {
   // Mutations
   const saveMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/research-monitor/findings/${id}/save`, { method: "POST" });
+      const res = await fetch(`/api/research-monitor/findings/${id}/save`, {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Save failed");
       return res.json();
     },
@@ -307,7 +314,10 @@ export default function ResearchFeed() {
 
   const dismissMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/research-monitor/findings/${id}/dismiss`, { method: "POST" });
+      const res = await fetch(`/api/research-monitor/findings/${id}/dismiss`, {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Dismiss failed");
       return res.json();
     },
@@ -318,7 +328,10 @@ export default function ResearchFeed() {
 
   const readMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/research-monitor/findings/${id}/read`, { method: "POST" });
+      const res = await fetch(`/api/research-monitor/findings/${id}/read`, {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Mark read failed");
       return res.json();
     },
@@ -329,7 +342,10 @@ export default function ResearchFeed() {
 
   const scanMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/research-monitor/scan-now", { method: "POST" });
+      const res = await fetch("/api/research-monitor/scan-now", {
+        method: "POST",
+        credentials: "include",
+      });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Scan failed");
