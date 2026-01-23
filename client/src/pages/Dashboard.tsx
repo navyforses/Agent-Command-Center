@@ -6,161 +6,320 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Search,
-  FileText,
-  Bell,
-  Settings,
+  Newspaper,
+  MessageSquare,
   Bookmark,
-  TrendingUp,
-  ArrowRight,
+  Settings,
   User,
-  Calendar,
-  FlaskConical,
-  Upload,
+  LogOut,
+  ArrowRight,
+  Sparkles,
+  FileText,
+  TrendingUp,
+  Clock,
   ChevronRight,
+  Upload,
   Zap,
-  LogOut
+  Crown,
 } from "lucide-react";
 
-interface SavedTrial {
-  savedTrial: {
-    id: number;
-    trialId: number;
-    notes?: string;
-    savedAt: string;
-  };
-  trial: {
-    id: number;
-    nctNumber: string;
-    title: string;
-    status: string;
-    phase?: string;
-    locations?: string[];
-    conditions?: string[];
-  };
+interface FeedItem {
+  id: string;
+  title: string;
+  type: "clinical_trial" | "research_article" | "drug_info";
+  source: string;
+  relevanceScore: number;
+  publishedAt: string;
 }
 
-interface Document {
+interface Question {
   id: number;
-  title: string;
-  category?: string;
+  question: string;
   createdAt: string;
+  status: "pending" | "answered";
 }
 
 export default function Dashboard() {
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  const userName = user?.firstName || user?.email?.split('@')[0] || (language === 'ka' ? 'მომხმარებელი' : 'User');
+  const userName = user?.firstName || user?.email?.split("@")[0] || (language === "ka" ? "მომხმარებელი" : "User");
 
-  // Fetch saved trials
-  const { data: savedTrialsData, isLoading: savedLoading } = useQuery<SavedTrial[]>({
-    queryKey: ["/api/trials/saved"],
-    queryFn: async () => {
-      const res = await fetch("/api/trials/saved", {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
-      return res.json();
+  // Translations
+  const t = {
+    ka: {
+      welcome: "გამარჯობა",
+      subtitle: "თქვენი პერსონალური სამედიცინო გაზეთი მზადაა",
+      todaysFeed: "დღევანდელი ფიდი",
+      newArticles: "ახალი სტატია",
+      viewAll: "ყველას ნახვა",
+      recentQuestions: "ბოლო კითხვები",
+      askQuestion: "კითხვის დასმა",
+      noQuestions: "ჯერ არ დაგისვამთ კითხვა",
+      savedItems: "შენახული",
+      articles: "სტატია",
+      subscription: "გამოწერა",
+      freePlan: "უფასო გეგმა",
+      questionsLeft: "კითხვა დარჩენილია",
+      upgrade: "განახლება",
+      quickActions: "სწრაფი მოქმედებები",
+      browseFeeds: "ფიდის დათვალიერება",
+      askAI: "AI-ს შეკითხვა",
+      uploadForm: "ფორმა 100-ის ატვირთვა",
+      settings: "პარამეტრები",
+      completeProfile: "შეავსეთ პროფილი",
+      profileDesc: "სრული პროფილი უკეთეს რეკომენდაციებს მოგცემთ",
+      logout: "გასვლა",
+      trial: "კლინიკური კვლევა",
+      article: "სამეცნიერო სტატია",
+      drug: "მედიკამენტი",
+      pending: "მუშავდება",
+      answered: "პასუხი მზადაა",
+      relevance: "რელევანტურობა",
     },
-  });
-
-  // Fetch documents
-  const { data: documentsData, isLoading: docsLoading } = useQuery<Document[]>({
-    queryKey: ["/api/documents"],
-    queryFn: async () => {
-      const res = await fetch("/api/documents", {
-        credentials: "include",
-      });
-      if (!res.ok) return [];
-      return res.json();
+    en: {
+      welcome: "Hello",
+      subtitle: "Your personal medical newspaper is ready",
+      todaysFeed: "Today's Feed",
+      newArticles: "new articles",
+      viewAll: "View All",
+      recentQuestions: "Recent Questions",
+      askQuestion: "Ask a Question",
+      noQuestions: "No questions yet",
+      savedItems: "Saved",
+      articles: "articles",
+      subscription: "Subscription",
+      freePlan: "Free Plan",
+      questionsLeft: "questions left",
+      upgrade: "Upgrade",
+      quickActions: "Quick Actions",
+      browseFeeds: "Browse Feed",
+      askAI: "Ask AI",
+      uploadForm: "Upload Form 100",
+      settings: "Settings",
+      completeProfile: "Complete Your Profile",
+      profileDesc: "A complete profile gives better recommendations",
+      logout: "Log out",
+      trial: "Clinical Trial",
+      article: "Research Article",
+      drug: "Drug Info",
+      pending: "Processing",
+      answered: "Answered",
+      relevance: "Relevance",
     },
-  });
-
-  // Calculate stats from real data
-  const stats = {
-    savedTrials: savedTrialsData?.length || 0,
-    documents: documentsData?.length || 0,
-    profileComplete: user?.firstName && user?.lastName ? 100 : user?.firstName || user?.email ? 75 : 50,
+    ru: {
+      welcome: "Привет",
+      subtitle: "Ваша персональная медицинская газета готова",
+      todaysFeed: "Сегодняшняя лента",
+      newArticles: "новых статей",
+      viewAll: "Смотреть все",
+      recentQuestions: "Последние вопросы",
+      askQuestion: "Задать вопрос",
+      noQuestions: "Пока нет вопросов",
+      savedItems: "Сохранённые",
+      articles: "статей",
+      subscription: "Подписка",
+      freePlan: "Бесплатный план",
+      questionsLeft: "вопросов осталось",
+      upgrade: "Обновить",
+      quickActions: "Быстрые действия",
+      browseFeeds: "Просмотр ленты",
+      askAI: "Спросить AI",
+      uploadForm: "Загрузить Форму 100",
+      settings: "Настройки",
+      completeProfile: "Заполните профиль",
+      profileDesc: "Полный профиль даёт лучшие рекомендации",
+      logout: "Выйти",
+      trial: "Клиническое исследование",
+      article: "Научная статья",
+      drug: "Лекарство",
+      pending: "Обрабатывается",
+      answered: "Отвечено",
+      relevance: "Релевантность",
+    },
   };
 
-  // Get recent trials from saved data
-  const recentTrials = (savedTrialsData || []).slice(0, 3).map(item => ({
-    id: String(item.trial.id),
-    title: item.trial.title,
-    status: item.trial.status || 'unknown',
-    match: 85 + Math.floor(Math.random() * 10), // Simulated match score
-    location: item.trial.locations?.[0] || 'N/A'
-  }));
+  const tr = t[language as keyof typeof t] || t.en;
+
+  // Fetch feed data
+  const { data: feedData } = useQuery({
+    queryKey: ["/api/feed"],
+    queryFn: async () => {
+      const res = await fetch("/api/feed?limit=5", { credentials: "include" });
+      if (!res.ok) return { items: [], total: 0 };
+      return res.json();
+    },
+  });
+
+  // Fetch questions
+  const { data: questionsData } = useQuery({
+    queryKey: ["/api/questions"],
+    queryFn: async () => {
+      const res = await fetch("/api/questions?limit=3", { credentials: "include" });
+      if (!res.ok) return { questions: [] };
+      return res.json();
+    },
+  });
+
+  // Fetch saved items count
+  const { data: savedData } = useQuery({
+    queryKey: ["/api/saved"],
+    queryFn: async () => {
+      const res = await fetch("/api/saved?limit=1", { credentials: "include" });
+      if (!res.ok) return { pagination: { total: 0 } };
+      return res.json();
+    },
+  });
+
+  // Fetch subscription
+  const { data: subscriptionData } = useQuery({
+    queryKey: ["/api/subscriptions/current"],
+    queryFn: async () => {
+      const res = await fetch("/api/subscriptions/current", { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Mock data for demo
+  const mockFeedItems: FeedItem[] = [
+    {
+      id: "1",
+      title: language === "ka"
+        ? "ჰიპოქსიურ-იშემიური ენცეფალოპათიის ახალი მკურნალობა"
+        : "New Treatment for Hypoxic-Ischemic Encephalopathy",
+      type: "clinical_trial",
+      source: "ClinicalTrials.gov",
+      relevanceScore: 94,
+      publishedAt: new Date().toISOString(),
+    },
+    {
+      id: "2",
+      title: language === "ka"
+        ? "ცერებრალური დამბლის რეაბილიტაციის კვლევა"
+        : "Cerebral Palsy Rehabilitation Study",
+      type: "research_article",
+      source: "PubMed",
+      relevanceScore: 89,
+      publishedAt: new Date().toISOString(),
+    },
+    {
+      id: "3",
+      title: language === "ka"
+        ? "ნეონატალური ენცეფალოპათიის პროგნოზი"
+        : "Neonatal Encephalopathy Prognosis",
+      type: "research_article",
+      source: "PubMed",
+      relevanceScore: 85,
+      publishedAt: new Date().toISOString(),
+    },
+  ];
+
+  const feedItems = feedData?.items?.length > 0 ? feedData.items : mockFeedItems;
+  const feedTotal = feedData?.total || mockFeedItems.length;
+  const questions = questionsData?.questions || [];
+  const savedCount = savedData?.pagination?.total || 0;
+  const plan = subscriptionData?.plan || { id: "free", name: "Free", nameKa: "უფასო" };
+  const usage = subscriptionData?.usage || { questionsThisMonth: 0 };
+  const questionsLimit = plan.features?.questionsPerMonth || 5;
+  const questionsRemaining = questionsLimit === -1 ? "∞" : Math.max(0, questionsLimit - usage.questionsThisMonth);
+
+  const profileComplete = user?.firstName && user?.lastName ? 100 : user?.firstName || user?.email ? 75 : 50;
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "clinical_trial":
+        return <Sparkles className="h-4 w-4" />;
+      case "research_article":
+        return <FileText className="h-4 w-4" />;
+      case "drug_info":
+        return <TrendingUp className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "clinical_trial":
+        return tr.trial;
+      case "research_article":
+        return tr.article;
+      case "drug_info":
+        return tr.drug;
+      default:
+        return type;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-950 dark:via-blue-950/30 dark:to-purple-950/30">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container py-8 px-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">
-                {t('profile.welcome')}, {userName}!
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {language === 'ka'
-                  ? 'თქვენი პერსონალიზებული კლინიკური კვლევების პანელი'
-                  : 'Your personalized clinical trials dashboard'}
-              </p>
+      <header className="w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
+              <Newspaper className="h-5 w-5 text-white" />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setLocation('/profile')}>
-                <User className="h-4 w-4 mr-2" />
-                {t('nav.profile')}
-              </Button>
-              <Button onClick={() => setLocation('/search')}>
-                <Search className="h-4 w-4 mr-2" />
-                {t('nav.search')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.location.href = '/api/logout'}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                {language === 'ka' ? 'გასვლა' : language === 'ru' ? 'Выход' : 'Log out'}
-              </Button>
-            </div>
+            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              MedNews
+            </span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")}>
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/profile")}>
+              <User className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => (window.location.href = "/api/logout")}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="container py-8 px-4">
-        <div className="grid gap-6 lg:grid-cols-3">
+      {/* Main Content */}
+      <main className="container px-4 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">
+            {tr.welcome}, {userName}!
+          </h1>
+          <p className="text-muted-foreground">{tr.subtitle}</p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content - Left 2 columns */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Profile Completion Card */}
-            {stats.profileComplete < 100 && (
-              <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-transparent">
+            {/* Profile Completion */}
+            {profileComplete < 100 && (
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
-                    <div className="p-3 rounded-xl bg-primary/10">
-                      <FileText className="h-6 w-6 text-primary" />
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600">
+                      <Upload className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold mb-1">
-                        {language === 'ka' ? 'შეავსეთ პროფილი' : 'Complete Your Profile'}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {language === 'ka'
-                          ? 'სრული პროფილი დაგეხმარებათ უკეთესი შესაბამისობის პოვნაში'
-                          : 'A complete profile helps us find better matching trials'}
-                      </p>
+                      <h3 className="font-semibold mb-1">{tr.completeProfile}</h3>
+                      <p className="text-sm text-muted-foreground mb-3">{tr.profileDesc}</p>
                       <div className="flex items-center gap-4">
-                        <Progress value={stats.profileComplete} className="flex-1 h-2" />
-                        <span className="text-sm font-medium">{stats.profileComplete}%</span>
+                        <Progress value={profileComplete} className="flex-1 h-2" />
+                        <span className="text-sm font-medium">{profileComplete}%</span>
                       </div>
-                      <Button variant="link" className="p-0 h-auto mt-2" onClick={() => setLocation('/profile')}>
-                        {language === 'ka' ? 'პროფილის შევსება' : 'Complete Profile'}
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto mt-2 text-blue-600"
+                        onClick={() => setLocation("/profile")}
+                      >
+                        {tr.completeProfile}
                         <ArrowRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
@@ -169,207 +328,247 @@ export default function Dashboard() {
               </Card>
             )}
 
-            {/* Matching Trials */}
-            <Card>
+            {/* Today's Feed */}
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>{t('profile.matchingTrials')}</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Newspaper className="h-5 w-5 text-purple-600" />
+                      {tr.todaysFeed}
+                    </CardTitle>
                     <CardDescription>
-                      {language === 'ka'
-                        ? 'კვლევები რომლებიც შეესაბამება თქვენს პროფილს'
-                        : 'Trials that match your profile'}
+                      {feedTotal} {tr.newArticles}
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary" className="gap-1">
-                    <Zap className="h-3 w-3" />
-                    {stats.matchingTrials} {language === 'ka' ? 'ახალი' : 'new'}
-                  </Badge>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation("/feed")}>
+                    {tr.viewAll}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {recentTrials.map((trial) => (
+              <CardContent className="space-y-3">
+                {feedItems.slice(0, 3).map((item: FeedItem) => (
                   <div
-                    key={trial.id}
-                    className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => setLocation(`/trial/${trial.id}`)}
+                    key={item.id}
+                    className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/article/${item.id}`)}
                   >
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <FlaskConical className="h-5 w-5 text-primary" />
+                    <div
+                      className={`p-2 rounded-lg ${
+                        item.type === "clinical_trial"
+                          ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600"
+                          : item.type === "research_article"
+                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600"
+                          : "bg-green-100 dark:bg-green-900/30 text-green-600"
+                      }`}
+                    >
+                      {getTypeIcon(item.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium line-clamp-1">{trial.title}</h4>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                        <Badge variant={trial.status === 'recruiting' ? 'default' : 'secondary'} className="text-xs">
-                          {trial.status === 'recruiting'
-                            ? (language === 'ka' ? 'რეკრუტირება' : 'Recruiting')
-                            : (language === 'ka' ? 'აქტიური' : 'Active')}
+                      <h4 className="font-medium line-clamp-2 mb-1">{item.title}</h4>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Badge variant="secondary" className="text-xs">
+                          {getTypeLabel(item.type)}
                         </Badge>
                         <span>•</span>
-                        <span>{trial.location}</span>
+                        <span>{item.source}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-primary">{trial.match}%</div>
-                      <div className="text-xs text-muted-foreground">{t('feed.matchScore')}</div>
+                      <div className="text-lg font-bold text-purple-600">{item.relevanceScore}%</div>
+                      <div className="text-xs text-muted-foreground">{tr.relevance}</div>
                     </div>
                   </div>
                 ))}
-                <Button variant="ghost" className="w-full" onClick={() => setLocation('/feed')}>
-                  {language === 'ka' ? 'ყველას ნახვა' : 'View All'}
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation('/search')}>
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-blue-500/10">
-                    <Search className="h-6 w-6 text-blue-500" />
+            {/* Recent Questions */}
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-blue-600" />
+                    {tr.recentQuestions}
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600"
+                    onClick={() => setLocation("/questions")}
+                  >
+                    {tr.askQuestion}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {questions.length > 0 ? (
+                  <div className="space-y-3">
+                    {questions.map((q: Question) => (
+                      <div
+                        key={q.id}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50"
+                      >
+                        <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="text-sm line-clamp-2">{q.question}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(q.createdAt).toLocaleDateString()}
+                            </span>
+                            <Badge
+                              variant={q.status === "answered" ? "default" : "secondary"}
+                              className="text-xs"
+                            >
+                              {q.status === "answered" ? tr.answered : tr.pending}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{t('search.title')}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {language === 'ka' ? 'მოძებნეთ ახალი კვლევები' : 'Find new trials'}
-                    </p>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>{tr.noQuestions}</p>
+                    <Button
+                      variant="link"
+                      className="mt-2 text-purple-600"
+                      onClick={() => setLocation("/questions")}
+                    >
+                      {tr.askQuestion}
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation('/profile')}>
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-orange-500/10">
-                    <Upload className="h-6 w-6 text-orange-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{t('profile.uploadForm100')}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {language === 'ka' ? 'AI ანალიზისთვის' : 'For AI analysis'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar - Right column */}
           <div className="space-y-6">
-            {/* Stats Cards */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{t('profile.savedTrials')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-pink-500/10">
-                      <Bookmark className="h-5 w-5 text-pink-500" />
-                    </div>
-                    <div className="text-3xl font-bold">{stats.savedTrials}</div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setLocation('/saved')}>
-                    {language === 'ka' ? 'ნახვა' : 'View'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{t('profile.notifications')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-500/10">
-                      <Bell className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <div className="text-lg font-semibold">
-                        {language === 'ka' ? 'ჩართული' : 'Enabled'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {language === 'ka' ? 'კვირეული დაიჯესტი' : 'Weekly digest'}
-                      </div>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setLocation('/settings')}>
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Deep Search Promo */}
-            <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="h-5 w-5" />
-                  <span className="font-semibold">Deep Search</span>
-                </div>
-                <p className="text-sm opacity-90 mb-4">
-                  {language === 'ka'
-                    ? 'ექსპერტები იპოვიან თქვენთვის იდეალურ კვლევებს'
-                    : 'Let our experts find the perfect trials for you'}
-                </p>
-                <Button variant="secondary" size="sm" className="w-full" onClick={() => setLocation('/pricing')}>
-                  {language === 'ka' ? 'გაიგეთ მეტი' : 'Learn More'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Quick Links */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">
-                  {language === 'ka' ? 'სწრაფი ბმულები' : 'Quick Links'}
-                </CardTitle>
+            {/* Quick Actions */}
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{tr.quickActions}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Link href="/profile">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <User className="h-4 w-4 mr-2" />
-                    {t('nav.profile')}
-                  </Button>
-                </Link>
-                <Link href="/research">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <FlaskConical className="h-4 w-4 mr-2" />
-                    {language === 'ka' ? 'მკვლევარის რეჟიმი' : 'Research Mode'}
-                  </Button>
-                </Link>
-                <Link href="/feed">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <Bell className="h-4 w-4 mr-2" />
-                    {t('nav.feed')}
-                  </Button>
-                </Link>
-                <Link href="/services">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <FileText className="h-4 w-4 mr-2" />
-                    {language === 'ka' ? 'სერვისები' : language === 'ru' ? 'Услуги' : 'Services'}
-                  </Button>
-                </Link>
-                <Link href="/settings">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <Settings className="h-4 w-4 mr-2" />
-                    {t('nav.settings')}
-                  </Button>
-                </Link>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => window.location.href = '/api/logout'}
+                  className="w-full justify-start h-12"
+                  onClick={() => setLocation("/feed")}
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {language === 'ka' ? 'გასვლა' : language === 'ru' ? 'Выход' : 'Log out'}
+                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 mr-3">
+                    <Newspaper className="h-4 w-4 text-purple-600" />
+                  </div>
+                  {tr.browseFeeds}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start h-12"
+                  onClick={() => setLocation("/questions")}
+                >
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 mr-3">
+                    <MessageSquare className="h-4 w-4 text-blue-600" />
+                  </div>
+                  {tr.askAI}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start h-12"
+                  onClick={() => setLocation("/profile")}
+                >
+                  <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30 mr-3">
+                    <Upload className="h-4 w-4 text-orange-600" />
+                  </div>
+                  {tr.uploadForm}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start h-12"
+                  onClick={() => setLocation("/settings")}
+                >
+                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 mr-3">
+                    <Settings className="h-4 w-4 text-slate-600" />
+                  </div>
+                  {tr.settings}
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Saved Items */}
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-pink-100 dark:bg-pink-900/30">
+                      <Bookmark className="h-5 w-5 text-pink-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold">{savedCount}</div>
+                      <div className="text-sm text-muted-foreground">{tr.savedItems}</div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation("/saved")}>
+                    {tr.viewAll}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Subscription Status */}
+            <Card
+              className={`border-0 shadow-lg overflow-hidden ${
+                plan.id === "free"
+                  ? "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900"
+                  : plan.id === "standard"
+                  ? "bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white"
+                  : "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 text-white"
+              }`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  {plan.id === "premium" ? (
+                    <Crown className="h-5 w-5" />
+                  ) : plan.id === "standard" ? (
+                    <Sparkles className="h-5 w-5" />
+                  ) : (
+                    <Zap className="h-5 w-5" />
+                  )}
+                  <span className="font-semibold">{tr.subscription}</span>
+                </div>
+                <div className="text-lg font-bold mb-1">
+                  {language === "ka" ? plan.nameKa : plan.name}
+                </div>
+                <div className="text-sm opacity-90 mb-4">
+                  {questionsRemaining} {tr.questionsLeft}
+                </div>
+                {plan.id === "free" && (
+                  <Button
+                    size="sm"
+                    className="w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700"
+                    onClick={() => setLocation("/pricing")}
+                  >
+                    {tr.upgrade}
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Logout */}
+            <Button
+              variant="outline"
+              className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              onClick={() => (window.location.href = "/api/logout")}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {tr.logout}
+            </Button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

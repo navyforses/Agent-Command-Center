@@ -28,6 +28,8 @@ const TrialDetail = lazy(() => import("@/pages/TrialDetail"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const ResearchFeed = lazy(() => import("@/pages/ResearchFeed"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Questions = lazy(() => import("@/pages/Questions"));
+const SavedItems = lazy(() => import("@/pages/SavedItems"));
 
 // Feature pages (lazy loaded)
 const Therapy = lazy(() => import("@/pages/Therapy"));
@@ -85,6 +87,8 @@ function ProtectedRouter() {
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/feed" component={PatientFeed} />
+        <Route path="/questions" component={Questions} />
+        <Route path="/saved" component={SavedItems} />
         <Route path="/search" component={TrialSearch} />
         <Route path="/trial/:id" component={TrialDetail} />
         <Route path="/profile" component={ProfilePage} />
