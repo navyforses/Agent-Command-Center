@@ -83,11 +83,8 @@ export default function PatientFeed() {
   };
 
   const handleSave = (id: string) => {
-    setFeedItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, is_saved: !item.is_saved } : item
-      )
-    );
+    // TODO: Implement save functionality with API call
+    console.log('Save item:', id);
   };
 
   return (

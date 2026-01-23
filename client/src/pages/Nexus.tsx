@@ -95,11 +95,11 @@ export default function Nexus() {
   };
 
   const getConsensusLabel = (level: string) => {
-    const labels: Record<string, { en: string; ka: string }> = {
-      unanimous: { en: "Unanimous", ka: "ერთხმად" },
-      high: { en: "High", ka: "მაღალი" },
-      moderate: { en: "Moderate", ka: "საშუალო" },
-      low: { en: "Low", ka: "დაბალი" },
+    const labels: Record<string, { en: string; ka: string; ru: string }> = {
+      unanimous: { en: "Unanimous", ka: "ერთხმად", ru: "Единогласно" },
+      high: { en: "High", ka: "მაღალი", ru: "Высокий" },
+      moderate: { en: "Moderate", ka: "საშუალო", ru: "Средний" },
+      low: { en: "Low", ka: "დაბალი", ru: "Низкий" },
     };
     return labels[level]?.[language] || level;
   };

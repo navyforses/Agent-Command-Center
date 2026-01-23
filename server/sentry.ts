@@ -113,12 +113,8 @@ export async function initSentry(app?: Express): Promise<boolean> {
     });
 
     // Setup Express integration if app provided
-    if (app) {
-      // Request handler creates a separate execution context for transactions
-      app.use(Sentry.Handlers.requestHandler());
-      // TracingHandler creates a trace for every incoming request
-      app.use(Sentry.Handlers.tracingHandler());
-    }
+    // Note: Sentry v8 uses automatic instrumentation via OpenTelemetry
+    // No need for explicit request/tracing handlers
 
     sentryInitialized = true;
     console.log("[Sentry] Initialized successfully");
@@ -134,20 +130,23 @@ export async function initSentry(app?: Express): Promise<boolean> {
 // ============================================================================
 
 export function sentryErrorHandler() {
-  if (!Sentry) {
-    // Return a no-op middleware if Sentry is not available
-    return (_err: any, _req: Request, _res: Response, next: NextFunction) => next(_err);
-  }
+  // Return error handler middleware compatible with Sentry v8
+  return (err: any, _req: Request, _res: Response, next: NextFunction) => {
+    if (!Sentry || !sentryInitialized) {
+      return next(err);
+    }
 
-  return Sentry.Handlers.errorHandler({
-    shouldHandleError(error: any) {
-      // Report all 500 errors
-      if (error.statusCode >= 500) return true;
-      // Report unexpected 400 errors (not validation)
-      if (error.statusCode >= 400 && error.code !== "VALIDATION_ERROR") return true;
-      return false;
-    },
-  });
+    // Determine if we should capture this error
+    const shouldCapture =
+      (err.statusCode >= 500) ||
+      (err.statusCode >= 400 && err.code !== "VALIDATION_ERROR");
+
+    if (shouldCapture) {
+      Sentry.captureException(err);
+    }
+
+    next(err);
+  };
 }
 
 // ============================================================================
