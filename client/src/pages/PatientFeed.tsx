@@ -48,6 +48,7 @@ export default function PatientFeed() {
   const { language } = useLanguage();
   const [activeFilters, setActiveFilters] = useState<ContentType[]>([]);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [feedItems, setFeedItems] = useState<FeedItemData[]>([]);
 
   // Fetch trials from API
   const { data: trialsData, isLoading, refetch } = useQuery({
@@ -59,8 +60,9 @@ export default function PatientFeed() {
     },
   });
 
-  // Transform trials to feed items
-  const feedItems: FeedItemData[] = (trialsData?.trials || []).map(transformTrialToFeedItem);
+  useEffect(() => {
+    setFeedItems((trialsData?.trials || []).map(transformTrialToFeedItem));
+  }, [trialsData]);
 
   // Filter items based on active filters
   const filteredItems = activeFilters.length === 0

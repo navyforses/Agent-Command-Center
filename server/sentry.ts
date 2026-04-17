@@ -25,6 +25,15 @@ const APP_VERSION = process.env.APP_VERSION || "1.0.0";
 
 let Sentry: typeof import("@sentry/node") | null = null;
 let nodeProfilingIntegration: typeof import("@sentry/profiling-node").nodeProfilingIntegration | null = null;
+type SentryWithHandlers = typeof import("@sentry/node") & {
+  Handlers?: {
+    requestHandler: () => (req: Request, res: Response, next: NextFunction) => void;
+    tracingHandler: () => (req: Request, res: Response, next: NextFunction) => void;
+    errorHandler: (options?: {
+      shouldHandleError?: (error: any) => boolean;
+    }) => (err: any, req: Request, res: Response, next: NextFunction) => void;
+  };
+};
 
 async function loadSentryModules(): Promise<boolean> {
   try {
@@ -114,10 +123,13 @@ export async function initSentry(app?: Express): Promise<boolean> {
 
     // Setup Express integration if app provided
     if (app) {
-      // Request handler creates a separate execution context for transactions
-      app.use(Sentry.Handlers.requestHandler());
-      // TracingHandler creates a trace for every incoming request
-      app.use(Sentry.Handlers.tracingHandler());
+      const sentryHandlers = (Sentry as SentryWithHandlers).Handlers;
+      if (sentryHandlers) {
+        // Request handler creates a separate execution context for transactions
+        app.use(sentryHandlers.requestHandler());
+        // TracingHandler creates a trace for every incoming request
+        app.use(sentryHandlers.tracingHandler());
+      }
     }
 
     sentryInitialized = true;
@@ -139,7 +151,12 @@ export function sentryErrorHandler() {
     return (_err: any, _req: Request, _res: Response, next: NextFunction) => next(_err);
   }
 
-  return Sentry.Handlers.errorHandler({
+  const sentryHandlers = (Sentry as SentryWithHandlers).Handlers;
+  if (!sentryHandlers) {
+    return (_err: any, _req: Request, _res: Response, next: NextFunction) => next(_err);
+  }
+
+  return sentryHandlers.errorHandler({
     shouldHandleError(error: any) {
       // Report all 500 errors
       if (error.statusCode >= 500) return true;

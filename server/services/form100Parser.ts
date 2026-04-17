@@ -442,7 +442,7 @@ export function generateSearchKeywords(parsedData: ParsedForm100): string[] {
   }
 
   // Remove duplicates and empty strings
-  return [...new Set(keywords.filter((k) => k && k.trim().length > 0))];
+  return Array.from(new Set(keywords.filter((k) => k && k.trim().length > 0)));
 }
 
 // ============================================================================
